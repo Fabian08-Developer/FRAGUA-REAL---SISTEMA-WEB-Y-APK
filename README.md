@@ -88,8 +88,9 @@ reembolso. También agrega a `pagos` cómo se aprobó (`confirmado_via`: pasarel
 `comandas`: lo que se manda a la cocina de cada pedido (inicial, cambios o cancelación), con su estado
 de impresión aparte del pedido, sus intentos e impresiones y una clave única para no duplicarla
 (punto 42). El endurecimiento de seguridad (punto 43) no necesita migración. Pruebas automáticas:
-`php artisan test` (296 en `tests/Feature`, incluida la prueba de un día completo de operación,
-`DiaCompletoTest`).
+`php artisan test` (304 en `tests/Feature`, incluida la prueba de un día completo de operación,
+`DiaCompletoTest`). Pruebas a mano: `PRUEBA-DIA-COMPLETO.md` y una lista por rol
+(`QA-CLIENTE.md`, `QA-MESERO.md` y `QA-ADMINISTRADOR.md`).
 
 ## Decisiones de arquitectura (ADR)
 

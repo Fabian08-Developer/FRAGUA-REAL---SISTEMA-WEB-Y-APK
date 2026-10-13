@@ -6,6 +6,7 @@ import { Minus, Plus, Trash2 } from 'lucide-vue-next'
 import mascota from '@/assets/img/mascota-fragua-real.png'
 import { computed } from 'vue'
 import { useCarritoStore } from '@/stores/carrito'
+import { componentesCombo } from '@/utils/combos'
 import { useCotizacion } from '@/composables/useCotizacion'
 
 const carrito = useCarritoStore()
@@ -52,7 +53,10 @@ function formatoPrecio(valor: number) {
           class="flex items-start gap-4 rounded-2xl border border-[#e2dbcf] bg-white p-4"
         >
           <div class="min-w-0 flex-1">
-            <p class="font-display text-lg text-ink">{{ linea.producto.nombre }}</p>
+            <p class="font-display text-lg text-ink">{{ carrito.nombreLinea(linea) }}</p>
+            <p v-if="linea.combo && componentesCombo(linea.combo)" class="mt-0.5 text-xs text-[#6c655c]">
+              Incluye {{ componentesCombo(linea.combo) }}
+            </p>
             <p v-if="linea.variante" class="mt-0.5 text-xs text-[#6c655c]">{{ linea.variante.nombre }}</p>
             <p v-if="linea.extras.length" class="mt-0.5 text-xs text-[#6c655c]">
               + {{ linea.extras.map((e) => e.nombre).join(', ') }}

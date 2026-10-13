@@ -3,14 +3,16 @@
 // único (la validación del lado servidor es la que manda; aquí solo se
 // refleja el error 422 que devuelva).
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, AtSign, Lock, Mail, Phone, User } from 'lucide-vue-next'
 import BaseInput from '@/components/common/BaseInput.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import { useAuth } from '@/composables/useAuth'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
+import { destinoInterno } from '@/utils/redireccion'
 
 const router = useRouter()
+const route = useRoute()
 const { registrar } = useAuth()
 
 const nombre = ref('')
@@ -36,7 +38,8 @@ async function onSubmit() {
       password: password.value,
       password_confirmation: passwordConfirmation.value,
     })
-    router.push('/')
+    // Revisión por rol (13/10/2026): quien llegó desde el Checkout vuelve a terminar su pedido.
+    router.push(destinoInterno(route.query.redirect) ?? '/')
   } catch (e) {
     erroresCampo.value = erroresDeValidacion(e)
     if (Object.keys(erroresCampo.value).length === 0) {
@@ -116,7 +119,7 @@ async function onSubmit() {
     </BaseButton>
     <p class="text-center text-sm text-[#6c655c]">
       ¿Ya tienes cuenta?
-      <router-link to="/login" class="font-medium text-brand-700 hover:text-brand-800">Inicia sesión</router-link>
+      <router-link :to="{ path: '/login', query: destinoInterno(route.query.redirect) ? { redirect: destinoInterno(route.query.redirect) } : {} }" class="font-medium text-brand-700 hover:text-brand-800">Inicia sesión</router-link>
     </p>
 
     <div class="flex items-center gap-3 pt-1">

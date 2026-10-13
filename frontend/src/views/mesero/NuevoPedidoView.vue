@@ -15,6 +15,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Armchair, Bike, ChevronUp, Minus, Plus, Search, ShoppingBag, ShoppingBasket, X } from 'lucide-vue-next'
 import { catalogoService } from '@/services/catalogo.service'
 import { extrasDe } from '@/utils/extras'
+import { componentesCombo } from '@/utils/combos'
 import { mesaService } from '@/services/mesa.service'
 import { pedidoService, type LineaPedidoPayload } from '@/services/pedido.service'
 import { configuracionService } from '@/services/configuracion.service'
@@ -285,11 +286,13 @@ function agregarAlCarrito() {
     ? {
         key: `combo-${comboActivo.value.id}`,
         nombre: comboActivo.value.nombre,
-        detalle: null,
+        // Revisión por rol (13/10/2026): lo que trae el combo y su nota para cocina.
+        detalle: componentesCombo(comboActivo.value) || null,
         combo_id: comboActivo.value.id,
         extras_ids: [],
         precioUnitario: precioUnitarioActivo.value,
         cantidad: cantidadActiva.value,
+        observaciones: observacionesActivas.value.trim() || undefined,
       }
     : {
         key: `producto-${productoActivo.value!.id}-${varianteActiva.value?.id ?? 0}-${extrasIds.join('.')}`,
@@ -612,6 +615,7 @@ onMounted(() => {
                 </div>
                 <div class="min-w-0 flex-1 sm:flex-none">
                   <p class="font-display text-[17px] font-medium leading-snug text-ink sm:text-lg">{{ combo.nombre }}</p>
+                  <p v-if="componentesCombo(combo)" class="mt-0.5 line-clamp-2 text-xs text-gray-500">{{ componentesCombo(combo) }}</p>
                   <div class="mt-1 flex items-center justify-between gap-2 sm:mt-3 sm:items-baseline">
                     <p class="text-base font-semibold text-ink">{{ formatoPrecio(combo.precio) }}</p>
                     <span
@@ -709,6 +713,12 @@ onMounted(() => {
             <div class="min-h-0 flex-1 overflow-y-auto px-5 pb-5 lg:overflow-visible">
               <p class="font-display text-2xl font-medium leading-tight text-ink">{{ comboActivo?.nombre ?? productoActivo?.nombre }}</p>
               <p v-if="productoActivo?.descripcion" class="mt-2 text-sm text-gray-500">{{ productoActivo.descripcion }}</p>
+              <template v-if="comboActivo && comboActivo.productos?.length">
+                <p class="field-label mt-5">Incluye</p>
+                <ul class="mt-2 space-y-1 text-sm text-gray-600">
+                  <li v-for="p in comboActivo.productos" :key="p.id">{{ p.pivot?.cantidad ?? 1 }} × {{ p.nombre }}</li>
+                </ul>
+              </template>
 
               <template v-if="productoActivo && variantesVendibles(productoActivo).length">
                 <p class="field-label mt-5">Presentación</p>
@@ -756,7 +766,7 @@ onMounted(() => {
                 </div>
               </template>
 
-              <label v-if="productoActivo" class="mt-5 block">
+              <label class="mt-5 block">
                 <span class="field-label">Observaciones para cocina</span>
                 <input
                   v-model="observacionesActivas"

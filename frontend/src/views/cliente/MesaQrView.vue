@@ -19,11 +19,12 @@ import { mesaService } from '@/services/mesa.service'
 import { catalogoService } from '@/services/catalogo.service'
 import { pedidoService } from '@/services/pedido.service'
 import { useCarritoStore } from '@/stores/carrito'
+import { componentesCombo } from '@/utils/combos'
 import { useCotizacion } from '@/composables/useCotizacion'
 import { mensajeDeError } from '@/services/errors'
 import { iconoPorNombre as iconoPara } from '@/utils/iconoCategoria'
 import { etiquetaPromocion, precioConPromocion } from '@/utils/promociones'
-import type { Categoria, Extra, Mesa, Pedido, Producto, Variante } from '@/types/models'
+import type { Categoria, Combo, Extra, Mesa, Pedido, Producto, Variante } from '@/types/models'
 
 const route = useRoute()
 const carrito = useCarritoStore()
@@ -39,22 +40,43 @@ const mesa = ref<Mesa | null>(null)
 const errorMesa = ref('')
 
 // ---- Menú ----
+// Revisión por rol (13/10/2026, RF-M04-020/031): pestaña "Combos" (antes no se ofrecían por QR).
+const CATEGORIA_COMBOS = -1
 const categorias = ref<Categoria[]>([])
 const productos = ref<Producto[]>([])
+const combos = ref<Combo[]>([])
 const cargandoMenu = ref(true)
 const errorMenu = ref('')
 const categoriaActivaId = ref<number | null>(null)
+const enCombos = computed(() => categoriaActivaId.value === CATEGORIA_COMBOS)
 
 const productosDeCategoria = computed(() => productos.value.filter((p) => p.categoria_id === categoriaActivaId.value))
 
 // ---- Personalizar producto (hoja/modal, no un panel aparte — más simple en celular) ----
 const productoAbierto = ref<Producto | null>(null)
+const comboAbierto = ref<Combo | null>(null)
+const modalAbierto = computed(() => Boolean(productoAbierto.value || comboAbierto.value))
 const varianteSeleccionada = ref<Variante | null>(null)
 const extrasSeleccionados = ref<Extra[]>([])
 const cantidadSeleccionada = ref(1)
 const notasSeleccionadas = ref('')
 
+function abrirCombo(combo: Combo) {
+  comboAbierto.value = combo
+  productoAbierto.value = null
+  varianteSeleccionada.value = null
+  extrasSeleccionados.value = []
+  cantidadSeleccionada.value = 1
+  notasSeleccionadas.value = ''
+}
+
+function cerrarModal() {
+  productoAbierto.value = null
+  comboAbierto.value = null
+}
+
 function abrirProducto(producto: Producto) {
+  comboAbierto.value = null
   productoAbierto.value = producto
   varianteSeleccionada.value = producto.variantes?.find((v) => v.activa) ?? null
   extrasSeleccionados.value = []
@@ -69,6 +91,7 @@ function alternarExtra(extra: Extra) {
 }
 
 const precioSeleccion = computed(() => {
+  if (comboAbierto.value) return Number(comboAbierto.value.precio)
   if (!productoAbierto.value) return 0
   return carrito.precioUnitario({
     producto: productoAbierto.value,
@@ -78,15 +101,27 @@ const precioSeleccion = computed(() => {
 })
 
 function confirmarAgregar() {
-  if (!productoAbierto.value) return
-  carrito.agregar({
-    producto: productoAbierto.value,
-    variante: varianteSeleccionada.value,
-    extras: [...extrasSeleccionados.value],
-    cantidad: cantidadSeleccionada.value,
-    notas: notasSeleccionadas.value || undefined,
-  })
-  productoAbierto.value = null
+  if (comboAbierto.value) {
+    carrito.agregar({
+      producto: null,
+      combo: comboAbierto.value,
+      variante: null,
+      extras: [],
+      cantidad: cantidadSeleccionada.value,
+      notas: notasSeleccionadas.value.trim() || undefined,
+    })
+  } else if (productoAbierto.value) {
+    carrito.agregar({
+      producto: productoAbierto.value,
+      variante: varianteSeleccionada.value,
+      extras: [...extrasSeleccionados.value],
+      cantidad: cantidadSeleccionada.value,
+      notas: notasSeleccionadas.value.trim() || undefined,
+    })
+  } else {
+    return
+  }
+  cerrarModal()
 }
 
 // ---- Pasos de la página: menú → carrito → confirmación ----
@@ -143,10 +178,16 @@ onMounted(async () => {
 
   cargandoMenu.value = true
   try {
-    const [resCategorias, resProductos] = await Promise.all([catalogoService.categorias(), catalogoService.productos()])
+    const [resCategorias, resProductos, resCombos] = await Promise.all([
+      catalogoService.categorias(),
+      catalogoService.productos(),
+      // Si los combos no cargan, el resto del menú sigue funcionando.
+      catalogoService.combos().catch(() => ({ data: [] as Combo[] })),
+    ])
     categorias.value = resCategorias.data
     productos.value = resProductos.data
-    categoriaActivaId.value = categorias.value[0]?.id ?? null
+    combos.value = resCombos.data
+    categoriaActivaId.value = categorias.value[0]?.id ?? (combos.value.length ? CATEGORIA_COMBOS : null)
   } catch {
     errorMenu.value = 'No pudimos cargar el menú. Desliza hacia abajo para intentar de nuevo.'
   } finally {
@@ -227,7 +268,10 @@ onMounted(async () => {
             class="flex items-start gap-4 rounded-2xl border border-[#e2dbcf] bg-white p-4"
           >
             <div class="min-w-0 flex-1">
-              <p class="font-display text-base text-ink">{{ linea.producto.nombre }}</p>
+              <p class="font-display text-base text-ink">{{ carrito.nombreLinea(linea) }}</p>
+              <p v-if="linea.combo && componentesCombo(linea.combo)" class="mt-0.5 text-xs text-[#6c655c]">
+                Incluye {{ componentesCombo(linea.combo) }}
+              </p>
               <p v-if="linea.variante" class="mt-0.5 text-xs text-[#6c655c]">{{ linea.variante.nombre }}</p>
               <p v-if="linea.extras.length" class="mt-0.5 text-xs text-[#6c655c]">
                 + {{ linea.extras.map((e) => e.nombre).join(', ') }}
@@ -313,13 +357,52 @@ onMounted(async () => {
               <component :is="iconoPara(categoria.nombre)" :size="15" />
               {{ categoria.nombre }}
             </button>
+            <button
+              v-if="combos.length"
+              type="button"
+              class="flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition"
+              :class="enCombos ? 'border-ink bg-ink text-white' : 'border-[#dfd8cd] bg-white text-[#59534c]'"
+              @click="categoriaActivaId = CATEGORIA_COMBOS"
+            >
+              <component :is="iconoPara('combo')" :size="15" />
+              Combos
+            </button>
           </nav>
 
-          <p v-if="productosDeCategoria.length === 0" class="mt-8 text-sm text-[#6c655c]">
+          <ul v-if="enCombos" class="mt-5 space-y-3">
+            <li
+              v-for="combo in combos"
+              :key="combo.id"
+              class="flex items-center gap-4 rounded-2xl border border-[#e2dbcf] bg-white p-3"
+            >
+              <div
+                class="flex size-16 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#efe8db] to-[#e0d6c2] text-brand-700/60"
+              >
+                <component :is="iconoPara(combo.nombre)" :size="28" :stroke-width="1.5" />
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="font-display text-base text-ink">{{ combo.nombre }}</p>
+                <p v-if="componentesCombo(combo)" class="mt-0.5 line-clamp-2 text-xs text-[#6f685f]">
+                  Incluye {{ componentesCombo(combo) }}
+                </p>
+                <p class="mt-1 text-sm text-ink">{{ formatoPrecio(Number(combo.precio)) }}</p>
+              </div>
+              <button
+                type="button"
+                class="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-500 text-ink transition hover:bg-brand-400"
+                :aria-label="`Agregar ${combo.nombre}`"
+                @click="abrirCombo(combo)"
+              >
+                <Plus :size="18" />
+              </button>
+            </li>
+          </ul>
+
+          <p v-else-if="productosDeCategoria.length === 0" class="mt-8 text-sm text-[#6c655c]">
             No hay productos disponibles en esta categoría por ahora.
           </p>
 
-          <ul class="mt-5 space-y-3">
+          <ul v-if="!enCombos" class="mt-5 space-y-3">
             <li
               v-for="producto in productosDeCategoria"
               :key="producto.id"
@@ -376,18 +459,25 @@ onMounted(async () => {
 
     <!-- Personalizar producto -->
     <BaseModal
-      :model-value="!!productoAbierto"
-      :title="productoAbierto?.nombre ?? ''"
-      @update:model-value="productoAbierto = null"
+      :model-value="modalAbierto"
+      :title="comboAbierto?.nombre ?? productoAbierto?.nombre ?? ''"
+      @update:model-value="cerrarModal"
     >
-      <div v-if="productoAbierto" class="space-y-5">
-        <p v-if="productoAbierto.descripcion" class="text-sm text-[#6c655c]">{{ productoAbierto.descripcion }}</p>
+      <div v-if="modalAbierto" class="space-y-5">
+        <p v-if="productoAbierto?.descripcion" class="text-sm text-[#6c655c]">{{ productoAbierto.descripcion }}</p>
 
-        <div v-if="productoAbierto.variantes?.filter((v) => v.activa).length">
+        <div v-if="comboAbierto">
+          <p class="mb-2 text-xs font-medium text-gray-700">Incluye</p>
+          <ul class="space-y-1 text-sm text-[#6c655c]">
+            <li v-for="p in comboAbierto.productos ?? []" :key="p.id">{{ p.pivot?.cantidad ?? 1 }} × {{ p.nombre }}</li>
+          </ul>
+        </div>
+
+        <div v-if="productoAbierto?.variantes?.filter((v) => v.activa).length">
           <p class="mb-2 text-xs font-medium text-gray-700">Elige la presentación</p>
           <div class="space-y-2">
             <label
-              v-for="variante in productoAbierto.variantes!.filter((v) => v.activa)"
+              v-for="variante in productoAbierto!.variantes!.filter((v) => v.activa)"
               :key="variante.id"
               class="flex items-center justify-between gap-3 rounded-xl border px-4 py-2.5 text-sm"
               :class="varianteSeleccionada?.id === variante.id ? 'border-brand-500 bg-[#fff7e5]' : 'border-gray-200'"
@@ -405,7 +495,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-if="extrasDe(productoAbierto).length">
+        <div v-if="productoAbierto && extrasDe(productoAbierto).length">
           <p class="mb-2 text-xs font-medium text-gray-700">Extras</p>
           <div class="space-y-2">
             <label

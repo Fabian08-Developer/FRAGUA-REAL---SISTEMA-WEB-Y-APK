@@ -8,6 +8,10 @@ otra ventana con el Mesero.
 
 Cada punto cita el requisito oficial en el que se apoya.
 
+Listas hermanas (revisión por rol, 13/10/2026): `QA-CLIENTE.md` (Cliente con cuenta, invitado y
+QR de mesa) y `QA-MESERO.md` (todo el turno del Mesero). Lo que cruza roles se prueba en
+detalle en la lista de quien lo hace; aquí queda lo que ve y controla el Administrador.
+
 ## 0. Configuración (RF-M07-030, RF-M05-028)
 
 La pantalla Administrador > Configuración se construyó el 06/10/2026 (antes el backend ya
@@ -114,6 +118,10 @@ RF-M01-017/024/025, HU-M01-015/020, RNF-TRANS-022/023, RN-USR-12/13.
 - [ ] Precio en cero o un nombre de producto o categoría repetido: mensaje claro bajo el campo.
 - [ ] Cambiar el precio de un producto queda en la auditoría con el valor anterior y el nuevo (RF-M04-022).
 - [ ] Combos: crear con vigencia; se oculta si un componente está agotado (RN-M04-11).
+- [ ] Un combo activo aparece en la pestaña "Combos" del Menú del Cliente, del QR de mesa y de
+      "Nuevo pedido" del Mesero, con lo que incluye ("1 × Hamburguesa Clásica · 1 × Gaseosa
+      400ml"); fuera de su vigencia no aparece en ninguno (RF-M04-020/031 — antes solo el Mesero
+      podía venderlo; ver QA-CLIENTE, secciones 2 y 7).
 - [ ] Promociones: crear, editar y desactivar; cada cambio queda en la auditoría (RF-M04-039/040).
 - [ ] Promoción automática de un producto con 20 %: el menú la marca "−20 %" con el precio tachado,
       y un pedido nuevo de ese producto sale con el descuento (RF-M04-035).
@@ -464,6 +472,7 @@ Antes de probar: `php artisan migrate`. Permitir las ventanas emergentes del sit
 - [ ] Un Cliente no puede abrir `/api/comandas/pendientes` ni el ticket de una comanda (403).
 
 ## 9b. Invitado (sin cuenta)
+Resumen; la lista completa del invitado está en `QA-CLIENTE.md` (secciones 4 a 8).
 - [ ] Pedir una recogida sin iniciar sesión: el Checkout muestra el enlace de seguimiento.
 - [ ] El enlace muestra el pedido "Recibido"; al confirmarlo el Mesero, en máximo 30 segundos pasa a
       "Confirmado" sin recargar (RF-M07-027).
@@ -484,3 +493,8 @@ Antes de probar: `php artisan migrate`. Permitir las ventanas emergentes del sit
 - [ ] Usuarios: cada desactivación queda registrada y se ve en Auditoría (sección 2b).
 - [ ] Cada pantalla en teléfono (ancho ~390 px): sin scroll horizontal ni botones cortados.
 - [ ] Errores del servidor (422/500) muestran un mensaje legible, no una pantalla en blanco.
+- [ ] Ningún mensaje ni texto de pantalla muestra códigos de requisitos ("(RN-M06-03)") ni el
+      texto en inglés de Laravel ("Too Many Attempts.", "This action is unauthorized."); un 500
+      muestra el mensaje genérico de la pantalla (revisión por rol, 13/10/2026).
+- [ ] Con `APP_LOCALE=es` en el `.env` del servidor (ya viene así en `.env.example`), un
+      formulario con un campo obligatorio vacío dice el error en español.

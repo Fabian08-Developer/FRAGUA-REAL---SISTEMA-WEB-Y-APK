@@ -7,6 +7,7 @@ import BaseInput from '@/components/common/BaseInput.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import { useAuth } from '@/composables/useAuth'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
+import { destinoInterno } from '@/utils/redireccion'
 
 const router = useRouter()
 const route = useRoute()
@@ -34,8 +35,7 @@ async function onSubmit() {
   cargando.value = true
   try {
     await login({ login: identificador.value.trim(), password: password.value })
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : rutaSegunRol()
-    router.push(redirect)
+    router.push(destinoInterno(route.query.redirect) ?? rutaSegunRol())
   } catch (e) {
     erroresCampo.value = erroresDeValidacion(e)
     if (Object.keys(erroresCampo.value).length === 0) {
@@ -92,7 +92,7 @@ async function onSubmit() {
     </BaseButton>
     <p class="text-center text-sm text-[#6c655c]">
       ¿Aún no tienes cuenta?
-      <router-link to="/registro" class="font-medium text-brand-700 hover:text-brand-800">Crear cuenta</router-link>
+      <router-link :to="{ path: '/registro', query: destinoInterno(route.query.redirect) ? { redirect: destinoInterno(route.query.redirect) } : {} }" class="font-medium text-brand-700 hover:text-brand-800">Crear cuenta</router-link>
     </p>
 
     <div class="flex items-center gap-3 pt-1">

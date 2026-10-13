@@ -415,7 +415,7 @@ onMounted(() => {
           class="mt-2 field"
         />
       </label>
-      <p class="mt-1 text-xs text-gray-400">Obligatoria solo si el efectivo contado no coincide con el esperado (RF-M06-015/016).</p>
+      <p class="mt-1 text-xs text-gray-400">Obligatoria solo si el efectivo contado no coincide con el esperado.</p>
 
       <p v-if="errorCerrar" class="mt-3 alert-error">{{ errorCerrar }}</p>
 

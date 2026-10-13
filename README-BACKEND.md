@@ -1056,6 +1056,52 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
     - `PRUEBA-DIA-COMPLETO.md` es el mismo recorrido para hacerlo a mano en el navegador, con los
       precios del sembrado y las cifras que deben salir: ventas $125.000, resultado $90.000 y
       efectivo esperado $142.000.
+45. **Revisión manual por rol (13/10/2026), última tarea del plan.** Sin migración. Tres listas de
+    revisión a mano, una por rol, con el formato de `QA-ADMINISTRADOR.md`: `QA-CLIENTE.md` (Cliente
+    con cuenta, invitado y QR de mesa) y `QA-MESERO.md` (el turno completo del Mesero), en la raíz
+    del repositorio; `QA-ADMINISTRADOR.md` se repasó y ahora remite a las otras dos. Al escribirlas
+    se revisó cada pantalla contra el código y los requisitos, y se corrigió lo que apareció:
+    - CORREGIDO: **el Cliente no podía pedir combos** ni en el Menú web ni por el QR de mesa; solo
+      el Mesero los vendía, aunque RF-M04-020 pide el catálogo con combos «para el Cliente» y
+      RF-M04-031 los nombra en los canales Local, QR y Domicilio. El servidor ya los aceptaba
+      (`GET /combos` y `combo_id` en `POST /pedidos`); faltaba el frontend:
+      - pestaña «Combos» en el Menú y en el QR, con lo que incluye cada combo, la nota para cocina
+        y la cantidad;
+      - el carrito (`stores/carrito.ts`) admite líneas de combo;
+      - el Mesero también ve lo que incluye y ahora puede ponerle nota;
+      - `utils/combos.ts` arma el texto «1 × Hamburguesa Clásica · 1 × Gaseosa 400ml».
+      Prueba: `CombosClienteTest` (4).
+    - CORREGIDO: desde «Mis pedidos», el Cliente podía cancelar una reserva con el depósito
+      **pagado en efectivo**, y la caja lo daba por devuelto sin que nadie se lo entregara.
+      `ReservaPolicy::cancelar()` lo rechaza con el mismo mensaje del enlace de la reserva («llama o
+      pasa por el restaurante»), y la pantalla ya no ofrece el botón. Con tarjeta o en línea sigue
+      igual. Prueba nueva en `ReservaPersonalTest`.
+    - CORREGIDO: el **enlace de seguimiento** devolvía el pedido completo: teléfono y correo del
+      cliente, quién del personal hizo cada paso y las notas internas de pagos y revisiones. El
+      enlace se puede reenviar, así que `PedidoController::paraEnlacePublico()` deja solo lo que
+      usa la pantalla. Aplica a `GET /pedidos/seguimiento/{token}` y a su cancelación. El personal
+      sigue viendo todo. Prueba: `EnlaceSeguimientoTest` (3).
+    - CORREGIDO: la **lista de pedidos del Mesero** no se actualizaba sola, aunque decía «Cuando
+      entre uno nuevo aparecerá aquí»; un pedido de la web o del QR solo salía al recargar. Ahora:
+      - se pone al día cada 20 s en «Activos», sin «Cargando…», y al volver a la pestaña;
+      - se detiene mientras hay una ventana abierta o una acción en curso;
+      - avisa «Llegó 1 pedido nuevo.»;
+      - tiene «Actualizar» a mano.
+    - CORREGIDO: **mensajes**:
+      - Varios mensajes del servidor terminan con la regla («… (RN-M06-03).»). Siguen así en la API
+        y en las pruebas; `services/errors.ts` los quita antes de mostrarlos.
+      - Los textos de Laravel que no se traducen («Too Many Attempts.», «This action is
+        unauthorized.», «Server Error») se cambian por uno en español.
+      - Sin conexión, el mensaje lo dice.
+      - Se quitaron 10 códigos que se veían en pantallas del Administrador y en Reservas.
+      - «Contanos» pasó a «Cuéntanos».
+    - CORREGIDO: `.env.example` traía `APP_LOCALE=en`. Un servidor armado desde él mostraba los
+      mensajes de validación en inglés, aunque `lang/es/validation.php` existe. Ahora trae `es`,
+      `es` y `es_CO`.
+    - CORREGIDO: después de crear la cuenta desde el Checkout, el Cliente quedaba en el Inicio.
+      Ahora vuelve a terminar su pedido; `?redirect=` pasa entre «Inicia sesión» y «Crear cuenta».
+      `utils/redireccion.ts` solo acepta rutas internas: un enlace armado con
+      `?redirect=//otro-sitio` no saca a nadie del sitio.
 
 ## Qué falta a propósito
 

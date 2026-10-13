@@ -143,7 +143,7 @@ function cerrarCancelarPedido() {
 async function confirmarCancelarPedido() {
   if (!pedidoACancelar.value) return
   if (!motivoCancelacion.value.trim()) {
-    errorCancelarPedido.value = 'Contanos brevemente el motivo.'
+    errorCancelarPedido.value = 'Cuéntanos brevemente el motivo.'
     return
   }
 
@@ -184,7 +184,13 @@ const ESTADOS_RESERVA: Record<EstadoReserva, { texto: string; clase: string }> =
 // Mesero/Administrador." (ver ReservaPolicy::cancelar() — la autorización fina real vive
 // en el backend; esto solo decide si se muestra el botón).
 function puedeCancelarReserva(reserva: Reserva) {
-  return ['pendiente_pago', 'confirmada'].includes(reserva.estado) && new Date(reserva.fecha_hora) > new Date()
+  return ['pendiente_pago', 'confirmada'].includes(reserva.estado) && new Date(reserva.fecha_hora) > new Date() && !depositoEnEfectivo(reserva)
+}
+
+// Revisión por rol (13/10/2026): un depósito pagado en efectivo se devuelve en el local (igual
+// que en el enlace de la reserva); el servidor también lo rechaza.
+function depositoEnEfectivo(reserva: Reserva) {
+  return reserva.deposito_pagado && reserva.deposito_metodo === 'efectivo'
 }
 
 async function cargarReservas() {
@@ -429,6 +435,12 @@ onMounted(cargarPedidos)
               <XCircle :size="14" />
               Cancelar reserva
             </button>
+            <span
+              v-else-if="depositoEnEfectivo(reserva) && ['pendiente_pago', 'confirmada'].includes(reserva.estado)"
+              class="text-xs text-[#6c655c]"
+            >
+              Pagaste el depósito en el local: para cancelarla, llama o pasa por el restaurante.
+            </span>
           </div>
         </li>
       </ul>
@@ -438,7 +450,7 @@ onMounted(cargarPedidos)
     <div v-if="pedidoACancelar" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div class="w-full max-w-sm rounded-2xl bg-white p-6">
         <h2 class="font-display text-lg text-ink">Cancelar pedido #{{ pedidoACancelar.id }}</h2>
-        <p class="mt-1 text-sm text-[#6c655c]">Contanos brevemente por qué cancelas este pedido.</p>
+        <p class="mt-1 text-sm text-[#6c655c]">Cuéntanos brevemente por qué cancelas este pedido.</p>
         <textarea
           v-model="motivoCancelacion"
           rows="3"

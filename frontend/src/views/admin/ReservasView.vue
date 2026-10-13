@@ -283,7 +283,7 @@ async function crearNueva() {
   if (!n.mesa_id) erroresNueva.value.mesa_id = 'Elige una mesa disponible.'
   if (!n.nombre.trim()) erroresNueva.value.cliente_nombre = 'Escribe el nombre.'
   if (!n.telefono.trim()) erroresNueva.value.cliente_telefono = 'Escribe el teléfono.'
-  if (!n.correo.trim()) erroresNueva.value.cliente_correo = 'Escribe el correo (RN-M05-12).'
+  if (!n.correo.trim()) erroresNueva.value.cliente_correo = 'Escribe el correo.'
   if (Object.keys(erroresNueva.value).length) return
 
   creandoNueva.value = true
@@ -711,7 +711,7 @@ onBeforeUnmount(() => clearInterval(reloj))
         </div>
         <p class="text-xs text-gray-500">
           La reserva queda pendiente hasta registrar el depósito<template v-if="depositoVigente">
-            de {{ formatoPesos.format(depositoVigente) }}</template> en efectivo, tarjeta o transferencia (RN-M05-16).
+            de {{ formatoPesos.format(depositoVigente) }}</template> en efectivo, tarjeta o transferencia.
         </p>
 
         <p v-if="errorNueva" class="alert-error">{{ errorNueva }}</p>

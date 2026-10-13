@@ -108,8 +108,37 @@ class PedidoController extends Controller
     {
         $pedido = Pedido::where('token_publico', $token)->firstOrFail();
 
-        // Fase 6: con el intento en la pasarela de cada pago en línea (estado y si se puede reintentar).
-        return response()->json($pedido->load(['detalles.producto', 'detalles.variante', 'detalles.combo', 'detalles.extras', 'pagos.transaccionPasarela', 'comprobante']));
+        return response()->json($this->paraEnlacePublico($pedido));
+    }
+
+    /**
+     * Lo que ve quien tiene el enlace de seguimiento (el invitado). Fase 6: con el intento en la
+     * pasarela de cada pago en línea (estado y si se puede reintentar).
+     *
+     * Revisión por rol (13/10/2026): el enlace se puede reenviar (a quien pasa a recoger, por
+     * ejemplo), así que ya no lleva el teléfono ni el correo del cliente, ni qué persona del
+     * personal hizo cada paso, ni las notas internas de pagos y revisiones. La pantalla de
+     * seguimiento no usaba nada de eso.
+     */
+    private function paraEnlacePublico(Pedido $pedido): Pedido
+    {
+        $pedido->loadMissing(['detalles.producto', 'detalles.variante', 'detalles.combo', 'detalles.extras', 'pagos.transaccionPasarela', 'comprobante']);
+
+        $pedido->makeHidden([
+            'cliente_id', 'cliente_invitado_telefono', 'cliente_invitado_correo', 'telefono_contacto',
+            'descuento_manual_por', 'confirmado_por', 'listo_por', 'entregado_por', 'recogido_por',
+            'finalizado_por', 'cancelado_por',
+        ]);
+        foreach ($pedido->pagos as $pago) {
+            $pago->makeHidden(['caja_turno_id', 'registrado_por', 'confirmado_por', 'anulado_por', 'anulado_motivo', 'reserva_id']);
+            $pago->transaccionPasarela?->makeHidden([
+                'pagable_type', 'pagable_id', 'requiere_revision', 'motivo_revision', 'revisado_por', 'revisado_at',
+                'reembolso_mensaje',
+            ]);
+        }
+        $pedido->comprobante?->makeHidden(['anulado_motivo', 'impresiones']);
+
+        return $pedido;
     }
 
     public function confirmar(Request $request, Pedido $pedido)
@@ -247,6 +276,6 @@ class PedidoController extends Controller
         abort_if(! in_array($pedido->tipo, ['domicilio', 'recogida'], true), 404);
         abort_if($pedido->estado !== 'pendiente', 422, 'El pedido ya fue confirmado por el restaurante; para cancelarlo comunícate con el local.');
 
-        return response()->json($this->pedidoService->cancelar($pedido, null, $request->motivo));
+        return response()->json($this->paraEnlacePublico($this->pedidoService->cancelar($pedido, null, $request->motivo)));
     }
 }

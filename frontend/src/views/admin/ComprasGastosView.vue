@@ -291,7 +291,7 @@ function abrirAnular(registro: CompraGasto) {
 async function confirmarAnular() {
   if (!registroAAnular.value) return
   if (!motivoAnular.value.trim()) {
-    errorAnular.value = 'El motivo es obligatorio (RN-M03-06).'
+    errorAnular.value = 'El motivo es obligatorio.'
     return
   }
 
@@ -640,7 +640,7 @@ onMounted(() => {
     <BaseModal :model-value="!!registroAAnular" :title="`Anular registro #${registroAAnular?.id ?? ''}`" @update:model-value="registroAAnular = null">
       <div class="space-y-4">
         <p class="text-sm text-gray-600">
-          El registro queda marcado como ANULADO y se excluye de los totales — no se elimina (RN-M03-04/05).
+          El registro queda marcado como ANULADO y se excluye de los totales — no se elimina.
         </p>
         <label class="block">
           <span class="field-label">Motivo</span>

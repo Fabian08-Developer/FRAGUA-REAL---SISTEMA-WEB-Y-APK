@@ -131,7 +131,7 @@ onMounted(() => {
       <div>
         <p class="section-title">Cierre diario</p>
         <p class="mt-0.5 text-xs text-gray-500">
-          Ventas − compras − otros gastos del día. Es un resultado estimado: no es un arqueo de caja ni la utilidad contable (RN-M03-09/10).
+          Ventas − compras − otros gastos del día. Es un resultado estimado: no es un arqueo de caja ni la utilidad contable.
         </p>
       </div>
       <form class="flex items-end gap-2" @submit.prevent="cargar">

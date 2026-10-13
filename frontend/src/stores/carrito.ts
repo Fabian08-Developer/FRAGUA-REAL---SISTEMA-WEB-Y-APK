@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { LineaPedidoPayload } from '@/services/pedido.service'
-import type { Extra, Producto, Variante } from '@/types/models'
+import type { Combo, Extra, Producto, Variante } from '@/types/models'
 
 // M02: carrito del Cliente antes de confirmar el pedido (Local vía QR,
 // Domicilio o Recogida). Precio se congela al confirmar el pedido en el
@@ -10,19 +10,32 @@ import type { Extra, Producto, Variante } from '@/types/models'
 // Cada línea es una selección concreta: producto + variante elegida (si
 // tiene, RN-M04) + extras marcados. Dos líneas del mismo producto con
 // distinta variante/extras NO se combinan — son pedidos distintos.
+//
+// Revisión por rol (13/10/2026, RF-M04-020/031): una línea también puede ser un combo
+// (combo con precio propio, sin variante ni extras; sí con nota para cocina). Antes el Menú y
+// el QR de mesa no ofrecían combos: solo el Mesero podía venderlos.
 export interface LineaCarrito {
   id: string
-  producto: Producto
+  producto: Producto | null
+  combo?: Combo | null
   variante: Variante | null
   extras: Extra[]
   cantidad: number
   notas?: string
 }
 
-function precioUnitario(linea: Pick<LineaCarrito, 'producto' | 'variante' | 'extras'>): number {
+type SeleccionPrecio = Pick<LineaCarrito, 'producto' | 'variante' | 'extras'> & { combo?: Combo | null }
+
+function precioUnitario(linea: SeleccionPrecio): number {
+  if (linea.combo) return Number(linea.combo.precio)
+  if (!linea.producto) return 0
   const base = linea.variante ? Number(linea.variante.precio) : Number(linea.producto.precio_base)
   const extras = linea.extras.reduce((acc, e) => acc + Number(e.precio), 0)
   return base + extras
+}
+
+function nombreLinea(linea: Pick<LineaCarrito, 'producto' | 'combo'>): string {
+  return linea.combo?.nombre ?? linea.producto?.nombre ?? ''
 }
 
 export const useCarritoStore = defineStore('carrito', () => {
@@ -58,13 +71,17 @@ export const useCarritoStore = defineStore('carrito', () => {
   // variante_id/extras_ids/observaciones) — este método no existía, así que confirmar
   // CUALQUIER pedido fallaba con un TypeError antes de llegar siquiera al backend.
   function aLineasPedido(): LineaPedidoPayload[] {
-    return lineas.value.map((l) => ({
-      producto_id: l.producto.id,
-      variante_id: l.variante?.id ?? undefined,
-      cantidad: l.cantidad,
-      extras_ids: l.extras.length ? l.extras.map((e) => e.id) : undefined,
-      observaciones: l.notas || undefined,
-    }))
+    return lineas.value.map((l) =>
+      l.combo
+        ? { combo_id: l.combo.id, cantidad: l.cantidad, observaciones: l.notas || undefined }
+        : {
+            producto_id: l.producto?.id,
+            variante_id: l.variante?.id ?? undefined,
+            cantidad: l.cantidad,
+            extras_ids: l.extras.length ? l.extras.map((e) => e.id) : undefined,
+            observaciones: l.notas || undefined,
+          },
+    )
   }
 
   return {
@@ -76,6 +93,7 @@ export const useCarritoStore = defineStore('carrito', () => {
     quitar,
     vaciar,
     precioUnitario,
+    nombreLinea,
     aLineasPedido,
   }
 })

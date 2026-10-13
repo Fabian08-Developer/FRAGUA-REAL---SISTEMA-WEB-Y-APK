@@ -4,6 +4,9 @@
 // de personalización a la derecha. Datos reales desde GET /categorias y
 // GET /productos (CatalogoController), que ya vienen filtrados a
 // activo+disponible para Cliente (RN-M04-08).
+//
+// Revisión por rol (13/10/2026, RF-M04-020/031): pestaña "Combos" con GET /combos (solo los
+// que hoy se pueden pedir). Antes el Cliente no podía pedir combos ni en la web ni por QR.
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { X } from 'lucide-vue-next'
@@ -12,15 +15,21 @@ import { extrasDe } from '@/utils/extras'
 import { useCarritoStore } from '@/stores/carrito'
 import { iconoPorNombre as iconoPara } from '@/utils/iconoCategoria'
 import { etiquetaPromocion, precioConPromocion } from '@/utils/promociones'
-import type { Categoria, Extra, Producto, Variante } from '@/types/models'
+import { componentesCombo } from '@/utils/combos'
+import type { Categoria, Combo, Extra, Producto, Variante } from '@/types/models'
+
+// Pestaña sintética: no viene del backend.
+const CATEGORIA_COMBOS = -1
 
 const categorias = ref<Categoria[]>([])
 const productos = ref<Producto[]>([])
+const combos = ref<Combo[]>([])
 const cargando = ref(true)
 const error = ref('')
 
 const categoriaActivaId = ref<number | null>(null)
 const productoSeleccionado = ref<Producto | null>(null)
+const comboSeleccionado = ref<Combo | null>(null)
 const varianteSeleccionada = ref<Variante | null>(null)
 const extrasSeleccionados = ref<Extra[]>([])
 const cantidad = ref(1)
@@ -44,12 +53,15 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [resCategorias, resProductos] = await Promise.all([
+    const [resCategorias, resProductos, resCombos] = await Promise.all([
       catalogoService.categorias(),
       catalogoService.productos(),
+      // Si los combos no cargan, el resto del menú sigue funcionando.
+      catalogoService.combos().catch(() => ({ data: [] as Combo[] })),
     ])
     categorias.value = resCategorias.data
     productos.value = resProductos.data
+    combos.value = resCombos.data
 
     // Permite llegar con una categoría preseleccionada, p. ej. desde los
     // accesos rápidos del Home (/menu?categoria=hamburguesas). Coincidencia
@@ -58,7 +70,10 @@ async function cargar() {
     const categoriaPreseleccionada = categoriaQuery
       ? categorias.value.find((c) => c.nombre.toLowerCase().includes(categoriaQuery))
       : null
-    categoriaActivaId.value = categoriaPreseleccionada?.id ?? categorias.value[0]?.id ?? null
+    const pideCombos = categoriaQuery.startsWith('combo') && combos.value.length > 0
+    categoriaActivaId.value = pideCombos
+      ? CATEGORIA_COMBOS
+      : (categoriaPreseleccionada?.id ?? categorias.value[0]?.id ?? (combos.value.length ? CATEGORIA_COMBOS : null))
     seleccionarPrimeroDeCategoria()
   } catch {
     error.value = 'No se pudo cargar el menú. Intenta de nuevo.'
@@ -69,9 +84,17 @@ async function cargar() {
 
 onMounted(cargar)
 
+const enCombos = computed(() => categoriaActivaId.value === CATEGORIA_COMBOS)
+
 const productosDeCategoria = computed(() =>
   productos.value.filter((p) => p.categoria_id === categoriaActivaId.value),
 )
+
+const tituloCategoria = computed(() =>
+  enCombos.value ? 'Combos' : categorias.value.find((c) => c.id === categoriaActivaId.value)?.nombre,
+)
+
+const haySeleccion = computed(() => Boolean(productoSeleccionado.value || comboSeleccionado.value))
 
 function seleccionarCategoria(id: number) {
   categoriaActivaId.value = id
@@ -80,11 +103,30 @@ function seleccionarCategoria(id: number) {
 }
 
 function seleccionarPrimeroDeCategoria() {
+  if (enCombos.value) {
+    seleccionarCombo(combos.value[0] ?? null)
+    return
+  }
   const primero = productosDeCategoria.value[0] ?? null
   seleccionarProducto(primero)
 }
 
+function seleccionarCombo(combo: Combo | null) {
+  comboSeleccionado.value = combo
+  productoSeleccionado.value = null
+  varianteSeleccionada.value = null
+  extrasSeleccionados.value = []
+  cantidad.value = 1
+  notas.value = ''
+}
+
+function elegirCombo(combo: Combo) {
+  seleccionarCombo(combo)
+  mostrarConfiguradorMovil.value = true
+}
+
 function seleccionarProducto(producto: Producto | null) {
+  comboSeleccionado.value = null
   productoSeleccionado.value = producto
   varianteSeleccionada.value = producto?.variantes?.find((v) => v.activa) ?? null
   extrasSeleccionados.value = []
@@ -113,6 +155,7 @@ function alternarExtra(extra: Extra) {
 }
 
 const precioSeleccion = computed(() => {
+  if (comboSeleccionado.value) return Number(comboSeleccionado.value.precio)
   if (!productoSeleccionado.value) return 0
   return carrito.precioUnitario({
     producto: productoSeleccionado.value,
@@ -122,16 +165,29 @@ const precioSeleccion = computed(() => {
 })
 
 function agregarAlPedido() {
-  if (!productoSeleccionado.value) return
-  carrito.agregar({
-    producto: productoSeleccionado.value,
-    variante: varianteSeleccionada.value,
-    extras: [...extrasSeleccionados.value],
-    cantidad: cantidad.value,
-    notas: notas.value || undefined,
-  })
+  if (comboSeleccionado.value) {
+    carrito.agregar({
+      producto: null,
+      combo: comboSeleccionado.value,
+      variante: null,
+      extras: [],
+      cantidad: cantidad.value,
+      notas: notas.value.trim() || undefined,
+    })
+  } else if (productoSeleccionado.value) {
+    carrito.agregar({
+      producto: productoSeleccionado.value,
+      variante: varianteSeleccionada.value,
+      extras: [...extrasSeleccionados.value],
+      cantidad: cantidad.value,
+      notas: notas.value.trim() || undefined,
+    })
+  } else {
+    return
+  }
   cantidad.value = 1
   extrasSeleccionados.value = []
+  notas.value = ''
   mostrarConfiguradorMovil.value = false
 }
 
@@ -169,22 +225,65 @@ function formatoPrecio(valor: number) {
           <component :is="iconoPara(categoria.nombre)" :size="15" />
           {{ categoria.nombre }}
         </button>
+        <button
+          v-if="combos.length"
+          type="button"
+          class="flex shrink-0 items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium transition"
+          :class="
+            enCombos
+              ? 'border-ink bg-ink text-white'
+              : 'border-[#dfd8cd] bg-white text-[#59534c] hover:border-brand-500'
+          "
+          @click="seleccionarCategoria(CATEGORIA_COMBOS)"
+        >
+          <component :is="iconoPara('combo')" :size="15" />
+          Combos
+        </button>
       </nav>
 
       <div class="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]">
         <section>
           <div class="mb-4 flex items-baseline justify-between">
-            <h2 class="font-display text-2xl text-ink">
-              {{ categorias.find((c) => c.id === categoriaActivaId)?.nombre }}
-            </h2>
-            <span class="text-xs text-[#797269]">{{ productosDeCategoria.length }} productos</span>
+            <h2 class="font-display text-2xl text-ink">{{ tituloCategoria }}</h2>
+            <span class="text-xs text-[#797269]">
+              {{ enCombos ? `${combos.length} ${combos.length === 1 ? 'combo' : 'combos'}` : `${productosDeCategoria.length} productos` }}
+            </span>
           </div>
 
-          <p v-if="productosDeCategoria.length === 0" class="text-sm text-[#6c655c]">
+          <div v-if="enCombos" class="grid gap-4 sm:grid-cols-2">
+            <button
+              v-for="combo in combos"
+              :key="combo.id"
+              type="button"
+              class="rounded-2xl border bg-white p-4 text-left transition"
+              :class="
+                comboSeleccionado?.id === combo.id
+                  ? 'border-brand-500 shadow-[0_0_0_2px_rgba(214,164,58,0.14)]'
+                  : 'border-[#e2dbcf] hover:border-brand-300'
+              "
+              @click="elegirCombo(combo)"
+            >
+              <div
+                class="mb-3 flex aspect-[4/3] items-center justify-center rounded-xl bg-gradient-to-br from-[#efe8db] to-[#e0d6c2] text-brand-700/60"
+              >
+                <component :is="iconoPara(combo.nombre)" :size="36" :stroke-width="1.5" />
+              </div>
+              <p class="font-display text-lg text-ink">{{ combo.nombre }}</p>
+              <p v-if="componentesCombo(combo)" class="mt-1 line-clamp-2 text-xs text-[#6f685f]">
+                Incluye {{ componentesCombo(combo) }}
+              </p>
+              <div class="mt-3 flex items-baseline justify-between">
+                <p class="text-base text-ink">{{ formatoPrecio(Number(combo.precio)) }}</p>
+                <span class="border-b border-brand-700 pb-0.5 text-xs font-medium text-brand-700">Elegir</span>
+              </div>
+            </button>
+          </div>
+
+          <p v-else-if="productosDeCategoria.length === 0" class="text-sm text-[#6c655c]">
             No hay productos disponibles en esta categoría por ahora.
           </p>
 
-          <div class="grid gap-4 sm:grid-cols-2">
+          <div v-if="!enCombos" class="grid gap-4 sm:grid-cols-2">
             <button
               v-for="producto in productosDeCategoria"
               :key="producto.id"
@@ -234,14 +333,14 @@ function formatoPrecio(valor: number) {
           leave-to-class="opacity-0"
         >
           <div
-            v-if="productoSeleccionado && mostrarConfiguradorMovil"
+            v-if="haySeleccion && mostrarConfiguradorMovil"
             class="fixed inset-0 z-30 bg-black/40 lg:hidden"
             @click="cerrarConfiguradorMovil"
           />
         </Transition>
 
         <aside
-          v-if="productoSeleccionado"
+          v-if="haySeleccion"
           class="fixed inset-x-0 bottom-0 z-40 flex max-h-[85vh] flex-col rounded-t-3xl border-t border-[#ded7cc] bg-[#fffdf9] shadow-[0_-18px_40px_rgba(53,42,20,0.18)] transition-transform duration-300 ease-out lg:sticky lg:top-24 lg:inset-x-auto lg:bottom-auto lg:z-auto lg:h-fit lg:max-h-none lg:translate-y-0 lg:rounded-2xl lg:border lg:shadow-[0_18px_22.5px_rgba(53,42,20,0.08)]"
           :class="mostrarConfiguradorMovil ? 'translate-y-0' : 'translate-y-full'"
         >
@@ -269,14 +368,20 @@ function formatoPrecio(valor: number) {
             <div
               class="flex aspect-[4/3] items-center justify-center rounded-xl bg-gradient-to-br from-[#efe8db] to-[#e0d6c2] text-brand-700/60"
             >
-              <component :is="iconoPara(productoSeleccionado.nombre)" :size="56" :stroke-width="1.5" />
+              <component :is="iconoPara(comboSeleccionado?.nombre ?? productoSeleccionado?.nombre ?? '')" :size="56" :stroke-width="1.5" />
             </div>
-            <p class="mt-4 font-display text-2xl text-ink">{{ productoSeleccionado.nombre }}</p>
-            <p v-if="productoSeleccionado.descripcion" class="mt-2 text-[13px] leading-relaxed text-[#696158]">
+            <p class="mt-4 font-display text-2xl text-ink">{{ comboSeleccionado?.nombre ?? productoSeleccionado?.nombre }}</p>
+            <p v-if="productoSeleccionado?.descripcion" class="mt-2 text-[13px] leading-relaxed text-[#696158]">
               {{ productoSeleccionado.descripcion }}
             </p>
+            <template v-if="comboSeleccionado">
+              <p class="mt-5 text-xs text-ink">Incluye</p>
+              <ul class="mt-2 space-y-1 text-[13px] text-[#696158]">
+                <li v-for="p in comboSeleccionado.productos ?? []" :key="p.id">{{ p.pivot?.cantidad ?? 1 }} × {{ p.nombre }}</li>
+              </ul>
+            </template>
 
-            <template v-if="productoSeleccionado.variantes?.length">
+            <template v-if="productoSeleccionado?.variantes?.length">
               <p class="mt-5 text-xs text-ink">Elige la presentación</p>
               <div class="mt-2 space-y-2">
                 <label
@@ -304,7 +409,7 @@ function formatoPrecio(valor: number) {
               </div>
             </template>
 
-            <template v-if="extrasDe(productoSeleccionado).length">
+            <template v-if="productoSeleccionado && extrasDe(productoSeleccionado).length">
               <p class="mt-5 text-xs text-ink">Extras</p>
               <div class="mt-2 space-y-2">
                 <label

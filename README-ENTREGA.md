@@ -124,7 +124,9 @@ Endurecimiento del 13/10/2026 (`README-BACKEND.md`, punto 43). En el VPS, despu�
    - SMTP real;
    - `QUEUE_CONNECTION=database`;
    - llaves de Wompi de producción con `WOMPI_AMBIENTE=produccion`;
-   - `CORS_ORIGENES` vacío.
+   - `CORS_ORIGENES` vacío;
+   - `APP_LOCALE=es` (ya viene así en `.env.example` desde el 13/10/2026; con `en`, los errores de
+     los formularios salen en inglés).
 3. Cambiar la contraseña de las cuentas sembradas (admin, mesero y cliente con `password`) o
    desactivarlas.
 4. `composer install --no-dev --optimize-autoloader`, `php artisan config:cache` y
@@ -141,6 +143,9 @@ Endurecimiento del 13/10/2026 (`README-BACKEND.md`, punto 43). En el VPS, despu�
    - Se corrige lo seguro con `npm audit fix`, sin `--force`, y se vuelve a correr `npm run build`.
    - No usar `npm audit fix --force`: instala Tailwind 4, que cambia la configuración y rompería
      los estilos. Pasar a Tailwind 4 sería una tarea aparte.
+7. Recorrer a mano, con el sistema ya en el servidor, `PRUEBA-DIA-COMPLETO.md` y las tres listas
+   por rol: `QA-CLIENTE.md` (desde un teléfono, como lo usará el cliente), `QA-MESERO.md` (en la
+   tableta o el teléfono del Mesero) y `QA-ADMINISTRADOR.md`.
 
 La sesión del navegador se guarda en `localStorage` (decisión del 13/10/2026). Por eso la CSP de
 Nginx solo deja ejecutar el código del propio sitio: no agregar scripts de terceros (analítica,
@@ -165,6 +170,33 @@ Verificado en vivo contra los servidores de desarrollo del usuario
 - **Recuperación de contraseña por correo real** (RF-M01-012/013): probada
   de punta a punta con una cuenta real — el correo llega y el enlace
   precarga el formulario de restablecimiento.
+
+## Revisión por rol (13/10/2026)
+
+Tres listas para revisar a mano, una por rol, con casillas para marcar y la fecha:
+
+- `QA-CLIENTE.md`: Cliente con cuenta, invitado y QR de mesa; 12 secciones.
+- `QA-MESERO.md`: el turno completo del Mesero; 10 secciones.
+- `QA-ADMINISTRADOR.md`: se repasó y ahora remite a las otras dos.
+
+Al escribirlas se cruzó cada pantalla con el código y los requisitos. Lo que apareció quedó
+corregido, con pruebas (`README-BACKEND.md`, punto 45):
+
+- El Cliente ya puede pedir **combos** en el Menú web y por el QR de mesa; antes solo el Mesero
+  los vendía. Cada combo dice lo que incluye y acepta una nota para la cocina.
+- Un Cliente ya no puede cancelar desde "Mis pedidos" una reserva con el depósito pagado en
+  **efectivo**: ese dinero se devuelve en el local.
+- El **enlace de seguimiento** ya no trae el teléfono ni el correo del cliente, ni quién del
+  personal hizo cada paso.
+- La lista de **pedidos del Mesero se actualiza sola** cada 20 segundos y avisa cuando llega un
+  pedido nuevo de la web o del QR.
+- Los **mensajes** ya no muestran códigos de reglas ("(RN-M06-03)") ni textos de Laravel en
+  inglés, y sin internet lo dicen. `.env.example` trae `APP_LOCALE=es`.
+- Después de crear la cuenta o iniciar sesión desde el Checkout, el Cliente **vuelve a su
+  pedido**; los enlaces armados para sacarlo del sitio no funcionan.
+
+Antes de probar en el equipo hay que compilar el frontend (`npm run build` en `frontend`). El
+backend no trae migraciones nuevas.
 
 ## Bug real encontrado y corregido en este cierre
 
@@ -250,7 +282,10 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   cocina impresas desde el navegador, punto 42) la Fase 6 quedó completa el 13/10/2026. Después
   se hizo el endurecimiento de seguridad (punto 43, "Antes de abrir al público") y la prueba de un
   día completo de operación (punto 44): automatizada en `DiaCompletoTest`, y para recorrerla a mano
-  con `PRUEBA-DIA-COMPLETO.md`. Siguen las listas de revisión manual por rol.
+  con `PRUEBA-DIA-COMPLETO.md`. Por último, las listas de revisión manual por rol (punto 45):
+  `QA-CLIENTE.md`, `QA-MESERO.md` y `QA-ADMINISTRADOR.md`, con lo que se corrigió al escribirlas
+  (ver "Revisión por rol" más abajo). Con esto el plan de implementación quedó completo el
+  13/10/2026.
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr

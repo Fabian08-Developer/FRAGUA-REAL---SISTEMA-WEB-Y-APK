@@ -180,4 +180,28 @@ class ReservaPersonalTest extends TestCase
         $this->assertSame('ocupada', $mesa->estado);
         $this->assertNotNull($mesa->ocupada_desde, 'La llegada abre la cuenta de la mesa.');
     }
+
+    // Revisión por rol (13/10/2026): el depósito en efectivo se devuelve en la mano, así que el
+    // Cliente no puede cancelar esa reserva desde "Mis pedidos" (antes sí, y la caja daba el
+    // dinero por devuelto). Con un depósito por tarjeta sí puede.
+    public function test_el_cliente_no_cancela_desde_su_cuenta_una_reserva_con_deposito_en_efectivo(): void
+    {
+        $reserva = $this->reservaConfirmada();
+        $cliente = User::create(['role' => 'cliente', 'nombre' => 'Laura Pérez', 'email' => 'laura@correo.co', 'password' => 'secreto123', 'activo' => true]);
+
+        Sanctum::actingAs($cliente);
+        $this->assertSame([$reserva->id], collect($this->getJson('/api/mis-reservas')->assertOk()->json('data'))->pluck('id')->all());
+        $this->postJson("/api/reservas/{$reserva->id}/cancelar")
+            ->assertForbidden()
+            ->assertJsonPath('message', fn ($m) => str_contains($m, 'llama o pasa por el restaurante'));
+        $this->assertSame('confirmada', $reserva->fresh()->estado);
+        $this->assertFalse((bool) $reserva->fresh()->deposito_reembolsado);
+
+        // Por tarjeta (en otra mesa, para no cruzarse) sí la puede cancelar.
+        Sanctum::actingAs($this->mesero);
+        $id = $this->postJson('/api/reservas', $this->datos(['mesa_id' => $this->otraMesa->id]))->assertCreated()->json('id');
+        $this->postJson("/api/reservas/{$id}/deposito/manual", ['metodo' => 'tarjeta'])->assertOk();
+        Sanctum::actingAs($cliente);
+        $this->postJson("/api/reservas/{$id}/cancelar")->assertOk()->assertJsonPath('estado', 'cancelada');
+    }
 }

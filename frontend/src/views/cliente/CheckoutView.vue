@@ -457,7 +457,7 @@ async function pagarEnLinea() {
           <h2 class="font-display text-lg text-ink">Resumen</h2>
           <ul class="mt-4 space-y-2 text-sm">
             <li v-for="linea in carrito.lineas" :key="linea.id" class="flex justify-between gap-3 text-[#6c655c]">
-              <span>{{ linea.cantidad }}× {{ linea.producto.nombre }}</span>
+              <span>{{ linea.cantidad }}× {{ carrito.nombreLinea(linea) }}</span>
               <span class="shrink-0 text-ink">{{ formatoPrecio(carrito.precioUnitario(linea) * linea.cantidad) }}</span>
             </li>
           </ul>

@@ -148,7 +148,7 @@ onMounted(cargar)
           <div class="min-w-0 flex-1">
             <h2 class="text-[15px] font-semibold text-ink">Valor del domicilio</h2>
             <p class="mt-0.5 text-xs text-gray-500">
-              Valor fijo igual para toda la ciudad, sin zonas ni tarifas por barrio (RN-M07-02). La recogida en el
+              Valor fijo igual para toda la ciudad, sin zonas ni tarifas por barrio. La recogida en el
               local no tiene costo.
             </p>
             <div class="mt-3">
@@ -176,7 +176,7 @@ onMounted(cargar)
           <div class="min-w-0 flex-1">
             <h2 class="text-[15px] font-semibold text-ink">Depósito de reserva</h2>
             <p class="mt-0.5 text-xs text-gray-500">
-              Valor fijo obligatorio para toda reserva, sin importar el número de personas (RN-M05-14). Se reembolsa
+              Valor fijo obligatorio para toda reserva, sin importar el número de personas. Se reembolsa
               si se cancela a tiempo, se retiene si hay no-show y se abona al pedido si el cliente llega.
             </p>
             <div class="mt-3">

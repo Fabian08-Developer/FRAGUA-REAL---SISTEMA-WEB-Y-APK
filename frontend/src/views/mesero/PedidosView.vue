@@ -8,8 +8,8 @@
 // muestra su historial (HU-M02-020). Fase 2: descuento manual con motivo (RF-M04-036, HU-M04-015).
 // Fase 4, tarea 5: «Listo para recoger» avisa al cliente por correo (RF-M07-R-012).
 // Fase 6, tarea 2: confirmar abre la comanda para imprimir y cada pedido muestra la suya (D5).
-import { computed, onMounted, ref, watch } from 'vue'
-import { Check, ChevronDown, History, Pencil, Percent, Plus, ShoppingBasket } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Check, ChevronDown, History, Pencil, Percent, Plus, RefreshCw, ShoppingBasket } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -87,9 +87,13 @@ const pedidosFiltrados = computed(() =>
   }),
 )
 
-async function cargar() {
-  cargando.value = true
-  error.value = ''
+async function cargar(opciones: { silencioso?: boolean } = {}) {
+  const silencioso = opciones.silencioso === true
+  if (!silencioso) {
+    cargando.value = true
+    error.value = ''
+  }
+  const pendientesAntes = new Set(pedidos.value.filter((p) => p.estado === 'pendiente').map((p) => p.id))
   try {
     // Cada pestaña pide al servidor lo suyo: antes se traían solo los 20 pedidos más recientes
     // y los activos más viejos podían quedar fuera de la lista.
@@ -100,11 +104,42 @@ async function cargar() {
     const { data } = await pedidoService.index(params)
     pedidos.value = data.data
     if (filtroEstado.value === 'activos') conteoActivos.value = data.total
+    if (silencioso) {
+      const nuevos = data.data.filter((p) => p.estado === 'pendiente' && !pendientesAntes.has(p.id)).length
+      if (nuevos) avisoNuevos.value = nuevos === 1 ? 'Llegó 1 pedido nuevo.' : `Llegaron ${nuevos} pedidos nuevos.`
+    } else {
+      avisoNuevos.value = ''
+    }
   } catch (e) {
-    error.value = mensajeDeError(e, 'No pudimos cargar los pedidos.')
+    // En la actualización automática un corte de red no interrumpe al Mesero: se reintenta sola.
+    if (!silencioso) error.value = mensajeDeError(e, 'No pudimos cargar los pedidos.')
   } finally {
-    cargando.value = false
+    if (!silencioso) cargando.value = false
   }
+}
+
+// Revisión por rol (13/10/2026): los pedidos que llegan por la web o por el QR de una mesa
+// aparecen solos. Antes la lista solo cambiaba al recargar la página, aunque decía "Cuando entre
+// uno nuevo aparecerá aquí". Se actualiza cada 20 s en la pestaña Activos, sin "Cargando…", y
+// se detiene mientras el Mesero tiene abierta una ventana (editar, descuento, historial,
+// cancelar) o está confirmando algo, para no cambiarle el pedido en medio de una acción.
+const REFRESCO_MS = 20000
+const avisoNuevos = ref('')
+let temporizador: ReturnType<typeof setInterval> | null = null
+
+function hayAccionEnCurso() {
+  return Boolean(
+    pedidoACancelar.value || editandoId.value || descuentoId.value || historialId.value || procesando.value !== null,
+  )
+}
+
+function refrescarEnSilencio() {
+  if (document.hidden || cargando.value || filtroEstado.value !== 'activos' || hayAccionEnCurso()) return
+  void cargar({ silencioso: true })
+}
+
+function alVolverALaPestana() {
+  if (!document.hidden) refrescarEnSilencio()
 }
 
 watch(filtroEstado, () => {
@@ -266,7 +301,16 @@ async function confirmarCancelar() {
   }
 }
 
-onMounted(cargar)
+onMounted(() => {
+  void cargar()
+  temporizador = setInterval(refrescarEnSilencio, REFRESCO_MS)
+  document.addEventListener('visibilitychange', alVolverALaPestana)
+})
+
+onBeforeUnmount(() => {
+  if (temporizador) clearInterval(temporizador)
+  document.removeEventListener('visibilitychange', alVolverALaPestana)
+})
 </script>
 
 <template>
@@ -281,6 +325,10 @@ onMounted(cargar)
              ver views/mesero/NuevoPedidoView.vue. Ancho completo y alto en teléfono para
              que sea fácil de tocar. Desde la Fase 1 también registra domicilios y recogidas
              pedidos por teléfono (se elige el canal en el primer paso). -->
+        <BaseButton variant="ghost" :disabled="cargando" @click="cargar()">
+          <RefreshCw :size="16" class="mr-1.5" />
+          Actualizar
+        </BaseButton>
         <router-link
           :to="{ name: 'mesero-nuevo-pedido' }"
           class="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-3 text-sm font-semibold text-ink shadow-gold transition-all duration-150 hover:-translate-y-0.5 hover:bg-brand-400 active:scale-[0.98] sm:min-h-11"
@@ -325,6 +373,10 @@ onMounted(cargar)
     </div>
 
     <p v-if="error" class="mt-4 alert-error">{{ error }}</p>
+    <p v-if="avisoNuevos && filtroEstado === 'activos'" class="mt-4 alert-info flex items-center justify-between gap-3">
+      <span>{{ avisoNuevos }}</span>
+      <button type="button" class="text-xs font-semibold underline" @click="avisoNuevos = ''">Entendido</button>
+    </p>
 
     <div v-if="cargando" class="loading-state">Cargando pedidos…</div>
 
