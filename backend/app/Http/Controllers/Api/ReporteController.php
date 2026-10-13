@@ -5,17 +5,22 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\ReporteExportRequest;
 use App\Http\Requests\Api\ReporteFiltroRequest;
+use App\Models\ReporteExportacion;
 use App\Services\ReporteExportService;
 use App\Services\ReporteService;
 use App\Support\Reportes\PeriodoReporte;
 use Closure;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use RuntimeException;
 
 /**
  * M08 — Reportes (ADR-006: sin tablas propias, solo lectura — RN-M08-01/02). Este
  * Controller resuelve el periodo (RF-M08-001, RN-M08-03), delega el cálculo de cada
  * reporte a ReporteService, arma la comparación contra el periodo anterior cuando se pide
  * (RF-M08-010) y la exportación a PDF/Excel con su auditoría (RF-M08-011/012/014).
+ * Fase 5, tarea 3: la única tabla de M08 es `reporte_exportaciones`, el archivo de los documentos
+ * ya exportados (RNF-M08-006); no guarda una copia de los datos de otros módulos.
  */
 class ReporteController extends Controller
 {
@@ -60,43 +65,55 @@ class ReporteController extends Controller
         return $this->responder($request, fn ($d, $h) => $this->reporteService->usoDeMesas($d, $h));
     }
 
-    // RF-M08-011/012: exporta el reporte pedido; RF-M08-014: deja auditoría de la exportación.
+    /**
+     * RF-M08-011/012/014, RNF-M08-006 (Fase 5, tarea 3): genera el PDF o el Excel (.xlsx) del reporte
+     * que está en pantalla, lo guarda, lo audita y lo entrega. Queda en "Exportaciones guardadas"
+     * para volver a descargarlo tal cual (X-Exportacion-Id dice cuál es).
+     */
     public function exportar(ReporteExportRequest $request)
     {
         $periodo = PeriodoReporte::resolver($request->periodoElegido(), $request->desde, $request->hasta);
-        $datos = $this->calcular($request->reporte, $periodo, $request->integer('limite', 10));
-        $tabla = $this->reporteService->aTabla($request->reporte, $datos);
+        $exportacion = $this->exportService->exportar(
+            $request->reporte, $request->formato, $periodo, $request->boolean('comparar'), $request->integer('limite', 10), $request->user(),
+        );
 
-        $this->reporteService->registrarExportacion($request->reporte, $periodo->aArray(), $request->formato, $request->user());
-
-        if ($request->formato === 'excel') {
-            $contenido = $this->exportService->generarExcel($tabla['encabezados'], $tabla['filas']);
-
-            return response($contenido, 200, [
-                'Content-Type' => 'text/csv',
-                'Content-Disposition' => "attachment; filename=\"{$request->reporte}.csv\"",
-            ]);
-        }
-
-        $lineas = array_map(fn ($fila) => implode(' | ', $fila), $tabla['filas']);
-        $contenido = $this->exportService->generarPdf($request->reporte, $lineas);
-
-        return response($contenido, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => "attachment; filename=\"{$request->reporte}.pdf\"",
-        ]);
+        return $this->entregar($exportacion, $request, false);
     }
 
-    private function calcular(string $reporte, PeriodoReporte $periodo, int $limite): array
+    // RNF-M08-006: las exportaciones guardadas, de la más reciente a la más antigua.
+    public function exportaciones(Request $request): JsonResponse
     {
-        return match ($reporte) {
-            'ventas-totales' => $this->reporteService->ventasTotales($periodo->desde, $periodo->hasta),
-            'ventas-por-producto' => $this->reporteService->ventasPorProductoYCategoria($periodo->desde, $periodo->hasta, $limite),
-            'ventas-por-tipo-y-metodo' => $this->reporteService->ventasPorTipoYMetodo($periodo->desde, $periodo->hasta),
-            'compras-y-gastos' => $this->reporteService->comprasYGastos($periodo->desdeFecha, $periodo->hastaFecha),
-            'resultado-operativo' => $this->reporteService->resultadoOperativo($periodo->desdeFecha, $periodo->hastaFecha),
-            'uso-de-mesas' => $this->reporteService->usoDeMesas($periodo->desde, $periodo->hasta),
-        };
+        abort_if(! $request->user()->esAdministrador(), 403);
+
+        return response()->json(
+            ReporteExportacion::with('generadoPorUsuario:id,nombre')->latest('id')->paginate(min(max($request->integer('per_page', 20), 1), 50))
+        );
+    }
+
+    // RNF-M08-006: descarga el archivo tal como se generó, sin recalcular nada.
+    public function descargar(Request $request, ReporteExportacion $exportacion)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+
+        return $this->entregar($exportacion, $request, true);
+    }
+
+    // $descarga: false al exportar (se entrega el archivo recién generado); true al volver a
+    // descargar uno guardado, que suma y queda en la auditoría.
+    private function entregar(ReporteExportacion $exportacion, Request $request, bool $descarga)
+    {
+        try {
+            $contenido = $this->exportService->contenidoGuardado($exportacion, $descarga ? $request->user() : null);
+        } catch (RuntimeException $e) {
+            abort(410, $e->getMessage());
+        }
+
+        return response($contenido, 200, [
+            'Content-Type' => ReporteExportService::tipoContenido($exportacion->formato),
+            'Content-Disposition' => "attachment; filename=\"{$exportacion->nombre_archivo}\"",
+            'X-Exportacion-Id' => (string) $exportacion->id,
+            'Access-Control-Expose-Headers' => 'Content-Disposition, X-Exportacion-Id',
+        ]);
     }
 
     // RN-M08-03/04/05: resuelve el periodo, calcula el reporte y, si se pide (RF-M08-010),

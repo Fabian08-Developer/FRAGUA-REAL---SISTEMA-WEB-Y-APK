@@ -22,6 +22,7 @@ import {
   type PeriodoElegido,
   type PeriodoReporte,
   type ReporteExportable,
+  type ReporteExportacion,
   type ResultadoOperativoReporte,
   type UsoDeMesasPorEstado,
   type UsoDeMesasReporte,
@@ -33,6 +34,7 @@ import {
   type VentasTotalesReporte,
 } from '@/services/reporte.service'
 import { mensajeDeError } from '@/services/errors'
+import { guardarArchivo, mensajeDeBlob } from '@/utils/documentos'
 
 function hoy() {
   const d = new Date()
@@ -157,25 +159,50 @@ async function exportar(formato: 'pdf' | 'excel') {
     const hasta = periodoElegido.value === 'personalizado' ? hastaPersonalizado.value : undefined
     const limite = reporteAExportar.value === 'ventas-por-producto' ? 5 : undefined
 
-    const respuesta = await reporteService.exportar(reporteAExportar.value, formato, periodoElegido.value, desde, hasta, limite)
+    const respuesta = await reporteService.exportar(reporteAExportar.value, formato, periodoElegido.value, desde, hasta, limite, comparar.value)
 
     const disposicion = (respuesta.headers?.['content-disposition'] as string | undefined) ?? ''
     const coincidencia = disposicion.match(/filename="?([^"]+)"?/)
     const nombreArchivo = coincidencia?.[1] ?? `${reporteAExportar.value}.${formato === 'pdf' ? 'pdf' : 'xlsx'}`
-
-    const url = URL.createObjectURL(new Blob([respuesta.data]))
-    const enlace = document.createElement('a')
-    enlace.href = url
-    enlace.download = nombreArchivo
-    document.body.appendChild(enlace)
-    enlace.click()
-    document.body.removeChild(enlace)
-    URL.revokeObjectURL(url)
+    guardarArchivo(respuesta.data, nombreArchivo)
+    await cargarExportaciones()
   } catch (e) {
-    error.value = mensajeDeError(e, 'No se pudo exportar el reporte.')
+    error.value = await mensajeDeBlob(e, 'No se pudo exportar el reporte.')
   } finally {
     exportando.value = false
   }
+}
+
+// ---- Fase 5, tarea 3 (RNF-M08-006): exportaciones guardadas, se descargan tal cual se generaron ----
+const exportaciones = ref<ReporteExportacion[]>([])
+const descargando = ref<number | null>(null)
+const errorExportaciones = ref('')
+const NOMBRE_REPORTE = Object.fromEntries(opcionesExportar.map((o) => [o.v, o.etiqueta])) as Record<ReporteExportable, string>
+
+async function cargarExportaciones() {
+  try {
+    exportaciones.value = (await reporteService.exportaciones()).data.data
+  } catch {
+    exportaciones.value = []
+  }
+}
+
+async function descargarGuardada(exportacion: ReporteExportacion) {
+  descargando.value = exportacion.id
+  errorExportaciones.value = ''
+  try {
+    const { data } = await reporteService.descargarExportacion(exportacion.id)
+    guardarArchivo(data, exportacion.nombre_archivo)
+    exportacion.descargas++
+  } catch (e) {
+    errorExportaciones.value = await mensajeDeBlob(e, 'No se pudo descargar el archivo.')
+  } finally {
+    descargando.value = null
+  }
+}
+
+function fechaHora(valor: string) {
+  return new Date(valor).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })
 }
 
 function elegirPeriodo(v: PeriodoElegido) {
@@ -183,7 +210,10 @@ function elegirPeriodo(v: PeriodoElegido) {
   if (v !== 'personalizado') cargar()
 }
 
-onMounted(cargar)
+onMounted(() => {
+  cargar()
+  cargarExportaciones()
+})
 
 // RF-M08-004: más y menos vendidos ya vienen separados del backend, sobre el mismo
 // listado de productos — aquí solo se normaliza el ancho de la barra contra el máximo de
@@ -706,5 +736,34 @@ const maxOcupacionPorMesa = computed(() =>
         </div>
       </div>
     </template>
+
+    <!-- Fase 5, tarea 3 (RNF-M08-006): lo exportado queda guardado y se vuelve a descargar tal cual. -->
+    <section v-if="exportaciones.length" class="card mt-6 p-4 sm:p-5">
+      <p class="section-title">Exportaciones guardadas</p>
+      <p class="mt-0.5 text-xs text-gray-500">
+        Se descargan tal como se generaron, con las cifras de ese momento (el archivo dice cuándo y quién lo generó).
+        Cada descarga queda en la auditoría.
+      </p>
+      <p v-if="errorExportaciones" class="alert-error mt-3">{{ errorExportaciones }}</p>
+      <ul class="mt-3 divide-y divide-gray-100">
+        <li v-for="x in exportaciones" :key="x.id" class="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-w-0 text-sm">
+            <p class="font-semibold text-ink">
+              {{ NOMBRE_REPORTE[x.reporte] ?? x.reporte }}
+              <span class="ml-1 badge bg-gray-100 text-gray-700 ring-gray-500/20">{{ x.formato === 'excel' ? 'Excel' : 'PDF' }}</span>
+              <span v-if="x.comparar" class="ml-1 badge bg-sky-50 text-sky-700 ring-sky-600/20">con comparación</span>
+              <span v-if="x.parcial" class="ml-1 badge bg-amber-50 text-amber-700 ring-amber-600/20">parcial</span>
+            </p>
+            <p class="mt-0.5 text-xs text-gray-500">
+              {{ formatoFecha(x.desde) }} – {{ formatoFecha(x.hasta) }} · generado {{ fechaHora(x.created_at) }}
+              por {{ x.generado_por_usuario?.nombre ?? '—' }}<template v-if="x.descargas"> · descargado {{ x.descargas === 1 ? '1 vez' : `${x.descargas} veces` }} más</template>
+            </p>
+          </div>
+          <BaseButton variant="secondary" size="sm" :disabled="descargando === x.id" @click="descargarGuardada(x)">
+            {{ descargando === x.id ? 'Descargando…' : 'Descargar' }}
+          </BaseButton>
+        </li>
+      </ul>
+    </section>
   </div>
 </template>

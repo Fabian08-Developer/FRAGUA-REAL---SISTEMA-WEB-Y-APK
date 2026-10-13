@@ -803,6 +803,35 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
     - Frontend: en un día cerrado, Compras y gastos > Cierre diario tiene "Imprimir / PDF del
       cierre" (luego "Reimprimir PDF del cierre", con aviso); en un día sin cerrar queda
       "Imprimir vista previa" (impresión del navegador) y la hoja dice que es una vista previa.
+39. **Fase 5, tarea 3 (13/10/2026): exportación real de reportes (M08).** RF-M08-011, 012, 014,
+    RNF-M08-006, HU-M08-009, 010, CA-M08-009, 010. Nueva dependencia
+    `phpoffice/phpspreadsheet` ^5.0. Migración `2026_10_19_000004` (tabla `reporte_exportaciones`);
+    7 pruebas en `ExportacionReportesTest` (una solo corre en PostgreSQL).
+    - CORREGIDO: el "Excel" era un CSV y el PDF una sola página armada a mano que se cortaba.
+    - `ReporteExportService::documento()` arma el documento con el mismo cálculo de la pantalla
+      (`ReporteService::calcular()`, que también usan las rutas de cada reporte): título, periodo en
+      letras, marca de parcial (RN-M08-05), resumen con nombres en español, la comparación con el
+      periodo anterior si la pantalla compara (`comparar`, RF-M08-010) y las tablas del detalle
+      (más y menos vendidos con el mismo tope de la pantalla, por categoría, todos los productos,
+      por tipo de venta, por método de pago, compras y gastos por categoría, reservas por estado y
+      ocupación por mesa). Reemplaza a `ReporteService::aTabla()`.
+    - PDF (`resources/views/reportes/pdf.blade.php`, carta): las páginas que haga falta, encabezados
+      de tabla repetidos, "Página n de m" (`App\Support\Documentos\PiePagina`, también la usa el
+      cierre) y al pie quién lo generó y cuándo.
+    - Excel `.xlsx` real: hoja "Resumen" (con la comparación y la nota del resultado operativo) y
+      una hoja por tabla, con valores numéricos, formato de pesos, encabezados fijos y filtros.
+    - RNF-M08-006: cada archivo se guarda en el disco privado (`storage/app/private/reportes/...`) y
+      queda en `reporte_exportaciones` (reporte, formato, periodo, parcial, comparar, archivo,
+      quién, descargas). `GET /reportes/exportaciones` las lista y
+      `GET /reportes/exportaciones/{id}/descargar` entrega el mismo archivo, sin recalcular; cada
+      descarga posterior suma y queda en la auditoría (`descargar_reporte`). Si el archivo ya no
+      está en el servidor responde 410 con el motivo. La exportación sigue auditada como
+      `exportar_reporte`, ahora con el id del archivo y si comparaba.
+    - Sobre la regla de reimpresión: un archivo guardado no se puede marcar "REIMPRESIÓN" sin
+      regenerarlo, y RNF-M08-006 pide no regenerarlo. Por eso cada documento dice cuándo y quién lo
+      generó, y cada descarga queda registrada.
+    - Frontend: Reportes exporta con la comparación de la pantalla y muestra "Exportaciones
+      guardadas" con "Descargar"; `utils/documentos.ts` gana `guardarArchivo()`.
 
 ## Qué falta a propósito
 
@@ -825,7 +854,7 @@ brechas de documentación, solo de implementación técnica):
 - **Alta de Administrador/Mesero**: RESUELTO. `UsuarioController` (solo Administrador) lista, crea
   cuentas de Mesero/Administrador, las activa/desactiva y revoca sus sesiones (RF-M01-001).
   `AuthController::register()` solo expone el autorregistro de Cliente (RF-M01-014).
-- **Exportación real de reportes (M08)**: documentado como pendiente en
+- **Exportación real de reportes (M08)**: RESUELTO (13/10/2026, punto 39). Antes: documentado como pendiente en
   `M08_Reportes_e_Informes_Fragua_Real.docx` sección 16 ("Definir el formato exacto y la
   plantilla visual de los archivos exportados"), sobre la base de RF-M08-011/012.
   `ReporteExportService` genera un Excel como CSV real (`fputcsv`, Excel lo abre
@@ -833,7 +862,8 @@ brechas de documentación, solo de implementación técnica):
   formato) y un PDF real de una sola página sin dependencias externas (un reporte más largo
   se trunca — falta paginación real y una librería como `dompdf`).
 - **Caché de reportes de periodos ya cerrados**: recomendación de arquitectura explícita en
-  `M08...docx` sección 15; hoy cada consulta recalcula.
+  `M08...docx` sección 15; la pantalla sigue recalculando cada consulta (los archivos exportados sí
+  quedan guardados desde el punto 39).
 - **Generación asíncrona de exportaciones**: recomendación de arquitectura explícita en
   `M08...docx` sección 15; hoy `/reportes/exportar` genera el archivo de forma síncrona.
 - **`DomicilioController` dedicado**: no hace falta — M07 vive dentro de `PedidoController`

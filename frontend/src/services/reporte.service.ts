@@ -174,6 +174,22 @@ export type ReporteExportable =
   | 'resultado-operativo'
   | 'uso-de-mesas'
 
+// Fase 5, tarea 3 (RNF-M08-006): un reporte exportado y guardado, para volver a descargarlo tal cual.
+export interface ReporteExportacion {
+  id: number
+  reporte: ReporteExportable
+  formato: 'pdf' | 'excel'
+  desde: string
+  hasta: string
+  parcial: boolean
+  comparar: boolean
+  nombre_archivo: string
+  bytes: number
+  descargas: number
+  created_at: string
+  generado_por_usuario?: { id: number; nombre: string } | null
+}
+
 // Arma los params de periodo que todos los endpoints de /reportes comparten (RF-M08-001),
 // más 'comparar' (RF-M08-010) cuando se pide.
 function paramsDePeriodo(periodo: PeriodoElegido, desde?: string, hasta?: string, comparar?: boolean) {
@@ -238,17 +254,26 @@ export const reporteService = {
     periodo: PeriodoElegido,
     desde?: string,
     hasta?: string,
-    limite?: number
+    limite?: number,
+    comparar?: boolean
   ) {
-    return api.post(
+    // Fase 5, tarea 3: si la pantalla compara con el periodo anterior, el archivo también.
+    return api.post<Blob>(
       '/reportes/exportar',
       {
         reporte,
         formato,
-        ...paramsDePeriodo(periodo, desde, hasta),
+        ...paramsDePeriodo(periodo, desde, hasta, comparar),
         ...(limite ? { limite } : {}),
       },
       { responseType: 'blob' }
     )
+  },
+  // RNF-M08-006: las exportaciones guardadas y la descarga del archivo tal como se generó.
+  exportaciones() {
+    return api.get<{ data: ReporteExportacion[] }>('/reportes/exportaciones')
+  },
+  descargarExportacion(id: number) {
+    return api.get<Blob>(`/reportes/exportaciones/${id}/descargar`, { responseType: 'blob' })
   },
 }

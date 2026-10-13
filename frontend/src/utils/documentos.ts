@@ -14,6 +14,18 @@ export async function mensajeDeBlob(e: unknown, fallback: string): Promise<strin
   return fallback
 }
 
+/** Descarga un archivo (Excel, PDF) con su nombre. */
+export function guardarArchivo(data: Blob, nombre: string) {
+  const url = URL.createObjectURL(data)
+  const enlace = document.createElement('a')
+  enlace.href = url
+  enlace.download = nombre
+  document.body.appendChild(enlace)
+  enlace.click()
+  document.body.removeChild(enlace)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 /** Abre el PDF en otra pestaña. Lanza Error con un mensaje legible si no se pudo. */
 export async function abrirPdf(pedir: () => Promise<{ data: Blob }>, fallback = 'No pudimos abrir el documento. Intenta de nuevo.') {
   // La pestaña se abre antes de pedir el archivo para que el navegador no la bloquee.

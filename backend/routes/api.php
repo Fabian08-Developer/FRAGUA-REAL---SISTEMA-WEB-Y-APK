@@ -297,5 +297,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::get('/reportes/resultado-operativo', [ReporteController::class, 'resultadoOperativo']);
         Route::get('/reportes/uso-de-mesas', [ReporteController::class, 'usoDeMesas']);
         Route::post('/reportes/exportar', [ReporteController::class, 'exportar']);
+        // Fase 5, tarea 3 (RNF-M08-006): exportaciones guardadas y su descarga sin regenerar.
+        Route::get('/reportes/exportaciones', [ReporteController::class, 'exportaciones']);
+        Route::get('/reportes/exportaciones/{exportacion}/descargar', [ReporteController::class, 'descargar']);
     });
 });

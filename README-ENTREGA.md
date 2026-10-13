@@ -35,6 +35,7 @@ cd backend
 composer install
 # Desde la Fase 5 (13/10/2026) el backend usa barryvdh/laravel-dompdf para los PDF. La primera vez
 # después de actualizar: composer update barryvdh/laravel-dompdf --with-all-dependencies
+# y, desde la tarea 3 (Excel .xlsx): composer update phpoffice/phpspreadsheet --with-all-dependencies
 # .env ya configurado (PostgreSQL + SMTP real para recuperación de contraseña)
 php artisan migrate --seed
 php artisan serve
@@ -145,7 +146,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 13/10/2026 van 479 de 579 verificables, 83 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 13/10/2026 van 484 de 579 verificables, 84 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -172,7 +173,9 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   la decisión D3 hasta elegir proveedor.
 - La Fase 5 empezó el 13/10/2026 con la tarea 1 (comprobante de pago): ver `README-BACKEND.md`,
   punto 36, con la reimpresión controlada que pediste el mismo día (punto 37) y con la tarea 2
-  (cierre diario impreso y en PDF, punto 38). Trae una dependencia nueva de Composer (`barryvdh/laravel-dompdf`): después de
+  (cierre diario impreso y en PDF, punto 38) y la tarea 3 (exportación real de reportes, punto 39),
+  que trae otra dependencia de Composer: `composer update phpoffice/phpspreadsheet
+  --with-all-dependencies`. Trae una dependencia nueva de Composer (`barryvdh/laravel-dompdf`): después de
   actualizar el código hay que correr `composer update barryvdh/laravel-dompdf
   --with-all-dependencies` en `backend` (actualiza `composer.lock`; en el VPS, `composer install`
   con ese lock). Para que el comprobante muestre el NIT, ponerlo en `FRAGUA_REAL_NIT`. Decisiones del 12/10/2026: el sistema corre en un VPS de
@@ -191,7 +194,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4 y 3 de la Fase 5, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4 y 4 de la Fase 5, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -326,6 +329,11 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   totales, el desglose, el arqueo, las correcciones posteriores, quién cerró y quién imprime, y
   líneas de firma. Sigue la misma regla de reimpresión. Un día sin cerrar se imprime solo como
   vista previa y la hoja lo dice.
+- Los reportes se exportan a Excel de verdad (`.xlsx`, con una hoja por tabla y los valores como
+  números en pesos) y a PDF de las páginas que haga falta, con la comparación si la pantalla
+  compara. Cada archivo queda en "Exportaciones guardadas" y se vuelve a descargar tal cual, sin
+  regenerarlo; cada descarga queda en Auditoría. En el VPS, `storage/app/private/reportes` debe
+  entrar en las copias de seguridad.
 
 ## Cambios de comportamiento de la Fase 4 (desde el 12/10/2026)
 

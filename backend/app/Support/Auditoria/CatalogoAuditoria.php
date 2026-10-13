@@ -117,6 +117,7 @@ final class CatalogoAuditoria
 
         // Reportes
         'exportar_reporte' => ['Exportación de reporte', 'reportes'],
+        'descargar_reporte' => ['Descarga de un reporte ya exportado', 'reportes'],
 
         // Configuración
         'editar_configuracion' => ['Cambio de configuración', 'configuracion'],

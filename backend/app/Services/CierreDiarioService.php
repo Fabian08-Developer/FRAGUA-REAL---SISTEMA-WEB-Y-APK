@@ -9,6 +9,7 @@ use App\Models\CompraGasto;
 use App\Models\Pago;
 use App\Models\Pedido;
 use App\Models\User;
+use App\Support\Documentos\PiePagina;
 use App\Support\Documentos\RegistroImpresiones;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
@@ -242,14 +243,7 @@ class CierreDiarioService
             'reimpresion' => $reimpresion,
         ])->setOption(RegistroImpresiones::OPCIONES_PDF)->setPaper('letter', 'portrait');
 
-        // "Página n de m" al pie: dompdf solo sabe el total después de dibujar todo.
-        $pdf->render();
-        $dompdf = $pdf->getDomPDF();
-        $lienzo = $dompdf->getCanvas();
-        $lienzo->page_text($lienzo->get_width() - 100, $lienzo->get_height() - 32, 'Página {PAGE_NUM} de {PAGE_COUNT}',
-            $dompdf->getFontMetrics()->getFont('DejaVu Sans'), 7.5, [0.42, 0.4, 0.36]);
-
-        return $pdf->stream("cierre-diario-{$fecha}.pdf");
+        return PiePagina::numerar($pdf)->stream("cierre-diario-{$fecha}.pdf");
     }
 
     /** Registra una corrección autorizada sobre un día cerrado (la llama CompraGastoService). */

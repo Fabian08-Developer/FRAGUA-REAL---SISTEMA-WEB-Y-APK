@@ -76,7 +76,9 @@ Fase 5 (13/10/2026): `2026_10_19_000001` completa la tabla `comprobantes` (conse
 documento en `detalle`, anulación con motivo; un pedido puede tener varios en su historia) para el
 comprobante de pago (punto 36). `2026_10_19_000002` agrega `comprobantes.impresiones` para marcar
 las reimpresiones (punto 37). `2026_10_19_000003` agrega `cierres_diarios.impresiones` para el
-cierre en PDF (punto 38). Pruebas automáticas: `php artisan test` (257 en `tests/Feature`).
+cierre en PDF (punto 38). `2026_10_19_000004` crea `reporte_exportaciones`, el archivo de los
+reportes exportados en PDF y Excel para volver a descargarlos sin regenerarlos (punto 39). Pruebas
+automáticas: `php artisan test` (264 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

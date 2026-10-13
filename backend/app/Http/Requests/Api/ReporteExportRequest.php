@@ -20,6 +20,10 @@ class ReporteExportRequest extends FormRequest
             'periodo' => ['nullable', 'in:semana,mes,personalizado'],
             'desde' => ['required_if:periodo,personalizado', 'date'],
             'hasta' => ['required_if:periodo,personalizado', 'date', 'after_or_equal:desde'],
+            // Fase 5, tarea 3 (CA-M08-009/010): el archivo lleva lo mismo que la pantalla, también la
+            // comparación con el periodo anterior y el tope de más/menos vendidos.
+            'comparar' => ['nullable', 'boolean'],
+            'limite' => ['nullable', 'integer', 'min:1', 'max:50'],
         ];
     }
 

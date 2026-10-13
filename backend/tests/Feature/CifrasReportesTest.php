@@ -109,11 +109,12 @@ class CifrasReportesTest extends TestCase
     public function test_la_exportacion_de_ventas_por_producto_sigue_funcionando(): void
     {
         $this->pedidoFinalizadoEn(CarbonImmutable::now('America/Bogota')->startOfDay()->addHours(12));
-        [$desde, $hasta] = $this->diaCompleto();
-        $servicio = app(ReporteService::class);
+        // Fase 5, tarea 3: la exportación arma su documento con el mismo cálculo de la pantalla.
+        $hoy = CarbonImmutable::now('America/Bogota')->toDateString();
+        $periodo = \App\Support\Reportes\PeriodoReporte::resolver('personalizado', $hoy, $hoy);
+        $doc = app(\App\Services\ReporteExportService::class)->documento('ventas-por-producto', $periodo, false, 10, $this->admin);
 
-        $tabla = $servicio->aTabla('ventas-por-producto', $servicio->ventasPorProductoYCategoria($desde, $hasta));
-
-        $this->assertContains('Combo: Combo pareja', array_column($tabla['filas'], 0));
+        $todos = collect($doc['tablas'])->firstWhere('titulo', 'Todos los productos');
+        $this->assertContains('Combo: Combo pareja', array_column($todos['filas'], 0));
     }
 }

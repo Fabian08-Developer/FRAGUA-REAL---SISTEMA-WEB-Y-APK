@@ -292,7 +292,25 @@ Antes de probar: `composer update barryvdh/laravel-dompdf --with-all-dependencie
 - [ ] Comparación contra el periodo anterior equivalente (RF-M08-010).
 - [ ] Periodo en curso aparece marcado como parcial (RN-M08-05).
 - [ ] Resultado operativo = ventas − compras − gastos (RN-M08-06), con y sin cierre diario del día.
-- [ ] Exportar a Excel (CSV) y PDF; la exportación queda en auditoría (RF-M08-011/012/014).
+- [ ] Exportar a Excel y PDF; la exportación queda en auditoría (RF-M08-011/012/014).
+
+### 8b. Exportación real (Fase 5, tarea 3 — RF-M08-011/012, RNF-M08-006, HU-M08-009/010)
+Antes de probar: `composer update phpoffice/phpspreadsheet --with-all-dependencies` y
+`php artisan migrate` en `backend`.
+- [ ] "Exportar Excel" descarga un `.xlsx` (no un CSV) que Excel abre sin avisos: hoja "Resumen"
+      con el título, el periodo en letras, quién lo generó y, si es la semana o el mes en curso,
+      "Periodo en curso: las cifras son parciales"; y una hoja por tabla (por ejemplo "Por tipo de
+      venta" y "Por método de pago"), con encabezados fijos, filtros y los valores como números en
+      pesos (se pueden sumar).
+- [ ] "Exportar PDF" de "Ventas por producto" con muchos productos: el PDF tiene las páginas que
+      haga falta (no se corta), repite los encabezados de la tabla en cada página y dice "Página n
+      de m" al pie.
+- [ ] Con "Comparar con el periodo anterior" marcado, el PDF y el Excel traen la tabla de
+      comparación (este periodo, anterior, variación y %), igual que la pantalla (CA-M08-009/010).
+- [ ] Debajo de los reportes aparece "Exportaciones guardadas" con cada archivo (reporte, formato,
+      periodo, "con comparación", "parcial", quién y cuándo). "Descargar" baja el mismo archivo
+      aunque después haya ventas nuevas: no se regenera (RNF-M08-006). Auditoría muestra
+      "Descarga de un reporte ya exportado".
 - [ ] Un Mesero no puede abrir Reportes (403).
 
 ## 9. Pedidos (supervisión)

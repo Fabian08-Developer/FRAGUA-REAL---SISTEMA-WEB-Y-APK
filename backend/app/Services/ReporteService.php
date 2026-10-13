@@ -10,6 +10,7 @@ use App\Models\Pedido;
 use App\Models\PedidoDetalle;
 use App\Models\Reserva;
 use App\Models\User;
+use App\Support\Reportes\PeriodoReporte;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -292,47 +293,28 @@ class ReporteService
         return $comparacion;
     }
 
-    // RF-M08-011/012: aplana un reporte ya calculado a una tabla (encabezados + filas)
-    // para exportarlo a Excel o PDF — ver ReporteExportService.
-    public function aTabla(string $reporte, array $datos): array
+    /**
+     * Calcula uno de los 6 reportes para un periodo (RF-M08-002 a 009). Lo usan la pantalla y la
+     * exportación (Fase 5, tarea 3), para que el archivo diga exactamente lo mismo que la pantalla
+     * (CA-M08-009/010).
+     */
+    public function calcular(string $reporte, PeriodoReporte $periodo, int $limite = 10): array
     {
         return match ($reporte) {
-            'ventas-totales', 'resultado-operativo' => [
-                'encabezados' => ['Métrica', 'Valor'],
-                'filas' => collect($datos['resumen'])->map(fn ($v, $k) => [$k, $v])->values()->all(),
-            ],
-            'ventas-por-producto' => [
-                'encabezados' => ['Producto', 'Unidades vendidas', 'Monto vendido'],
-                'filas' => collect($datos['detalle']['por_producto'])
-                    // Fase 0, tarea 5: por_producto ahora son arreglos (con 'clave' y 'es_combo').
-                    ->map(fn ($p) => [($p['es_combo'] ? 'Combo: ' : '').$p['nombre'], $p['unidades_vendidas'], $p['monto_vendido']])->all(),
-            ],
-            'ventas-por-tipo-y-metodo' => [
-                'encabezados' => ['Tipo o método', 'Cantidad/unidades', 'Monto'],
-                'filas' => collect($datos['detalle']['por_tipo'])
-                    ->map(fn ($t) => [$t->tipo_venta, $t->unidades_vendidas, $t->monto_vendido])
-                    ->concat(
-                        collect($datos['detalle']['por_metodo'])
-                            ->map(fn ($m) => [$m->metodo, $m->cantidad, $m->monto_total])
-                    )->all(),
-            ],
-            'compras-y-gastos' => [
-                'encabezados' => ['Tipo', 'Categoría', 'Cantidad', 'Total'],
-                'filas' => collect($datos['detalle']['por_categoria'])
-                    ->map(fn ($c) => [$c->tipo, $c->categoria, $c->cantidad, $c->total])->all(),
-            ],
-            'uso-de-mesas' => [
-                'encabezados' => ['Mesa', 'Reservas completadas'],
-                'filas' => collect($datos['detalle']['ocupacion_por_mesa'])
-                    ->map(fn ($m) => [$m->nombre, $m->reservas_completadas])->all(),
-            ],
+            'ventas-totales' => $this->ventasTotales($periodo->desde, $periodo->hasta),
+            'ventas-por-producto' => $this->ventasPorProductoYCategoria($periodo->desde, $periodo->hasta, $limite),
+            'ventas-por-tipo-y-metodo' => $this->ventasPorTipoYMetodo($periodo->desde, $periodo->hasta),
+            'compras-y-gastos' => $this->comprasYGastos($periodo->desdeFecha, $periodo->hastaFecha),
+            'resultado-operativo' => $this->resultadoOperativo($periodo->desdeFecha, $periodo->hastaFecha),
+            'uso-de-mesas' => $this->usoDeMesas($periodo->desde, $periodo->hasta),
             default => throw new InvalidArgumentException("Reporte desconocido: {$reporte}."),
         };
     }
 
-    // RF-M08-014: deja auditoría de cada exportación (usuario, reporte, periodo, formato).
-    public function registrarExportacion(string $reporte, array $periodo, string $formato, User $actor): void
+    // RF-M08-014: deja auditoría de cada exportación (usuario, reporte, periodo, formato y, desde la
+    // Fase 5, el archivo guardado y si comparaba con el periodo anterior).
+    public function registrarExportacion(string $reporte, array $periodo, string $formato, User $actor, array $extra = []): void
     {
-        app(AuditoriaService::class)->registrar('exportar_reporte', 'Reporte', null, ['reporte' => $reporte, 'formato' => $formato, 'periodo' => $periodo], $actor);
+        app(AuditoriaService::class)->registrar('exportar_reporte', 'Reporte', $extra['exportacion_id'] ?? null, ['reporte' => $reporte, 'formato' => $formato, 'periodo' => $periodo] + $extra, $actor);
     }
 }
