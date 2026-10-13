@@ -28,3 +28,13 @@ Artisan::command('fragua:latido', function (\App\Services\EstadoSistemaService $
 })->purpose('Registra que el programador corre y encola una prueba para la cola');
 
 \Illuminate\Support\Facades\Schedule::command('fragua:latido')->everyMinute();
+
+// Fase 4, tarea 3 (RF-M05-014, 016, 024, RN-M05-07): no-show automático al vencer la tolerancia,
+// mesa Reservada solo dentro de la ventana previa y recordatorio por correo antes de la hora.
+// Usa los tiempos de Configuración (15 min, 2 h y 1 h al empezar).
+Artisan::command('reservas:procesar', function (\App\Services\ReservaAutomaticaService $servicio) {
+    $r = $servicio->procesar();
+    $this->info("No-show: {$r['no_show']} · mesas reservadas: {$r['reservadas']} · mesas liberadas: {$r['liberadas']} · recordatorios: {$r['recordatorios']}");
+})->purpose('Aplica el no-show automático, la ventana de mesa Reservada y los recordatorios');
+
+\Illuminate\Support\Facades\Schedule::command('reservas:procesar')->everyMinute()->withoutOverlapping(5);

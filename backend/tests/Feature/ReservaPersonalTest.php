@@ -165,6 +165,11 @@ class ReservaPersonalTest extends TestCase
     public function test_RF_M05_015_el_mesero_confirma_la_llegada_y_la_mesa_queda_ocupada(): void
     {
         $reserva = $this->reservaConfirmada();
+        // Fase 4, tarea 3: la reserva es para mañana, así que la mesa sigue Libre; se marca
+        // Reservada desde 1 h antes (proceso de cada minuto).
+        $this->assertSame('libre', $this->mesa->fresh()->estado);
+        $this->travelTo($this->manana->subMinutes(30));
+        $this->artisan('reservas:procesar')->assertSuccessful();
         $this->assertSame('reservada', $this->mesa->fresh()->estado);
 
         $this->postJson("/api/reservas/{$reserva->id}/completar")->assertOk()->assertJsonPath('estado', 'completada');

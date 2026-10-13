@@ -11,7 +11,7 @@
 // (RF-M05-035). Por defecto se ven las reservas próximas, de hoy en adelante.
 // Fase 2, tarea 2 (12/10/2026): al confirmar la llegada el depósito se abona a la cuenta de la mesa
 // (RF-M05-034); el depósito manual exige la caja abierta y devolver uno en efectivo también.
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CalendarClock, Plus, Wallet, X } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
@@ -218,14 +218,33 @@ function hoyBogota() {
 }
 
 const depositoVigente = ref(0)
+// Fase 4, tarea 3 (RN-M05-07/08): minutos de tolerancia; la reserva se libera sola a la hora + esto.
+const toleranciaMinutos = ref(15)
 
 async function cargarDepositoVigente() {
   try {
     const { data } = await configuracionService.obtener()
     depositoVigente.value = Number(data.deposito_reserva)
+    toleranciaMinutos.value = data.reserva_tolerancia_minutos ?? 15
   } catch {
     // Solo es informativo: el servidor fija el valor real al crear la reserva.
   }
+}
+
+// Reloj de la pantalla (cada 30 s) para saber si ya venció la tolerancia de una reserva.
+const ahora = ref(Date.now())
+let reloj: ReturnType<typeof setInterval> | undefined
+
+function horaDeLiberacion(reserva: Reserva): Date {
+  return new Date(new Date(reserva.fecha_hora).getTime() + toleranciaMinutos.value * 60000)
+}
+
+function yaVencioTolerancia(reserva: Reserva): boolean {
+  return ahora.value >= horaDeLiberacion(reserva).getTime()
+}
+
+function horaCorta(valor: Date | string): string {
+  return new Date(valor).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: 'numeric', minute: '2-digit' })
 }
 
 function abrirNueva() {
@@ -356,7 +375,11 @@ const contadorTexto = computed(() => (total.value === 1 ? '1 reserva' : `${total
 onMounted(() => {
   cargarMesas()
   cargar()
+  cargarDepositoVigente()
+  reloj = setInterval(() => (ahora.value = Date.now()), 30000)
 })
+
+onBeforeUnmount(() => clearInterval(reloj))
 </script>
 
 <template>
@@ -451,6 +474,17 @@ onMounted(() => {
                   : `Registrada por ${reserva.registrada_por_usuario?.nombre ?? (reserva.creado_por === 'mesero' ? 'el Mesero' : 'el Administrador')}`
               }}
             </p>
+            <!-- Fase 4, tarea 3 (RF-M05-016/024): liberación automática y recordatorio. -->
+            <p v-if="reserva.estado === 'confirmada'" class="mt-1 text-xs text-gray-500">
+              <template v-if="yaVencioTolerancia(reserva)">
+                <span class="font-medium text-amber-700">Pasó la tolerancia: se libera como no-show en el próximo minuto.</span>
+              </template>
+              <template v-else>Si no llega, se libera sola a las {{ horaCorta(horaDeLiberacion(reserva)) }}.</template>
+              <template v-if="reserva.recordatorio_enviado_at"> · Recordatorio enviado a las {{ horaCorta(reserva.recordatorio_enviado_at) }}.</template>
+            </p>
+            <p v-else-if="reserva.estado === 'no_show' && reserva.no_show_at" class="mt-1 text-xs text-gray-500">
+              {{ reserva.no_show_automatico ? 'Liberada automáticamente' : 'Marcada no-show por el personal' }} a las {{ horaCorta(reserva.no_show_at) }}.
+            </p>
             <p class="mt-1 text-xs text-gray-500">
               Depósito: {{ formatoPesos.format(reserva.deposito_valor) }}
               <template v-if="reserva.deposito_pagado">
@@ -497,7 +531,14 @@ onMounted(() => {
               <BaseButton size="sm" variant="primary" :disabled="procesando === reserva.id" @click="completar(reserva)">
                 Confirmar llegada
               </BaseButton>
-              <BaseButton size="sm" variant="ghost" :disabled="procesando === reserva.id" @click="marcarNoShow(reserva)">
+              <!-- Fase 4, tarea 3 (RN-M05-07): el no-show solo cuando ya venció la tolerancia. -->
+              <BaseButton
+                v-if="yaVencioTolerancia(reserva)"
+                size="sm"
+                variant="ghost"
+                :disabled="procesando === reserva.id"
+                @click="marcarNoShow(reserva)"
+              >
                 Marcar no-show
               </BaseButton>
               <BaseButton size="sm" variant="danger-soft" :disabled="procesando === reserva.id" @click="cancelar(reserva)">

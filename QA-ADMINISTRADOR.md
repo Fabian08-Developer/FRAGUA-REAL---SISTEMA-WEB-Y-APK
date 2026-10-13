@@ -134,7 +134,8 @@ RF-M01-017/024/025, HU-M01-015/020, RNF-TRANS-022/023, RN-USR-12/13.
 - [ ] Confirmar y rechazar un depósito en línea; el rechazo permite reintentar.
 - [ ] Registrar depósito manual en una reserva por teléfono (RN-M05-16).
 - [ ] Cancelar antes de la hora: el depósito queda reembolsado (RN-M05-17).
-- [ ] Marcar no-show: el depósito se retiene y aparece en "depósitos retenidos" (RN-M05-18, HU-M05-015).
+- [ ] Marcar no-show: el botón solo aparece cuando ya pasó la hora + la tolerancia (15 min); el
+      depósito se retiene y aparece en "depósitos retenidos" (RN-M05-07/18, HU-M05-015).
 - [ ] Confirmar llegada (cliente llegó): la mesa pasa a Ocupada; al tomar el primer pedido, la
       cuenta de la mesa ya descuenta el depósito ("Incluye $20.000 del depósito de la reserva")
       y Reservas dice "abonado $20.000 a la cuenta" (RF-M05-034, RN-M05-19).
@@ -150,6 +151,24 @@ RF-M01-017/024/025, HU-M01-015/020, RNF-TRANS-022/023, RN-USR-12/13.
 - [ ] Otra reserva de la misma mesa una hora después: rechazada; dos horas y media después: aceptada.
 - [ ] El depósito manual solo ofrece efectivo, tarjeta y transferencia (RN-M05-16).
 - [ ] Con el Mesero: la pestaña Reservas hace lo mismo, sin el botón "Depósitos retenidos" (RF-M05-035).
+
+### 5b. Reservas automáticas (Fase 4, tarea 3 — RF-M05-014/016/024, RN-M05-07)
+Requiere el programador corriendo (`php artisan schedule:work` en desarrollo, o el cron en el
+VPS) y, para el correo, la cola (`php artisan queue:work`). Configuración > Tareas automáticas
+debe decir "activo".
+- [ ] Confirmar el depósito de una reserva para mañana: la mesa sigue Libre (antes quedaba
+      Reservada de inmediato). Cada reserva confirmada dice "Si no llega, se libera sola a las …".
+- [ ] Una reserva para dentro de 50 minutos: en el siguiente minuto la mesa pasa a Reservada.
+- [ ] Una mesa Ocupada con una reserva cercana sigue Ocupada; al liberarla, en el siguiente
+      minuto pasa a Reservada.
+- [ ] Sin llegar el cliente: a la hora + 15 min la reserva pasa sola a "No asistió", el depósito
+      queda retenido, la mesa vuelve a Libre y Auditoría muestra el no-show automático sin usuario.
+- [ ] Recordatorio: una reserva confirmada con más de 2 h de anticipación recibe el correo 2 h
+      antes (una sola vez) y Reservas dice "Recordatorio enviado a las …". Una reserva hecha 1 h
+      antes no recibe recordatorio.
+- [ ] Si el cliente pide en una mesa que aún está Libre pero tiene su reserva dentro de la hora
+      previa, ese primer pedido cuenta como su llegada y se abona el depósito.
+- [ ] Cambiar la tolerancia a 30 en Configuración: la siguiente reserva se libera a los 30 min.
 
 ## 6. Caja (M06)
 - [ ] Abrir turno (un solo turno por día, RN-M06-03); intentar abrir otro → rechazado.

@@ -14,6 +14,7 @@ class Reserva extends Model
         'deposito_reembolsado', 'deposito_aplicado_abono', 'deposito_registrado_por',
         'creado_por', 'registrada_por',
         'pedido_id', 'deposito_abonado', 'llegada_at', 'deposito_caja_turno_id', 'deposito_reembolso_caja_turno_id',
+        'no_show_at', 'no_show_automatico', 'recordatorio_enviado_at',
     ];
 
     protected $casts = [
@@ -25,7 +26,12 @@ class Reserva extends Model
         'deposito_valor' => 'decimal:2',
         'deposito_abonado' => 'decimal:2',
         'llegada_at' => 'datetime',
+        // Fase 4, tarea 3 (RF-M05-016/024)
+        'no_show_at' => 'datetime',
+        'no_show_automatico' => 'boolean',
+        'recordatorio_enviado_at' => 'datetime',
     ];
+
 
     public function mesa(): BelongsTo
     {

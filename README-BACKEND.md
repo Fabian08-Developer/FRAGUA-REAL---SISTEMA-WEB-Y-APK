@@ -644,6 +644,31 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
     - Frontend: Configuración tiene la tarjeta "Tiempos de las reservas"; Reservar mesa explica la
       tolerancia. CORREGIDO de paso: en Configuración el error de domicilio y depósito salía dos
       veces (BaseInput ya lo muestra).
+33. **Fase 4, tarea 3 (13/10/2026): no-show automático, mesa Reservada a tiempo y recordatorio
+    (M05).** RF-M05-014, 016, 024, RN-M05-07, 08, 13, 18. Migración `2026_10_18_000002`
+    (`reservas.no_show_at`, `no_show_automatico`, `recordatorio_enviado_at` e índice por estado y
+    hora); 11 pruebas en `ReservasAutomaticasTest`.
+    - `ReservaAutomaticaService`, comando `reservas:procesar` cada minuto (sin solaparse): marca
+      no-show las reservas confirmadas cuya hora + tolerancia ya pasó (depósito retenido,
+      auditoría `no_show_automatico` sin usuario), pone cada mesa en el estado que le toca y
+      encola el recordatorio por correo (`RecordatorioReservaNotification`, D3: correo en V1) N
+      minutos antes, una sola vez; no lo envía si la reserva se confirmó ya dentro de ese plazo.
+    - `ReservaService::sincronizarMesa()`: una mesa Libre pasa a Reservada solo dentro de la
+      ventana previa (1 h) o mientras corre la tolerancia; una Reservada sin reserva cercana vuelve
+      a Libre; una Ocupada no se toca. CORREGIDO: antes, confirmar el depósito marcaba la mesa
+      Reservada de inmediato aunque la reserva fuera para otro día, e incluso si estaba Ocupada.
+      Las mesas que quedaron Reservadas con el criterio anterior se corrigen solas en el primer
+      minuto del proceso.
+    - No-show manual (`POST /reservas/{id}/no-show`): solo cuando ya venció la tolerancia (422 con
+      la hora desde la que se puede); se audita como `marcar_no_show` con quien lo hizo.
+    - Llegada: el primer pedido local en una mesa Libre que tiene su reserva dentro de la ventana
+      también cuenta como llegada (completa la reserva y abona el depósito), aunque el proceso de
+      ese minuto aún no la hubiera marcado Reservada.
+    - El envío del recordatorio y su registro de entrega o falla por reserva (RF-M05-027), y los
+      avisos de confirmación, cancelación y no-show, son la tarea 4.
+    - Frontend: Reservas (Administrador y Mesero) muestra "Si no llega, se libera sola a las …",
+      el recordatorio enviado y si el no-show fue automático; "Marcar no-show" solo aparece cuando
+      ya pasó la tolerancia.
 
 ## Qué falta a propósito
 

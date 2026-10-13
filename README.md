@@ -64,8 +64,9 @@ el correo o con un nombre de usuario (punto 29). `2026_10_17_000003` agrega IP y
 Fase 4 (12/10/2026): `2026_10_18_000001` crea las tablas estándar de Laravel para la cola, la
 caché y las sesiones web (`jobs`, `job_batches`, `failed_jobs`, `cache`, `cache_locks`,
 `sessions`), solo si no existen (punto 31). La tarea 2 (tiempos de las reservas, punto 32) usa la
-tabla `configuraciones` y no necesita migración. Pruebas automáticas: `php artisan test` (212 en
-`tests/Feature`).
+tabla `configuraciones` y no necesita migración. `2026_10_18_000002` agrega a `reservas` cuándo se
+marcó el no-show, si fue automático y cuándo salió el recordatorio (punto 33). Pruebas automáticas:
+`php artisan test` (223 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

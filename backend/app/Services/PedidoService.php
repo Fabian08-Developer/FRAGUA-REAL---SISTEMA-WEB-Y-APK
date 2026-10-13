@@ -89,7 +89,10 @@ class PedidoService
             // mesa libre o reservada — de cualquier forma, ya hay alguien sentado ahí).
             if ($pedido->tipo === 'local' && $pedido->mesa_id) {
                 $mesa = Mesa::find($pedido->mesa_id);
-                $estabaReservada = $mesa?->estado === 'reservada';
+                // Fase 4, tarea 3: también cuenta como llegada si la mesa seguía Libre pero tiene una
+                // reserva confirmada dentro de su ventana (el proceso de cada minuto aún no la marcaba).
+                $estabaReservada = $mesa?->estado === 'reservada'
+                    || ($mesa?->estado === 'libre' && app(ReservaService::class)->reservaEnVentana($mesa->id) !== null);
                 if ($mesa && $mesa->estado !== 'ocupada') {
                     // La visita empieza con este pedido: así siempre queda dentro de la cuenta de la
                     // mesa, aunque el reloj cambie de segundo entre guardar el pedido y ocupar la mesa.

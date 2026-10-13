@@ -333,6 +333,10 @@ export interface Reserva {
   llegada_at?: string | null
   deposito_caja_turno_id?: number | null
   deposito_reembolso_caja_turno_id?: number | null
+  // Fase 4, tarea 3 (RF-M05-016/024): no-show (automático o del personal) y recordatorio enviado.
+  no_show_at?: string | null
+  no_show_automatico?: boolean
+  recordatorio_enviado_at?: string | null
   mesa?: Mesa
 }
 

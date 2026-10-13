@@ -120,6 +120,12 @@ class AbonoDepositoService
     /** La reserva confirmada de esa mesa para hoy, la más cercana a esta hora. */
     public function reservaDeHoy(int $mesaId): ?Reserva
     {
+        // Fase 4, tarea 3: primero la que tiene la mesa apartada ahora mismo (ventana/tolerancia).
+        $enVentana = app(ReservaService::class)->reservaEnVentana($mesaId);
+        if ($enVentana) {
+            return $enVentana;
+        }
+
         $ahora = Carbon::now(self::ZONA_HORARIA_NEGOCIO);
 
         return Reserva::where('mesa_id', $mesaId)

@@ -115,7 +115,7 @@ class ReservaController extends Controller
     {
         abort_if(! ($request->user()->esAdministrador() || $request->user()->esMesero()), 403);
 
-        return response()->json($this->reservaService->marcarNoShow($reserva)->load('mesa'));
+        return response()->json($this->reservaService->marcarNoShow($reserva, $request->user())->load('mesa'));
     }
 
     public function completar(Request $request, Reserva $reserva)

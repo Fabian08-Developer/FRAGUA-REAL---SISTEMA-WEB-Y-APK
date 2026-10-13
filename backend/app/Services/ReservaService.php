@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Mesa;
 use App\Models\Reserva;
 use App\Models\User;
+use App\Support\Reservas\PoliticaReservas;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -218,18 +219,87 @@ class ReservaService
     }
 
     // RN-M05-18: liberar por no-show (el cliente no llegó) — el depósito NO se reembolsa.
-    public function marcarNoShow(Reserva $reserva): Reserva
+    // Fase 4, tarea 3 (RN-M05-07, RF-M05-016): solo cuando ya venció la tolerancia (hora de la
+    // reserva + los minutos configurados). Lo hace el sistema solo cada minuto
+    // (ReservaAutomaticaService) o una persona desde Reservas; antes se podía marcar no-show
+    // incluso antes de la hora y el cliente perdía el depósito sin haber llegado tarde.
+    public function marcarNoShow(Reserva $reserva, ?User $actor = null, bool $automatico = false): Reserva
     {
         if ($reserva->estado !== 'confirmada') {
             throw new RuntimeException('Solo una reserva confirmada puede marcarse como no-show.');
         }
+        $libera = $this->horaDeLiberacion($reserva);
+        if (now()->lt($libera)) {
+            throw new RuntimeException("Todavía está dentro de la tolerancia: se puede marcar no-show desde las {$this->hora($libera)}.");
+        }
 
         $reserva->estado = 'no_show';
+        $reserva->no_show_at = now();
+        $reserva->no_show_automatico = $automatico;
         $reserva->save();
 
-        $this->liberarMesa($reserva);
+        $this->sincronizarMesa($reserva->mesa_id);
+
+        app(AuditoriaService::class)->registrar($automatico ? 'no_show_automatico' : 'marcar_no_show', 'Reserva', $reserva->id, [
+            'hora_reserva' => $reserva->fecha_hora->copy()->setTimezone('America/Bogota')->format('Y-m-d H:i'),
+            'tolerancia_minutos' => PoliticaReservas::toleranciaMinutos(),
+            'deposito_retenido' => $reserva->deposito_pagado ? (float) $reserva->deposito_valor : 0,
+        ], $actor);
 
         return $reserva;
+    }
+
+    /** Hora + tolerancia: desde ahí la reserva se considera no honrada (RN-M05-07/08). */
+    public function horaDeLiberacion(Reserva $reserva): CarbonInterface
+    {
+        return $reserva->fecha_hora->copy()->addMinutes(PoliticaReservas::toleranciaMinutos());
+    }
+
+    /**
+     * La reserva confirmada que hoy aparta esta mesa: su hora está dentro de la ventana previa
+     * (mesa Reservada desde N minutos antes) o ya pasó pero sigue dentro de la tolerancia.
+     */
+    public function reservaEnVentana(int $mesaId, ?CarbonInterface $momento = null): ?Reserva
+    {
+        $ahora = $momento ? Carbon::instance($momento) : now();
+
+        return Reserva::where('mesa_id', $mesaId)
+            ->where('estado', 'confirmada')
+            ->where('fecha_hora', '<=', $ahora->copy()->addMinutes(PoliticaReservas::ventanaReservadaMinutos()))
+            ->where('fecha_hora', '>', $ahora->copy()->subMinutes(PoliticaReservas::toleranciaMinutos()))
+            ->orderBy('fecha_hora')
+            ->first();
+    }
+
+    /**
+     * Fase 4, tarea 3 (RF-M05-014, RN-M05-07): pone la mesa en el estado que le corresponde según
+     * sus reservas. Una mesa libre pasa a Reservada solo dentro de la ventana previa a una reserva
+     * confirmada; una mesa Reservada sin reserva en la ventana vuelve a Libre (si no tiene pedidos
+     * activos). Una mesa Ocupada no se toca: los clientes que están sentados no se levantan; en
+     * cuanto se libere, el siguiente proceso la marca Reservada si toca.
+     */
+    public function sincronizarMesa(?int $mesaId): ?string
+    {
+        $mesa = $mesaId ? Mesa::find($mesaId) : null;
+        if (! $mesa || ! $mesa->activa) {
+            return null;
+        }
+
+        $tieneReserva = $this->reservaEnVentana($mesa->id) !== null;
+
+        if ($mesa->estado === 'libre' && $tieneReserva) {
+            $mesa->estado = 'reservada';
+            $mesa->save();
+
+            return 'reservada';
+        }
+        if ($mesa->estado === 'reservada' && ! $tieneReserva && ! $mesa->tienePedidosActivos()) {
+            $mesa->liberar();
+
+            return 'libre';
+        }
+
+        return null;
     }
 
     // RN-M05-19: si el cliente sí llega, la mesa pasa de reservada a ocupada y el depósito
@@ -296,20 +366,16 @@ class ReservaService
         return $reserva;
     }
 
+    // Fase 4, tarea 3: confirmar el depósito ya no marca la mesa Reservada de inmediato (antes lo
+    // hacía aunque la reserva fuera para otro día, y hasta pisaba una mesa Ocupada). Ahora solo
+    // si la reserva cae dentro de la ventana previa; si no, lo hace el proceso de cada minuto.
     private function marcarMesaReservada(Reserva $reserva): void
     {
-        $mesa = Mesa::find($reserva->mesa_id);
-        if ($mesa) {
-            $mesa->estado = 'reservada';
-            $mesa->save();
-        }
+        $this->sincronizarMesa($reserva->mesa_id);
     }
 
     private function liberarMesa(Reserva $reserva): void
     {
-        $mesa = Mesa::find($reserva->mesa_id);
-        if ($mesa && $mesa->estado === 'reservada' && ! $mesa->tienePedidosActivos()) {
-            $mesa->liberar();
-        }
+        $this->sincronizarMesa($reserva->mesa_id);
     }
 }

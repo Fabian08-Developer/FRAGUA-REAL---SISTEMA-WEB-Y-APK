@@ -141,7 +141,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 12/10/2026 van 459 de 579 verificables, 79 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 13/10/2026 van 462 de 579 verificables, 80 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -160,8 +160,9 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (`FRAGUA_REAL_SESION_INACTIVIDAD_MINUTOS`, `FRAGUA_REAL_SESION_DURACION_MAXIMA_MINUTOS`). La
   limpieza diaria de sesiones vencidas (`sesiones:limpiar`) necesita el cron de Laravel en el VPS
   (Fase 4).
-- La Fase 4 empezó con la tarea 1 (cola y programador en marcha) y la tarea 2 (tiempos de las
-  reservas configurables): ver "Programador y cola en el VPS" y `README-BACKEND.md`, puntos 31 y 32. Decisiones del 12/10/2026: el sistema corre en un VPS de
+- La Fase 4 empezó con la tarea 1 (cola y programador en marcha), la tarea 2 (tiempos de las
+  reservas configurables) y la tarea 3 (no-show automático, mesa Reservada a tiempo y
+  recordatorio): ver "Programador y cola en el VPS" y `README-BACKEND.md`, puntos 31 a 33. Decisiones del 12/10/2026: el sistema corre en un VPS de
   Hostinger (D2); los avisos al cliente van por correo en V1 y el SMS queda para después (D3);
   reservas con no-show a los 15 min, recordatorio 2 h antes y mesa Reservada 1 h antes,
   editables en Configuración (D6).
@@ -177,7 +178,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3 y 1 de la Fase 4, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3 y 2 de la Fase 4, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -300,6 +301,11 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 - Configuración tiene "Tiempos de las reservas": tolerancia antes del no-show (15 min),
   anticipación del recordatorio (2 h) y desde cuándo la mesa se ve Reservada (1 h). Se usan desde
   la tarea 3 de la Fase 4. En Reservar mesa, el Cliente ve cuántos minutos se le espera.
+- Las reservas se manejan solas (con el programador corriendo): la mesa se ve Reservada solo
+  desde 1 h antes (antes quedaba Reservada desde que se pagaba el depósito, aunque fuera para otro
+  día); si el cliente no llega en 15 min, la reserva pasa sola a "No asistió" y el depósito se
+  retiene; y 2 h antes le llega un correo de recordatorio. "Marcar no-show" a mano solo aparece
+  cuando ya pasó la tolerancia.
 - Se crearon las tablas que el `.env` ya esperaba (`jobs`, `failed_jobs`, `cache`,
   `cache_locks`, `sessions`…). Sin ellas, con `CACHE_STORE=database`, el límite de intentos del
   inicio de sesión y el programador fallaban en el servidor.
