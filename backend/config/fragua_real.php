@@ -42,6 +42,15 @@ return [
     // RF-M03-07, RNF-M03-06: soporte de una compra o gasto — tamaño máximo en KB.
     'soporte_max_kb' => (int) env('FRAGUA_REAL_SOPORTE_MAX_KB', 5120),
 
+    // Fase 4, tarea 2 (RF-M05-017/026, RN-M05-07/08/13, decisión D6 del 12/10/2026): valores
+    // iniciales de las reservas. El Administrador los cambia en Configuración (tabla
+    // `configuraciones`); estos solo se usan si esa fila aún no existe.
+    'reservas' => [
+        'tolerancia_minutos' => (int) env('FRAGUA_REAL_RESERVA_TOLERANCIA_MINUTOS', 15),
+        'recordatorio_minutos' => (int) env('FRAGUA_REAL_RESERVA_RECORDATORIO_MINUTOS', 120),
+        'ventana_reservada_minutos' => (int) env('FRAGUA_REAL_RESERVA_VENTANA_MINUTOS', 60),
+    ],
+
     // Fase 3, tarea 4 (RF-M01-010, RNF-M01-005, decisión de seguridad): política de las sesiones.
     // Una sesión se cierra sola si pasa este tiempo sin usarse (inactividad) o, aunque se use
     // todos los días, al cumplir la duración máxima; después hay que volver a iniciar sesión.

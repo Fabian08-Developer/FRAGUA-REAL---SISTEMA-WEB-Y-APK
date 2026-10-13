@@ -362,6 +362,8 @@ class CatalogoController extends Controller
                 'deposito_reserva',
                 (float) config('fragua_real.deposito_reserva_default')
             ),
+            // Fase 4, tarea 2: tiempos de las reservas (el Cliente ve la tolerancia al reservar).
+            ...\App\Support\Reservas\PoliticaReservas::valores(),
         ]);
     }
 }

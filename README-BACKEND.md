@@ -628,6 +628,22 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       (D3), y no-show 15 min / recordatorio 2 h / mesa Reservada 1 h (D6).
     - Frontend: Configuración > "Tareas automáticas"
       (`components/configuracion/EstadoTareasAutomaticas.vue`).
+32. **Fase 4, tarea 2 (12/10/2026): tiempos de las reservas configurables (M05).** RF-M05-017,
+    026, RN-M05-07, 08, 13; decisión D6. Sin migración (usa la tabla `configuraciones`); 5 pruebas
+    en `TiemposDeReservaTest`.
+    - `App\Support\Reservas\PoliticaReservas`: tolerancia antes del no-show
+      (`reserva_tolerancia_minutos`, 15 min, rango 5–120), anticipación del recordatorio
+      (`reserva_recordatorio_minutos`, 2 h, rango 30 min–48 h) y desde cuándo la mesa se ve
+      Reservada (`reserva_ventana_reservada_minutos`, 1 h, rango 15 min–4 h). Lee la tabla
+      `configuraciones` y, si la fila no existe, `config/fragua_real.php` (`reservas`).
+    - `PUT /configuraciones` acepta las tres claves (opcionales, minutos enteros dentro del rango,
+      con mensajes claros) y las audita con su antes → después como el resto. `GET /configuracion`
+      (público) las devuelve.
+    - Se aplican desde la tarea 3 (no-show automático, mesa Reservada a tiempo y recordatorios);
+      por ahora el Cliente ve la tolerancia al reservar ("te esperamos hasta 15 minutos").
+    - Frontend: Configuración tiene la tarjeta "Tiempos de las reservas"; Reservar mesa explica la
+      tolerancia. CORREGIDO de paso: en Configuración el error de domicilio y depósito salía dos
+      veces (BaseInput ya lo muestra).
 
 ## Qué falta a propósito
 

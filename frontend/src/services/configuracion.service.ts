@@ -10,7 +10,18 @@ import api from './api'
 export interface Configuracion {
   valor_domicilio: number
   deposito_reserva: number
+  // Fase 4, tarea 2 (RF-M05-017/026, decisión D6): tiempos de las reservas, en minutos.
+  reserva_tolerancia_minutos?: number
+  reserva_recordatorio_minutos?: number
+  reserva_ventana_reservada_minutos?: number
 }
+
+// Rangos permitidos (los mismos que valida el backend, PoliticaReservas::RANGOS).
+export const RANGOS_TIEMPOS_RESERVA = {
+  reserva_tolerancia_minutos: [5, 120],
+  reserva_recordatorio_minutos: [30, 2880],
+  reserva_ventana_reservada_minutos: [15, 240],
+} as const
 
 // Fase 4, tarea 1: estado del programador de tareas (cron) y de la cola de trabajos en el
 // servidor, con su último latido. GET /sistema/estado, solo Administrador.

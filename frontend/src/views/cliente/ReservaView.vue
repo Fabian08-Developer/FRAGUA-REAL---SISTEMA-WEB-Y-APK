@@ -21,6 +21,8 @@ const auth = useAuthStore()
 
 const mesas = ref<Mesa[]>([])
 const depositoValor = ref(20000)
+// Fase 4, tarea 2 (RN-M05-07/08/18): minutos de espera antes de liberar la reserva.
+const toleranciaMinutos = ref(15)
 const cargandoMesas = ref(true)
 
 const form = reactive({
@@ -57,6 +59,7 @@ onMounted(async () => {
     ])
     mesas.value = listaMesas
     depositoValor.value = config.deposito_reserva
+    toleranciaMinutos.value = config.reserva_tolerancia_minutos ?? 15
   } catch {
     errorGeneral.value = 'No pudimos cargar las mesas disponibles. Recarga la página.'
   } finally {
@@ -138,7 +141,8 @@ async function pagarDeposito() {
     <h1 class="font-display text-4xl font-medium tracking-tight text-ink">Reservar mesa</h1>
     <p class="mt-2 text-sm text-[#6c655c]">
       Toda reserva requiere un depósito de {{ formatoPrecio(depositoValor) }}, que se descuenta de tu cuenta el día
-      de tu visita. Si cancelas a tiempo, te lo devolvemos completo.
+      de tu visita. Si cancelas a tiempo, te lo devolvemos completo. Te esperamos hasta {{ toleranciaMinutos }} minutos
+      después de la hora; si no llegas, la reserva se libera y el depósito no se devuelve.
     </p>
 
     <!-- Confirmación / pago del depósito -->

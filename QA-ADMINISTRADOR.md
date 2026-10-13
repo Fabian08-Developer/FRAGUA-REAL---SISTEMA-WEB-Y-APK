@@ -19,6 +19,10 @@ permitía editar los valores, pero no había dónde hacerlo).
 - [ ] Valor vacío o con letras: error bajo el campo, sin llamar al servidor.
 - [ ] "Guardar cambios" queda desactivado mientras no haya cambios.
 - [ ] Un Mesero no puede abrir `/admin/configuracion` ni llamar `PUT /configuraciones` (403).
+- [ ] "Tiempos de las reservas" (Fase 4, tarea 2 — RF-M05-017/026): muestra 15, 120 y 60 en una
+      base nueva, con su texto ("se avisa al cliente 2 horas antes"). Valores fuera de rango (0,
+      3000, letras) muestran el error bajo el campo sin guardar. Al guardar, Reservar mesa del
+      Cliente dice la nueva tolerancia y Auditoría registra el cambio.
 - [ ] "Tareas automáticas" (Fase 4, tarea 1): sin cron ni trabajador, dice "detenido" en ambos.
       Con `php artisan schedule:work` y `php artisan queue:work` corriendo (o el cron y
       Supervisor en el VPS), al minuto ambos dicen "activo". Muestra pendientes, fallidos y si el

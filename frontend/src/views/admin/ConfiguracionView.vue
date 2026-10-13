@@ -1,23 +1,43 @@
 <script setup lang="ts">
-// M05/M07 — Administrador > Configuración: valor fijo de domicilio (RF-M07-030, RN-M07-02) y
-// valor fijo del depósito de reserva (RF-M05-028, RN-M05-14). El Administrador puede cambiarlos
+// M05/M07 — Administrador > Configuración: valor fijo de domicilio (RF-M07-030, RN-M07-02),
+// valor fijo del depósito de reserva (RF-M05-028, RN-M05-14) y, desde la Fase 4, los tiempos de
+// las reservas: tolerancia, recordatorio y ventana de mesa Reservada (RF-M05-017/026). El Administrador puede cambiarlos
 // "en cualquier momento"; el nuevo valor aplica a los pedidos/reservas creados después del
 // cambio y el histórico no se altera (precio congelado, ADR-002).
 // Lee con GET /configuracion (incluye el valor de respaldo si la tabla aún no tiene la fila) y
 // guarda con PUT /configuraciones.
 import { computed, onMounted, ref } from 'vue'
-import { Bike, CalendarClock } from 'lucide-vue-next'
+import { Bike, CalendarClock, Timer } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import EstadoTareasAutomaticas from '@/components/configuracion/EstadoTareasAutomaticas.vue'
-import { configuracionService } from '@/services/configuracion.service'
+import { configuracionService, RANGOS_TIEMPOS_RESERVA } from '@/services/configuracion.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 
 const domicilio = ref('')
 const deposito = ref('')
+// Fase 4, tarea 2 (RF-M05-017/026, D6): tiempos de las reservas, en minutos.
+const tolerancia = ref('15')
+const recordatorio = ref('120')
+const ventana = ref('60')
 // Valores guardados, para saber si hay cambios sin guardar.
-const guardados = ref({ domicilio: '', deposito: '' })
+const guardados = ref({ domicilio: '', deposito: '', tolerancia: '', recordatorio: '', ventana: '' })
+
+function actuales() {
+  return { domicilio: domicilio.value, deposito: deposito.value, tolerancia: tolerancia.value, recordatorio: recordatorio.value, ventana: ventana.value }
+}
+
+// "120" → "2 horas"; "90" → "1 h 30 min"; "45" → "45 minutos".
+function duracionTexto(texto: string): string {
+  const minutos = Number(texto)
+  if (!Number.isInteger(minutos) || minutos <= 0) return ''
+  const horas = Math.floor(minutos / 60)
+  const resto = minutos % 60
+  if (horas === 0) return `${minutos} minutos`
+  if (resto === 0) return horas === 1 ? '1 hora' : `${horas} horas`
+  return `${horas} h ${resto} min`
+}
 
 const cargando = ref(true)
 const guardando = ref(false)
@@ -34,9 +54,7 @@ function aNumero(texto: string): number {
   return Number(texto.replace(/[^\d]/g, ''))
 }
 
-const hayCambios = computed(
-  () => domicilio.value !== guardados.value.domicilio || deposito.value !== guardados.value.deposito,
-)
+const hayCambios = computed(() => JSON.stringify(actuales()) !== JSON.stringify(guardados.value))
 
 async function cargar() {
   cargando.value = true
@@ -45,7 +63,10 @@ async function cargar() {
     const { data } = await configuracionService.obtener()
     domicilio.value = String(Math.round(Number(data.valor_domicilio)))
     deposito.value = String(Math.round(Number(data.deposito_reserva)))
-    guardados.value = { domicilio: domicilio.value, deposito: deposito.value }
+    tolerancia.value = String(data.reserva_tolerancia_minutos ?? 15)
+    recordatorio.value = String(data.reserva_recordatorio_minutos ?? 120)
+    ventana.value = String(data.reserva_ventana_reservada_minutos ?? 60)
+    guardados.value = actuales()
   } catch (e) {
     error.value = mensajeDeError(e, 'No pudimos cargar la configuración.')
   } finally {
@@ -63,6 +84,17 @@ function validar(): boolean {
       errores.value[campo] = 'Escribe un valor en pesos (solo números, 0 o más).'
     }
   }
+  for (const [campo, texto] of [
+    ['reserva_tolerancia_minutos', tolerancia.value],
+    ['reserva_recordatorio_minutos', recordatorio.value],
+    ['reserva_ventana_reservada_minutos', ventana.value],
+  ] as const) {
+    const [minimo, maximo] = RANGOS_TIEMPOS_RESERVA[campo]
+    const minutos = Number(texto.trim())
+    if (!/^\d+$/.test(texto.trim()) || minutos < minimo || minutos > maximo) {
+      errores.value[campo] = `Escribe minutos enteros, entre ${minimo} y ${maximo}.`
+    }
+  }
   return Object.keys(errores.value).length === 0
 }
 
@@ -75,11 +107,14 @@ async function guardar() {
     await configuracionService.actualizar({
       valor_domicilio: aNumero(domicilio.value),
       deposito_reserva: aNumero(deposito.value),
+      reserva_tolerancia_minutos: Number(tolerancia.value),
+      reserva_recordatorio_minutos: Number(recordatorio.value),
+      reserva_ventana_reservada_minutos: Number(ventana.value),
     })
     domicilio.value = String(aNumero(domicilio.value))
     deposito.value = String(aNumero(deposito.value))
-    guardados.value = { domicilio: domicilio.value, deposito: deposito.value }
-    exito.value = 'Configuración guardada. Se aplica a los pedidos y reservas nuevos.'
+    guardados.value = actuales()
+    exito.value = 'Configuración guardada. Los valores en pesos aplican a los pedidos y reservas nuevos; los tiempos de reserva, desde ya.'
   } catch (e) {
     errores.value = erroresDeValidacion(e)
     // Si el servidor señaló campos concretos, el mensaje va bajo cada campo; el general solo
@@ -98,7 +133,7 @@ onMounted(cargar)
     <PageHeader
       eyebrow="SISTEMA"
       titulo="Configuración"
-      descripcion="Valores fijos que el negocio puede cambiar en cualquier momento."
+      descripcion="Valores que el negocio puede cambiar en cualquier momento."
     />
 
     <div v-if="cargando" class="loading-state">Cargando configuración…</div>
@@ -123,8 +158,8 @@ onMounted(cargar)
                 placeholder="2000"
                 :error="errores.valor_domicilio"
               />
-              <p v-if="errores.valor_domicilio" class="mt-1 text-xs text-red-600">{{ errores.valor_domicilio }}</p>
-              <p v-else-if="domicilio && !Number.isNaN(aNumero(domicilio))" class="mt-1 text-xs text-gray-500">
+              <!-- El error ya lo muestra BaseInput debajo del campo. -->
+              <p v-if="!errores.valor_domicilio && domicilio && !Number.isNaN(aNumero(domicilio))" class="mt-1 text-xs text-gray-500">
                 Se cobrará {{ formatoPrecio(aNumero(domicilio)) }} por cada domicilio.
               </p>
             </div>
@@ -151,10 +186,41 @@ onMounted(cargar)
                 placeholder="20000"
                 :error="errores.deposito_reserva"
               />
-              <p v-if="errores.deposito_reserva" class="mt-1 text-xs text-red-600">{{ errores.deposito_reserva }}</p>
-              <p v-else-if="deposito && !Number.isNaN(aNumero(deposito))" class="mt-1 text-xs text-gray-500">
+              <!-- El error ya lo muestra BaseInput debajo del campo. -->
+              <p v-if="!errores.deposito_reserva && deposito && !Number.isNaN(aNumero(deposito))" class="mt-1 text-xs text-gray-500">
                 Cada reserva exigirá {{ formatoPrecio(aNumero(deposito)) }} de depósito.
               </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fase 4, tarea 2 (RF-M05-017/026, RN-M05-07/08/13, decisión D6) -->
+      <div class="card p-4 sm:p-5">
+        <div class="flex items-start gap-3">
+          <span class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+            <Timer :size="21" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <h2 class="text-[15px] font-semibold text-ink">Tiempos de las reservas</h2>
+            <p class="mt-0.5 text-xs text-gray-500">
+              En minutos. Los usan el no-show automático, el recordatorio al cliente y el estado de la mesa.
+            </p>
+            <div class="mt-3 grid gap-4 sm:grid-cols-3">
+              <div>
+                <BaseInput v-model="tolerancia" label="Tolerancia (no-show)" type="text" placeholder="15" :error="errores.reserva_tolerancia_minutos" />
+                <p v-if="!errores.reserva_tolerancia_minutos" class="mt-1 text-xs text-gray-500">
+                  Si el cliente no llega {{ duracionTexto(tolerancia) || '…' }} después de la hora, la reserva se libera y el depósito se retiene.
+                </p>
+              </div>
+              <div>
+                <BaseInput v-model="recordatorio" label="Recordatorio" type="text" placeholder="120" :error="errores.reserva_recordatorio_minutos" />
+                <p v-if="!errores.reserva_recordatorio_minutos" class="mt-1 text-xs text-gray-500">Se avisa al cliente {{ duracionTexto(recordatorio) || '…' }} antes.</p>
+              </div>
+              <div>
+                <BaseInput v-model="ventana" label="Mesa Reservada" type="text" placeholder="60" :error="errores.reserva_ventana_reservada_minutos" />
+                <p v-if="!errores.reserva_ventana_reservada_minutos" class="mt-1 text-xs text-gray-500">La mesa se ve Reservada desde {{ duracionTexto(ventana) || '…' }} antes.</p>
+              </div>
             </div>
           </div>
         </div>
