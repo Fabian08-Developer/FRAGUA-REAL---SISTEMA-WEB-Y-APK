@@ -471,6 +471,35 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       `client_max_body_size 8m;`. La carpeta `storage/app/private` debe poder escribirla el usuario
       del servidor web e incluirse en las copias de seguridad.
 
+26. **Fase 2, tarea 5 (12/10/2026): cierre diario completo (M03).** RF-M03-20 a 27, 34,
+    RN-M03-08, 15, RN-M06-11, 12, HU-M03-07 a 10. Migración `2026_10_16_000003`
+    (`cierres_diarios.detalle` y `caja_turno_id`, tabla `cierre_ajustes`); 7 pruebas en
+    `CierreDiarioCompletoTest`. Con esta tarea la Fase 2 quedó completa.
+    - Consulta previa (RF-M03-26): `GET /cierres-diarios/previa?fecha=` da el cálculo del día con
+      su desglose: ventas por tipo de venta y por forma de pago (el abono de depósitos aparte),
+      compras y otros gastos por categoría, compras y gastos por forma de pago, el arqueo de la caja
+      del día, y si ya se puede cerrar. El resultado lleva la nota "estimado, no es la utilidad
+      contable" (RF-M03-34).
+    - Cierre formal (RF-M03-25, HU-M03-08): `POST /cierres-diarios` exige que la caja de ese día ya
+      esté cerrada, porque el arqueo alimenta el cierre (RN-M06-11); no acepta días futuros ni un
+      segundo cierre. Guarda los totales, el desglose y el turno de caja, y queda en la auditoría.
+    - Historial (RF-M03-27): `GET /cierres-diarios` (con cuántas correcciones tuvo cada uno) y
+      `GET /cierres-diarios/{id}` (el cierre tal como se hizo, sus ajustes, los valores
+      actualizados y el cálculo de hoy).
+    - Correcciones después del cierre (RF-M03-20, RN-M03-08/15, HU-M03-09, decisión D7):
+      registrar, corregir o anular una compra o gasto de un día cerrado (o moverla a ese día) exige
+      `password_confirmacion` del Administrador y un motivo (`motivo_correccion`; al anular, el de
+      la anulación). Sin ellos responde 422 con `requiere_autorizacion: true`. El cierre no se
+      reescribe: cada corrección queda en `cierre_ajustes` (cuánto cambiaron compras y gastos,
+      quién autorizó, cuándo y por qué) y en la auditoría (`ajuste_cierre_diario`).
+    - CORREGIDO de paso: el total de compras y gastos de un día se calculaba con `whereBetween`
+      sobre la fecha, que en SQLite no encontraba los registros (la fecha se guarda con hora).
+    - Frontend: `components/compras/CierreDiarioPanel.vue` en Compras y gastos — cálculo del día
+      con todo el desglose, botón "Cerrar el día" (desactivado con el motivo si la caja sigue
+      abierta), cierres anteriores, y en un día cerrado sus correcciones y los valores
+      actualizados. Al guardar o anular algo de un día cerrado, el formulario pide la contraseña y
+      el motivo.
+
 ## Qué falta a propósito
 
 Cada uno de los puntos abiertos ya está documentado en los documentos oficiales de módulo (no son

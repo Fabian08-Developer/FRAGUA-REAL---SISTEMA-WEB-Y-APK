@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CierreDiario extends Model
 {
@@ -15,7 +16,7 @@ class CierreDiario extends Model
 
     protected $fillable = [
         'fecha', 'total_ventas', 'total_compras', 'total_gastos',
-        'resultado_operativo', 'cerrado_por',
+        'resultado_operativo', 'cerrado_por', 'detalle', 'caja_turno_id',
     ];
 
     protected $casts = [
@@ -24,6 +25,7 @@ class CierreDiario extends Model
         'total_compras' => 'decimal:2',
         'total_gastos' => 'decimal:2',
         'resultado_operativo' => 'decimal:2',
+        'detalle' => 'array',
     ];
 
     // Mismo nombre colisionaba con la columna 'cerrado_por' al serializar (ver el mismo
@@ -32,5 +34,16 @@ class CierreDiario extends Model
     public function cerradoPorUsuario(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cerrado_por');
+    }
+
+    // Fase 2, tarea 5 (RF-M03-20, HU-M03-09): correcciones autorizadas después del cierre.
+    public function ajustes(): HasMany
+    {
+        return $this->hasMany(CierreAjuste::class, 'cierre_diario_id')->orderBy('id');
+    }
+
+    public function cajaTurno(): BelongsTo
+    {
+        return $this->belongsTo(CajaTurno::class);
     }
 }

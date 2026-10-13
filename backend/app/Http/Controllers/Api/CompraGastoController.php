@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\CompraGasto\AnularCompraGastoRequest;
 use App\Http\Requests\Api\CompraGasto\StoreCompraGastoRequest;
 use App\Http\Requests\Api\CompraGasto\UpdateCompraGastoRequest;
+use App\Models\CierreDiario;
 use App\Models\CompraGasto;
 use App\Services\CierreDiarioService;
 use App\Services\CompraGastoService;
@@ -74,7 +75,7 @@ class CompraGastoController extends Controller
 
     public function anular(AnularCompraGastoRequest $request, CompraGasto $compraGasto)
     {
-        return response()->json($this->compraGastoService->anular($compraGasto, $request->motivo, $request->user()));
+        return response()->json($this->compraGastoService->anular($compraGasto, $request->motivo, $request->user(), $request->input('password_confirmacion')));
     }
 
     // RF-M03-07, HU-M03-02: adjuntar o reemplazar el soporte (multipart, campo "soporte").
@@ -100,11 +101,44 @@ class CompraGastoController extends Controller
         );
     }
 
+    // RF-M03-25, HU-M03-08: cierre formal (solo Administrador). Exige la caja del día cerrada.
     public function generarCierreDiario(Request $request)
     {
         abort_if(! $request->user()->esAdministrador(), 403);
         $request->validate(['fecha' => ['required', 'date']]);
 
-        return response()->json($this->cierreDiarioService->generar(new \DateTime($request->fecha), $request->user()), 201);
+        $cierre = $this->cierreDiarioService->generar($request->string('fecha')->toString(), $request->user());
+
+        return response()->json($this->cierreDiarioService->consulta($cierre), 201);
+    }
+
+    // ---- Fase 2, tarea 5: consulta previa e historial de cierres ----
+
+    // RF-M03-26: cálculo actualizado del día antes del cierre formal (o el de un día ya cerrado).
+    public function previaCierre(Request $request)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+        $request->validate(['fecha' => ['required', 'date']]);
+
+        return response()->json($this->cierreDiarioService->previa($request->string('fecha')->toString()));
+    }
+
+    // RF-M03-27: historial de cierres realizados, del más reciente al más antiguo.
+    public function cierres(Request $request)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+
+        return response()->json(
+            CierreDiario::with('cerradoPorUsuario:id,nombre')->withCount('ajustes')
+                ->latest('fecha')->paginate(20)
+        );
+    }
+
+    // RN-M03-15, HU-M03-09: un cierre tal como se hizo, sus ajustes posteriores y los valores actualizados.
+    public function verCierre(Request $request, CierreDiario $cierre)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+
+        return response()->json($this->cierreDiarioService->consulta($cierre));
     }
 }

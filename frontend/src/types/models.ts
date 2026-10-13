@@ -373,4 +373,66 @@ export interface CierreDiario {
   resultado_operativo: number
   cerrado_por: number
   cerrado_por_usuario?: Usuario
+  created_at?: string
+  // Fase 2, tarea 5: la foto del desglose al cerrar, el arqueo que la alimentó y cuántas
+  // correcciones tuvo después (RF-M03-22 a 27, RN-M06-11, HU-M03-09).
+  detalle?: CalculoCierre | null
+  caja_turno_id?: number | null
+  ajustes_count?: number
+}
+
+// Fase 2, tarea 5 — CierreDiarioService::calcular(): el día con su desglose (RF-M03-21 a 24).
+export interface CalculoCierre {
+  fecha: string
+  ventas: {
+    total: number
+    pedidos: number
+    por_tipo: { tipo_venta: 'bebida' | 'alimento' | 'otro'; monto: number }[]
+    por_metodo: { metodo: string; monto: number }[]
+  }
+  compras: { total: number; por_categoria: { categoria: string; monto: number; cantidad: number }[] }
+  gastos: { total: number; por_categoria: { categoria: string; monto: number; cantidad: number }[] }
+  compras_gastos_por_forma_de_pago: { metodo: string; compras: number; gastos: number; total: number }[]
+  resultado_operativo: number
+  caja: {
+    id: number
+    estado: 'abierta' | 'cerrada'
+    base_inicial: number
+    efectivo_esperado: number
+    efectivo_contado: number | null
+    diferencia: number | null
+    justificacion: string | null
+  } | null
+  nota: string
+}
+
+// GET /cierres-diarios/previa: el cálculo de hoy y si ya se cerró (RF-M03-26).
+export interface PreviaCierre extends CalculoCierre {
+  cerrado: boolean
+  cierre_id: number | null
+  puede_cerrar: boolean
+  motivo_no_cierra: string | null
+}
+
+// Corrección autorizada a un día cerrado (RF-M03-20, RN-M03-08, HU-M03-09).
+export interface CierreAjuste {
+  id: number
+  accion: 'registrar' | 'editar' | 'anular'
+  compra_gasto_id: number | null
+  delta_compras: number
+  delta_gastos: number
+  detalle: Record<string, unknown> | null
+  motivo: string
+  created_at: string
+  autorizado_por_usuario?: Pick<Usuario, 'id' | 'nombre'>
+  compra_gasto?: Pick<CompraGasto, 'id' | 'descripcion' | 'tipo'> | null
+}
+
+// GET /cierres-diarios/{id}: el cierre tal como se hizo, sus ajustes y los valores actualizados.
+export interface ConsultaCierre {
+  cierre: CierreDiario
+  ajustes: CierreAjuste[]
+  actualizado: { total_ventas: number; total_compras: number; total_gastos: number; resultado_operativo: number }
+  calculo_hoy: CalculoCierre
+  nota: string
 }

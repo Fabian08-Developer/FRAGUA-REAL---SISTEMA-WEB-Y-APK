@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
+use App\Exceptions\AutorizacionRequerida;
+use App\Models\CierreDiario;
 use App\Models\CompraGasto;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +26,11 @@ use RuntimeException;
  * soporte JPG/PNG/PDF en almacenamiento privado (RF-M03-07, RNF-M03-06/11); filtros y totales
  * del historial (RF-M03-13, HU-M03-03); y trazabilidad de cada alta, corrección y anulación
  * (RF-M03-19, RNF-M03-04): quién y cuándo en el registro, y antes/después en la auditoría.
+ *
+ * Fase 2, tarea 5 (RF-M03-20, RN-M03-08, HU-M03-09): registrar, corregir o anular algo de un día que
+ * ya tiene cierre formal exige que el Administrador confirme con su contraseña y escriba el motivo
+ * (`password_confirmacion` y `motivo_correccion`; al anular, el motivo es el de la anulación). El
+ * cierre no se reescribe: la corrección queda como un ajuste del cierre (CierreDiarioService).
  */
 class CompraGastoService
 {
@@ -49,8 +57,10 @@ class CompraGastoService
         if ($valor <= 0) {
             throw new RuntimeException('El valor de la compra/gasto debe ser mayor a 0 (RN-M03-01).');
         }
+        $fecha = \Illuminate\Support\Carbon::parse($data['fecha'])->toDateString();
+        $cierres = $this->autorizarDiasCerrados([$fecha], $data, $actor, $data['motivo_correccion'] ?? null);
 
-        return DB::transaction(function () use ($data, $actor, $soporte, $valor) {
+        return DB::transaction(function () use ($data, $actor, $soporte, $valor, $cierres, $fecha) {
             $compraGasto = new CompraGasto();
             $compraGasto->fill(array_intersect_key($data, array_flip(self::CAMPOS_EDITABLES)));
             $compraGasto->valor = $valor;
@@ -74,6 +84,10 @@ class CompraGastoService
                 'con_soporte' => $compraGasto->tiene_soporte,
             ], $actor);
 
+            $this->ajustarCierres($cierres, $compraGasto, 'registrar', [$fecha => $this->delta($compraGasto->tipo, $valor)], [
+                'descripcion' => $compraGasto->descripcion, 'valor' => $valor, 'tipo' => $compraGasto->tipo,
+            ], (string) ($data['motivo_correccion'] ?? ''), $actor);
+
             return $compraGasto->fresh(['registradoPorUsuario']);
         });
     }
@@ -93,11 +107,16 @@ class CompraGastoService
 
         $fechaAnterior = $compraGasto->fecha?->toDateString();
         $antes = $compraGasto->getAttributes();
+        $tipoAnterior = $compraGasto->tipo;
+        $valorAnterior = (float) $compraGasto->valor;
 
         $compraGasto->fill(array_intersect_key($data, array_flip(self::CAMPOS_EDITABLES)));
         if (! $compraGasto->isDirty()) {
             return $compraGasto->load(['registradoPorUsuario', 'editadoPorUsuario']);
         }
+        $fechaNueva = $compraGasto->fecha->toDateString();
+        $cierres = $this->autorizarDiasCerrados(array_unique([$fechaAnterior, $fechaNueva]), $data, $actor, $data['motivo_correccion'] ?? null);
+
         $compraGasto->editado_por = $actor?->id;
         $compraGasto->editado_at = now();
         $compraGasto->save();
@@ -118,15 +137,23 @@ class CompraGastoService
         }
         app(AuditoriaService::class)->registrar('editar_compra_gasto', 'CompraGasto', $compraGasto->id, ['cambios' => $cambios], $actor);
 
+        // Lo que cambió en cada día cerrado: sale lo de antes y entra lo de ahora.
+        $deltas = [];
+        $this->sumarDelta($deltas, $fechaAnterior, $this->delta($tipoAnterior, -$valorAnterior));
+        $this->sumarDelta($deltas, $fechaNueva, $this->delta($compraGasto->tipo, (float) $compraGasto->valor));
+        $this->ajustarCierres($cierres, $compraGasto, 'editar', $deltas, ['cambios' => $cambios], (string) ($data['motivo_correccion'] ?? ''), $actor);
+
         return $compraGasto->load(['registradoPorUsuario', 'editadoPorUsuario']);
     }
 
     // RN-M03-04: no se borra un registro de compra/gasto, se anula con motivo.
-    public function anular(CompraGasto $compraGasto, string $motivo, ?User $actor = null): CompraGasto
+    public function anular(CompraGasto $compraGasto, string $motivo, ?User $actor = null, ?string $passwordConfirmacion = null): CompraGasto
     {
         if (! $compraGasto->estaActivo()) {
             throw new RuntimeException('Esta compra/gasto ya está anulada.');
         }
+        $fecha = $compraGasto->fecha->toDateString();
+        $cierres = $this->autorizarDiasCerrados([$fecha], ['password_confirmacion' => $passwordConfirmacion], $actor, $motivo);
 
         $compraGasto->estado = 'anulado';
         $compraGasto->anulado_motivo = $motivo;
@@ -143,7 +170,69 @@ class CompraGastoService
             'fecha' => $compraGasto->fecha->toDateString(),
         ], $actor);
 
+        $this->ajustarCierres($cierres, $compraGasto, 'anular', [$fecha => $this->delta($compraGasto->tipo, -(float) $compraGasto->valor)], [
+            'descripcion' => $compraGasto->descripcion, 'valor' => (float) $compraGasto->valor, 'tipo' => $compraGasto->tipo,
+        ], $motivo, $actor);
+
         return $compraGasto->load(['registradoPorUsuario', 'anuladoPorUsuario']);
+    }
+
+    // ───────────── Correcciones sobre días cerrados (Fase 2, tarea 5) ─────────────
+
+    /**
+     * RN-M03-08, RF-M03-20: si alguna de esas fechas ya tiene cierre formal, exige la contraseña del
+     * Administrador que hace el cambio y un motivo. Devuelve los cierres afectados, por fecha.
+     *
+     * @param  array<int, string|null>  $fechas
+     * @return array<string, CierreDiario>
+     */
+    private function autorizarDiasCerrados(array $fechas, array $data, ?User $actor, ?string $motivo): array
+    {
+        $fechas = array_values(array_filter(array_unique($fechas)));
+        $cierres = CierreDiario::whereIn(DB::raw('DATE(fecha)'), $fechas)->get()
+            ->keyBy(fn (CierreDiario $c) => $c->fecha->toDateString())->all();
+        if (! $cierres) {
+            return [];
+        }
+
+        $dias = implode(' y ', array_map(fn ($f) => \Illuminate\Support\Carbon::parse($f)->format('d/m/Y'), array_keys($cierres)));
+        $password = $data['password_confirmacion'] ?? null;
+        if (! $actor || ! $actor->esAdministrador() || empty($password) || ! Hash::check($password, $actor->password)) {
+            throw new AutorizacionRequerida(
+                "El día {$dias} ya tiene cierre. Para cambiarlo confirma tu contraseña de Administrador y escribe el motivo (RN-M03-08).",
+                ['fechas_cerradas' => array_keys($cierres)],
+            );
+        }
+        if (trim((string) $motivo) === '') {
+            throw new AutorizacionRequerida("El día {$dias} ya tiene cierre: escribe el motivo de la corrección.", ['fechas_cerradas' => array_keys($cierres)]);
+        }
+
+        return $cierres;
+    }
+
+    /** @param array<string, CierreDiario> $cierres  @param array<string, array{0: float, 1: float}> $deltas */
+    private function ajustarCierres(array $cierres, CompraGasto $registro, string $accion, array $deltas, array $detalle, string $motivo, ?User $actor): void
+    {
+        foreach ($cierres as $fecha => $cierre) {
+            [$compras, $gastos] = $deltas[$fecha] ?? [0.0, 0.0];
+            // Solo hay cierres aquí si autorizarDiasCerrados() ya verificó al Administrador.
+            app(CierreDiarioService::class)->registrarAjuste($cierre, $registro, $accion, $compras, $gastos, $detalle, $motivo, $actor);
+        }
+    }
+
+    /** @return array{0: float, 1: float} [compras, gastos] */
+    private function delta(string $tipo, float $valor): array
+    {
+        return $tipo === 'compra' ? [$valor, 0.0] : [0.0, $valor];
+    }
+
+    private function sumarDelta(array &$deltas, ?string $fecha, array $delta): void
+    {
+        if (! $fecha) {
+            return;
+        }
+        $actual = $deltas[$fecha] ?? [0.0, 0.0];
+        $deltas[$fecha] = [round($actual[0] + $delta[0], 2), round($actual[1] + $delta[1], 2)];
     }
 
     /**
@@ -223,7 +312,9 @@ class CompraGastoService
     {
         return (float) CompraGasto::where('tipo', $tipo)
             ->where('estado', 'activo')
-            ->whereBetween('fecha', [$desde->format('Y-m-d'), $hasta->format('Y-m-d')])
+            // whereDate: en SQLite la columna DATE se guarda con hora ("2026-10-13 00:00:00").
+            ->whereDate('fecha', '>=', $desde->format('Y-m-d'))
+            ->whereDate('fecha', '<=', $hasta->format('Y-m-d'))
             ->sum('valor');
     }
 }

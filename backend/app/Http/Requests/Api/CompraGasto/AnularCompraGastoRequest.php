@@ -15,6 +15,8 @@ class AnularCompraGastoRequest extends FormRequest
     {
         return [
             'motivo' => ['required', 'string', 'max:255'],
+            // Fase 2, tarea 5 (RN-M03-08): solo se pide si el día ya tiene cierre formal.
+            'password_confirmacion' => ['nullable', 'string'],
         ];
     }
 }

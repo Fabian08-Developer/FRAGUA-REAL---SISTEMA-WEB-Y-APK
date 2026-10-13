@@ -67,6 +67,8 @@ permitía editar los valores, pero no había dónde hacerlo).
 - [ ] "Cambiar nombre": el QR sigue siendo el mismo; un nombre de otra mesa se rechaza (RF-M05-002).
 - [ ] Desactivar (con historial no se borra) y reactivar; todo queda en la auditoría (RF-M05-021).
 - [ ] Regenerar QR: el anterior deja de funcionar (CA-M05-004).
+- [ ] Ver QR de una mesa: se ve la imagen del QR; "Descargar PDF" baja el PDF con el nombre de la
+      mesa y "Imprimir" abre la impresión, sin depender de internet (librerías locales).
 - [ ] Liberar mesa con pedidos activos: bloqueado.
 - [ ] Liberación forzada: exige motivo y deja registro en auditoría (RF-M05-011). Probar también con el Mesero, que tiene el botón "Forzar liberación…" en Mesero > Mesas (decidido el 06/10).
 
@@ -130,8 +132,17 @@ permitía editar los valores, pero no había dónde hacerlo).
       la lista cambian con el filtro y no cuentan los anulados (RF-M03-13).
 - [ ] Corregir el valor de un registro: la lista dice quién lo corrigió y la auditoría guarda el
       valor anterior y el nuevo; anular muestra quién y cuándo (RF-M03-19).
-- [ ] Generar el cierre diario y revisar que los totales coinciden con lo registrado.
-- [ ] El cierre aparece en el historial.
+- [ ] "Ver cálculo" de hoy: ventas, compras, otros gastos y resultado, con el desglose de ventas
+      por tipo y por forma de pago, compras y gastos por categoría y por forma de pago, y el arqueo
+      de la caja (RF-M03-21 a 26, RN-M06-12). Dice que no es la utilidad contable (RF-M03-34).
+- [ ] Con la caja del día abierta, "Cerrar el día" está desactivado y lo explica (RN-M06-11);
+      después de cerrar la caja, se cierra el día y los totales coinciden con lo registrado.
+- [ ] No se puede cerrar dos veces el mismo día ni un día futuro.
+- [ ] "Cierres anteriores" lista el cierre; al abrirlo se ve igual que al cerrarlo (RF-M03-27).
+- [ ] Registrar un gasto con la fecha de un día cerrado: el formulario pide la contraseña y el
+      motivo; con una contraseña equivocada no se guarda; con la correcta, el cierre muestra la
+      corrección y los valores actualizados, y el cierre original no cambia (RF-M03-20, HU-M03-09).
+- [ ] Corregir el valor y anular un registro de un día cerrado también piden la contraseña.
 
 ## 8. Reportes (M08)
 - [ ] Los 6 reportes cargan con la semana actual por defecto (RN-M08-03).

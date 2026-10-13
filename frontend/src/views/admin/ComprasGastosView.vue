@@ -5,15 +5,16 @@
 // observaciones, soporte JPG/PNG/PDF subido como archivo y visible solo con sesión (RF-M03-07,
 // RNF-M03-06/11), filtros del historial con sus totales (RF-M03-13) y quién corrigió o anuló.
 import { computed, onMounted, ref } from 'vue'
-import { Ban, Paperclip, Pencil, Plus, Printer, Receipt, ShoppingCart, SlidersHorizontal, Wallet } from 'lucide-vue-next'
+import { Ban, Paperclip, Pencil, Plus, Receipt, ShoppingCart, SlidersHorizontal, Wallet } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatCard from '@/components/common/StatCard.vue'
-import { compraGastoService, type CompraGastoPayload, type FiltrosCompraGasto } from '@/services/compra-gasto.service'
+import CierreDiarioPanel from '@/components/compras/CierreDiarioPanel.vue'
+import { compraGastoService, requiereAutorizacion, type CompraGastoPayload, type FiltrosCompraGasto } from '@/services/compra-gasto.service'
 import { reporteService } from '@/services/reporte.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
-import type { CierreDiario, CompraGasto } from '@/types/models'
+import type { CompraGasto } from '@/types/models'
 
 function hoy() {
   // Fecha local (Bogotá en la práctica) en formato Y-m-d — `fecha` es una columna DATE
@@ -163,11 +164,17 @@ function cambiarTipo(tipo: CompraGastoPayload['tipo']) {
 const erroresForm = ref<Record<string, string>>({})
 const errorForm = ref('')
 const guardando = ref(false)
+// Fase 2, tarea 5 (RN-M03-08, RF-M03-20): si la fecha ya tiene cierre, se pide la contraseña del
+// Administrador y el motivo, y se reintenta. El cierre no se reescribe: queda como corrección.
+const pideAutorizacion = ref(false)
+const autorizacion = ref({ password: '', motivo: '' })
 
 function abrirCrear() {
   editando.value = null
   form.value = formVacio()
   soporte.value = null
+  pideAutorizacion.value = false
+  autorizacion.value = { password: '', motivo: '' }
   erroresForm.value = {}
   errorForm.value = ''
   modalFormAbierto.value = true
@@ -189,6 +196,8 @@ function abrirEditar(registro: CompraGasto) {
     fecha: registro.fecha.slice(0, 10),
   }
   soporte.value = null
+  pideAutorizacion.value = false
+  autorizacion.value = { password: '', motivo: '' }
   erroresForm.value = {}
   errorForm.value = ''
   modalFormAbierto.value = true
@@ -206,6 +215,7 @@ async function confirmarGuardar() {
     proveedor: form.value.proveedor || null,
     numero_factura: form.value.numero_factura || null,
     observaciones: form.value.observaciones || null,
+    ...(pideAutorizacion.value ? { password_confirmacion: autorizacion.value.password, motivo_correccion: autorizacion.value.motivo.trim() } : {}),
   }
 
   try {
@@ -218,8 +228,14 @@ async function confirmarGuardar() {
       await cargar()
     }
     await cargarResumenDia()
+    await panelCierre.value?.recargar()
     modalFormAbierto.value = false
   } catch (e) {
+    if (requiereAutorizacion(e)) {
+      pideAutorizacion.value = true
+      errorForm.value = mensajeDeError(e, 'Ese día ya tiene cierre.')
+      return
+    }
     const campos = erroresDeValidacion(e)
     if (Object.keys(campos).length) {
       erroresForm.value = campos
@@ -259,12 +275,16 @@ function formatoFechaHora(valor?: string | null) {
 // ---- Anular ----
 const registroAAnular = ref<CompraGasto | null>(null)
 const motivoAnular = ref('')
+const passwordAnular = ref('')
+const anularPideAutorizacion = ref(false)
 const errorAnular = ref('')
 const anulando = ref(false)
 
 function abrirAnular(registro: CompraGasto) {
   registroAAnular.value = registro
   motivoAnular.value = ''
+  passwordAnular.value = ''
+  anularPideAutorizacion.value = false
   errorAnular.value = ''
 }
 
@@ -278,40 +298,22 @@ async function confirmarAnular() {
   anulando.value = true
   errorAnular.value = ''
   try {
-    const { data } = await compraGastoService.anular(registroAAnular.value.id, motivoAnular.value.trim())
+    const { data } = await compraGastoService.anular(registroAAnular.value.id, motivoAnular.value.trim(), passwordAnular.value)
     reemplazar(data)
     await cargarResumenDia()
+    await panelCierre.value?.recargar()
     registroAAnular.value = null
   } catch (e) {
+    if (requiereAutorizacion(e)) anularPideAutorizacion.value = true
     errorAnular.value = mensajeDeError(e, 'No pudimos anular el registro.')
   } finally {
     anulando.value = false
   }
 }
 
-// ---- Cierre diario (RN-M03-09/10/15, HU-M03-08) ----
-const fechaCierre = ref(hoy())
-const generandoCierre = ref(false)
-const errorCierre = ref('')
-const ultimoCierre = ref<CierreDiario | null>(null)
-
-async function generarCierre() {
-  generandoCierre.value = true
-  errorCierre.value = ''
-  ultimoCierre.value = null
-  try {
-    const { data } = await compraGastoService.generarCierreDiario(fechaCierre.value)
-    ultimoCierre.value = data
-  } catch (e) {
-    errorCierre.value = mensajeDeError(e, 'No pudimos generar el cierre diario.')
-  } finally {
-    generandoCierre.value = false
-  }
-}
-
-function imprimirCierre() {
-  window.print()
-}
+// ---- Cierre diario: vive en CierreDiarioPanel (Fase 2, tarea 5). Se recalcula cuando cambian
+// las compras y gastos. ----
+const panelCierre = ref<{ recargar: () => Promise<unknown> } | null>(null)
 
 const contadorTexto = computed(() => (total.value === 1 ? '1 registro' : `${total.value} registros`))
 
@@ -350,58 +352,9 @@ onMounted(() => {
       />
     </div>
 
-    <!-- Cierre diario — HU-M03-08: solo Administrador lo ejecuta; queda consultable. -->
-    <div class="card mt-6 p-4 sm:p-5 print:border-none print:p-0 print:shadow-none">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between print:hidden">
-        <div>
-          <p class="section-title">Cierre diario</p>
-          <p class="mt-0.5 text-xs text-gray-500">
-            Ventas − compras − gastos del día. No es un arqueo de caja ni la utilidad contable real (RN-M03-09/10).
-          </p>
-        </div>
-        <div class="flex items-end gap-2">
-          <label class="block flex-1 sm:flex-none">
-            <span class="field-label">Fecha</span>
-            <input v-model="fechaCierre" type="date" class="field" />
-          </label>
-          <BaseButton variant="secondary" :disabled="generandoCierre" @click="generarCierre">
-            {{ generandoCierre ? 'Generando…' : 'Generar cierre' }}
-          </BaseButton>
-        </div>
-      </div>
-
-      <p v-if="errorCierre" class="mt-3 alert-error print:hidden">{{ errorCierre }}</p>
-
-      <div v-if="ultimoCierre" class="mt-4 border-t border-gray-200 pt-4">
-        <div class="flex items-center justify-between">
-          <p class="text-sm font-semibold text-ink">Cierre del {{ formatoFecha(ultimoCierre.fecha) }}</p>
-          <button type="button" class="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 print:hidden" @click="imprimirCierre">
-            <Printer :size="14" />
-            Imprimir
-          </button>
-        </div>
-        <dl class="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-          <div>
-            <dt class="text-xs text-gray-500">Ventas</dt>
-            <dd class="font-semibold text-ink">{{ formatoPrecio(ultimoCierre.total_ventas) }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs text-gray-500">Compras</dt>
-            <dd class="font-semibold text-ink">{{ formatoPrecio(ultimoCierre.total_compras) }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs text-gray-500">Gastos</dt>
-            <dd class="font-semibold text-ink">{{ formatoPrecio(ultimoCierre.total_gastos) }}</dd>
-          </div>
-          <div>
-            <dt class="text-xs text-gray-500">Resultado operativo</dt>
-            <dd class="font-semibold" :class="ultimoCierre.resultado_operativo >= 0 ? 'text-emerald-700' : 'text-red-700'">
-              {{ formatoPrecio(ultimoCierre.resultado_operativo) }}
-            </dd>
-          </div>
-        </dl>
-      </div>
-    </div>
+    <!-- Cierre diario completo (Fase 2, tarea 5): consulta previa, desglose, cierre formal,
+         historial y correcciones posteriores. -->
+    <CierreDiarioPanel ref="panelCierre" :fecha-inicial="hoy()" />
 
     <!-- Listado -->
     <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
@@ -662,6 +615,18 @@ onMounted(() => {
 
         <p v-if="errorForm" class="alert-error">{{ errorForm }}</p>
 
+        <!-- RN-M03-08: el día ya está cerrado — corrección autorizada. -->
+        <div v-if="pideAutorizacion" class="space-y-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3">
+          <label class="block">
+            <span class="field-label">Tu contraseña de Administrador</span>
+            <input v-model="autorizacion.password" type="password" autocomplete="current-password" class="field" />
+          </label>
+          <label class="block">
+            <span class="field-label">Motivo de la corrección</span>
+            <input v-model="autorizacion.motivo" type="text" maxlength="255" class="field" placeholder="Ej.: se olvidó registrar, error de digitación" />
+          </label>
+        </div>
+
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <BaseButton variant="ghost" type="button" @click="modalFormAbierto = false">Cancelar</BaseButton>
           <BaseButton variant="primary" type="submit" :disabled="guardando">
@@ -685,6 +650,10 @@ onMounted(() => {
             class="field"
             placeholder="Motivo de la anulación"
           />
+        </label>
+        <label v-if="anularPideAutorizacion" class="block">
+          <span class="field-label">Tu contraseña de Administrador (el día ya tiene cierre)</span>
+          <input v-model="passwordAnular" type="password" autocomplete="current-password" class="field" />
         </label>
         <p v-if="errorAnular" class="alert-error">{{ errorAnular }}</p>
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

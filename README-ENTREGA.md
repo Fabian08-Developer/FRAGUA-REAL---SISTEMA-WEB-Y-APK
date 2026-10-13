@@ -114,7 +114,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 11/10/2026 van 420 de 579 verificables, 73 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 11/10/2026 van 434 de 579 verificables, 75 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -123,13 +123,21 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   completa el 11/10/2026; ver los puntos 20 y 21. La Fase 2 empezó con la tarea 1
   (promociones aplicadas al pedido y descuento manual) y la tarea 2 (el depósito de la reserva
   se abona a la cuenta de la visita), la tarea 3 (el mismo catálogo en todos los canales) y la
-  tarea 4 (compras y gastos completos); ver los puntos 22 a 25.
+  tarea 4 (compras y gastos completos). Con la tarea 5 (cierre diario completo) la Fase 2 quedó
+  completa el 12/10/2026; ver los puntos 22 a 26.
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr
   `npm run build` en `frontend` antes de probarlas.
+- El modal del QR de mesa (Administrador > Mesas) cargaba las librerías de QR y PDF desde un
+  CDN (esm.sh), lo que hacía fallar `npm run build` (2 errores TS2307 de `vue-tsc`) y dejaba el
+  QR dependiendo de un servidor externo. Corregido el 12/10/2026: `qrcode` y `jspdf` (4.2.1 o
+  superior, sin las vulnerabilidades de las versiones anteriores) son dependencias del
+  proyecto y `@types/qrcode` de desarrollo; después de actualizar hay que correr
+  `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
+  imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1 y 4 de la Fase 2, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1 y 5 de la Fase 2, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -212,6 +220,13 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 - El historial de compras y gastos se filtra por fechas, categoría, forma de pago, proveedor y
   estado, con los totales de lo filtrado, y muestra quién corrigió o anuló cada registro.
 - Una compra no puede registrarse con fecha futura.
+- El cierre diario muestra primero el cálculo del día con todo su desglose (ventas por tipo y por
+  forma de pago, compras y gastos por categoría y por forma de pago, y el arqueo de la caja). Solo
+  se puede cerrar el día después de cerrar la caja de ese día. Los cierres anteriores quedan en
+  una lista para consultarlos.
+- Registrar, corregir o anular una compra o un gasto de un día ya cerrado pide la contraseña del
+  Administrador y un motivo. El cierre no cambia: la corrección se ve debajo, con los valores
+  actualizados.
 
 ## Artefactos de prueba dejados en la base de datos
 

@@ -37,6 +37,9 @@ class StoreCompraGastoRequest extends FormRequest
             'observaciones' => ['nullable', 'string', 'max:1000'],
             'fecha' => ['required', 'date', 'before_or_equal:'.now('America/Bogota')->toDateString()],
             'soporte' => self::reglasSoporte(),
+            // Fase 2, tarea 5 (RN-M03-08): solo se piden si la fecha ya tiene cierre formal.
+            'password_confirmacion' => ['nullable', 'string'],
+            'motivo_correccion' => ['nullable', 'string', 'max:255'],
         ];
     }
 

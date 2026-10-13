@@ -51,7 +51,9 @@ hora de llegada y los turnos de caja en que se recibió y se devolvió el depós
 punto 23. `2026_10_16_000001` crea `producto_extra`, los extras generales que ofrece cada producto
 (punto 24). `2026_10_16_000002` completa `compras_gastos`: cantidad, unidad, observaciones, el
 soporte guardado en almacenamiento privado y quién corrigió o anuló cada registro (punto 25).
-Pruebas automáticas: `php artisan test` (168 en `tests/Feature`).
+`2026_10_16_000003` guarda el desglose del cierre diario y su turno de caja, y crea
+`cierre_ajustes`, las correcciones autorizadas después del cierre (punto 26). Pruebas
+automáticas: `php artisan test` (175 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

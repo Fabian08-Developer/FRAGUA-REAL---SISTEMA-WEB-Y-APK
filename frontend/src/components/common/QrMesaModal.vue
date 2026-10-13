@@ -4,9 +4,10 @@
 // regenerarlo (invalida el anterior). El QR codifica la URL pública que el Cliente
 // recorre al escanear: /mesa/:qr_code (RF-M02-L-025, ver ClienteQrView.vue).
 //
-// No hay librería de QR/PDF en package.json (ver frontend/package.json) y este proyecto
-// no tiene forma de hacer `npm install` desde aquí — por eso se cargan desde CDN con
-// import() dinámico, solo cuando este modal se usa, en vez de agregarlas como dependencia.
+// Las librerías de QR (qrcode) y PDF (jspdf) son dependencias del proyecto (package.json) y se
+// cargan con import() dinámico: Vite las separa en su propio archivo y solo se descargan
+// cuando se abre este modal. Antes se traían de un CDN (esm.sh), lo que rompía `vue-tsc -b`
+// (no hay tipos para una URL) y hacía que el QR dependiera de un servidor externo.
 import { ref, watch } from 'vue'
 import { Download, Printer, RefreshCw } from 'lucide-vue-next'
 import BaseButton from './BaseButton.vue'
@@ -36,10 +37,10 @@ async function generarQr() {
   errorQr.value = ''
   qrDataUrl.value = ''
   try {
-    const QRCode = await import('https://esm.sh/qrcode@1.5.4')
-    qrDataUrl.value = await QRCode.toDataURL(urlPublica(props.mesa), { width: 360, margin: 1 })
+    const { toDataURL } = await import('qrcode')
+    qrDataUrl.value = await toDataURL(urlPublica(props.mesa), { width: 360, margin: 1 })
   } catch (e) {
-    errorQr.value = 'No pudimos generar el código QR. Verifica tu conexión a internet e inténtalo de nuevo.'
+    errorQr.value = 'No pudimos generar el código QR. Recarga la página e inténtalo de nuevo.'
   } finally {
     generando.value = false
   }
@@ -61,7 +62,7 @@ function cerrar() {
 // ---- Descargar como PDF ----
 async function descargarPdf() {
   if (!props.mesa || !qrDataUrl.value) return
-  const { jsPDF } = await import('https://esm.sh/jspdf@2.5.1')
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const anchoPagina = doc.internal.pageSize.getWidth()
 
@@ -83,9 +84,15 @@ async function descargarPdf() {
 }
 
 // ---- Imprimir directamente (sin descargar nada) ----
+// El nombre de la mesa lo escribe el Administrador: se escapa antes de ponerlo en el HTML.
+function escaparHtml(texto: string): string {
+  const entidades: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+  return texto.replace(/[&<>"']/g, (c) => entidades[c] ?? c)
+}
+
 function imprimir() {
   if (!props.mesa || !qrDataUrl.value) return
-  const mesa = props.mesa
+  const nombreMesa = escaparHtml(props.mesa.nombre)
   const iframe = document.createElement('iframe')
   iframe.style.position = 'fixed'
   iframe.style.right = '0'
@@ -106,7 +113,7 @@ function imprimir() {
     <html>
       <head>
         <meta charset="utf-8" />
-        <title>QR ${mesa.nombre}</title>
+        <title>QR ${nombreMesa}</title>
         <style>
           body { font-family: Arial, sans-serif; text-align: center; padding: 48px; }
           h1 { font-size: 16px; color: #92400e; margin: 0 0 4px; }
@@ -117,7 +124,7 @@ function imprimir() {
       </head>
       <body>
         <h1>Fragua Real Burger</h1>
-        <h2>${mesa.nombre}</h2>
+        <h2>${nombreMesa}</h2>
         <img src="${qrDataUrl.value}" />
         <p>Escanea este código con tu celular para ver el menú y pedir</p>
       </body>

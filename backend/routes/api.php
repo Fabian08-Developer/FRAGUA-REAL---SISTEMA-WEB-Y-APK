@@ -243,6 +243,10 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::put('/compras-gastos/{compraGasto}', [CompraGastoController::class, 'update']);
         Route::post('/compras-gastos/{compraGasto}/anular', [CompraGastoController::class, 'anular']);
         Route::post('/cierres-diarios', [CompraGastoController::class, 'generarCierreDiario']);
+        // Fase 2, tarea 5 (RF-M03-26/27, HU-M03-09): consulta previa, historial y detalle con ajustes.
+        Route::get('/cierres-diarios/previa', [CompraGastoController::class, 'previaCierre']);
+        Route::get('/cierres-diarios', [CompraGastoController::class, 'cierres']);
+        Route::get('/cierres-diarios/{cierre}', [CompraGastoController::class, 'verCierre']);
 
         // Reportes (M08) — los 6 reportes reales del documento (RF-M08-002 a 009), cada
         // uno con periodo (RF-M08-001), comparación (RF-M08-010) y exportación

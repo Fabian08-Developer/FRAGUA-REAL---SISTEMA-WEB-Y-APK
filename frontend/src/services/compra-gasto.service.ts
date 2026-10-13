@@ -2,7 +2,7 @@
 // /compras-gastos, PUT /compras-gastos/{id}, POST /compras-gastos/{id}/anular,
 // POST /cierres-diarios). Exclusivo Administrador.
 import api from './api'
-import type { CierreDiario, CompraGasto } from '@/types/models'
+import type { CierreDiario, CompraGasto, ConsultaCierre, PreviaCierre } from '@/types/models'
 
 export interface CompraGastoPayload {
   tipo: 'compra' | 'gasto'
@@ -18,6 +18,14 @@ export interface CompraGastoPayload {
   numero_factura?: string | null
   observaciones?: string | null
   fecha: string
+  // Fase 2, tarea 5 (RN-M03-08): solo si el día ya tiene cierre formal.
+  password_confirmacion?: string
+  motivo_correccion?: string
+}
+
+// Fase 2, tarea 5: la respuesta 422 cuando un cambio toca un día cerrado.
+export function requiereAutorizacion(e: unknown): boolean {
+  return !!(e as { response?: { data?: { requiere_autorizacion?: boolean } } })?.response?.data?.requiere_autorizacion
 }
 
 // RF-M03-13 (Fase 2, tarea 4): filtros del historial.
@@ -75,12 +83,24 @@ export const compraGastoService = {
   verSoporte(id: number) {
     return api.get<Blob>(`/compras-gastos/${id}/soporte`, { responseType: 'blob' })
   },
-  anular(id: number, motivo: string) {
-    return api.post<CompraGasto>(`/compras-gastos/${id}/anular`, { motivo })
+  anular(id: number, motivo: string, passwordConfirmacion?: string) {
+    return api.post<CompraGasto>(`/compras-gastos/${id}/anular`, { motivo, password_confirmacion: passwordConfirmacion || undefined })
   },
   // RN-M03-04/09: no es un arqueo de caja — es la foto contable del día (ventas, compras,
-  // gastos, resultado operativo), una sola vez por fecha.
+  // gastos, resultado operativo), una sola vez por fecha. Fase 2, tarea 5: responde el cierre
+  // con su desglose; exige la caja del día cerrada (RN-M06-11).
   generarCierreDiario(fecha: string) {
-    return api.post<CierreDiario>('/cierres-diarios', { fecha })
+    return api.post<ConsultaCierre>('/cierres-diarios', { fecha })
+  },
+  // RF-M03-26: el cálculo del día antes del cierre formal.
+  previaCierre(fecha: string) {
+    return api.get<PreviaCierre>('/cierres-diarios/previa', { params: { fecha } })
+  },
+  // RF-M03-27: historial de cierres.
+  cierres(page = 1) {
+    return api.get<{ data: CierreDiario[]; current_page: number; last_page: number; total: number }>('/cierres-diarios', { params: { page } })
+  },
+  verCierre(id: number) {
+    return api.get<ConsultaCierre>(`/cierres-diarios/${id}`)
   },
 }
