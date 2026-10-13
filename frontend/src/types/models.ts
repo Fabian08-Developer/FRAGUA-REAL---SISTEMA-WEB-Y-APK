@@ -267,6 +267,8 @@ export interface Pedido {
   cliente_id: number | null
   cliente_invitado_nombre: string | null
   cliente_invitado_telefono: string | null
+  // Fase 4, tarea 5: correo opcional del invitado para avisarle (el Cliente con cuenta usa el suyo).
+  cliente_invitado_correo?: string | null
   // RF-M07-004, RF-M07-R-003: teléfono para llamar al cliente (domicilio y recogida).
   telefono_contacto?: string | null
   direccion_entrega: string | null
@@ -295,10 +297,28 @@ export interface Pedido {
   recogido_at?: string | null
   finalizado_at?: string | null
   cancelado_motivo?: string | null
+  // Fase 4, tarea 5 (RF-M07-R-012): la recogida está lista (no es un estado: sigue en preparando).
+  listo_at?: string | null
+  listo_por?: number | null
+  avisos?: PedidoAviso[]
   mesa?: Mesa
   cliente?: Usuario | null
   detalles?: PedidoDetalle[]
   pagos?: Pago[]
+}
+
+// Fase 4, tarea 5: aviso al cliente de un pedido (hoy, «listo para recoger»), del más reciente al más antiguo.
+export interface PedidoAviso {
+  id: number
+  pedido_id: number
+  tipo: 'listo_para_recoger'
+  canal: 'correo' | 'sms'
+  destino: string
+  estado: 'pendiente' | 'enviado' | 'fallido'
+  intentos: number
+  error: string | null
+  enviado_at: string | null
+  created_at: string
 }
 
 // Espeja app/Models/Reserva.php — sin cliente_id ni "número de personas": la reserva

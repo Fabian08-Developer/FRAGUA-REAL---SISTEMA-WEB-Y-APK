@@ -57,6 +57,12 @@ class PedidoService
             $pedido->cliente_id = $data['cliente_id'] ?? null;
             $pedido->cliente_invitado_nombre = $data['cliente_invitado_nombre'] ?? null;
             $pedido->cliente_invitado_telefono = $data['cliente_invitado_telefono'] ?? null;
+            // Fase 4, tarea 5: correo opcional del invitado para avisarle (RF-M07-R-012). El Cliente
+            // con cuenta usa el de su cuenta.
+            $correoInvitado = mb_strtolower(trim((string) ($data['cliente_invitado_correo'] ?? '')));
+            $pedido->cliente_invitado_correo = $data['tipo'] !== 'local' && empty($data['cliente_id']) && $correoInvitado !== ''
+                ? $correoInvitado
+                : null;
             $esRemoto = $data['tipo'] !== 'local';
             $pedido->telefono_contacto = $esRemoto ? $this->telefonoDeContacto($data) : null;
             // RN-M07-R-01: la recogida no lleva dirección ni barrio aunque el formulario los mande.
@@ -679,7 +685,7 @@ class PedidoService
     {
         $pedido->loadMissing(['modificaciones.usuario', 'pagos']);
         $nombres = User::whereIn('id', array_filter([
-            $pedido->confirmado_por, $pedido->entregado_por, $pedido->recogido_por,
+            $pedido->confirmado_por, $pedido->listo_por, $pedido->entregado_por, $pedido->recogido_por,
             $pedido->finalizado_por, $pedido->cancelado_por,
             ...$pedido->pagos->pluck('registrado_por')->all(),
             ...$pedido->pagos->pluck('anulado_por')->all(),
@@ -690,6 +696,7 @@ class PedidoService
             ['tipo' => 'estado', 'fecha' => $pedido->created_at, 'quien' => $pedido->origen === 'mesero' ? 'Mesero' : ($pedido->origen === 'qr' ? 'Cliente (QR de mesa)' : 'Cliente (web)'), 'descripcion' => 'Pedido creado (PENDIENTE)'],
             ['tipo' => 'estado', 'fecha' => $pedido->confirmado_at, 'quien' => $quien($pedido->confirmado_por), 'descripcion' => 'Pedido confirmado'],
             ['tipo' => 'estado', 'fecha' => $pedido->preparando_at, 'quien' => null, 'descripcion' => 'Pasó a preparación'],
+            ['tipo' => 'estado', 'fecha' => $pedido->listo_at, 'quien' => $quien($pedido->listo_por), 'descripcion' => 'Listo para recoger'],
             ['tipo' => 'estado', 'fecha' => $pedido->entregado_at, 'quien' => $quien($pedido->entregado_por), 'descripcion' => 'Entrega confirmada'],
             ['tipo' => 'estado', 'fecha' => $pedido->recogido_at, 'quien' => $quien($pedido->recogido_por), 'descripcion' => 'Recogida confirmada'],
             ['tipo' => 'estado', 'fecha' => $pedido->finalizado_at, 'quien' => $quien($pedido->finalizado_por), 'descripcion' => 'Pedido finalizado'],
@@ -778,6 +785,35 @@ class PedidoService
         $pedido->save();
 
         return $pedido;
+    }
+
+    /**
+     * Fase 4, tarea 5 — RF-M07-R-012, RN-M07-R-03, HU-M07-012: el Mesero (o el Administrador)
+     * marca que una recogida ya está lista y el cliente recibe el aviso por correo (D3: correo en
+     * V1, SMS después). No es un estado nuevo: el pedido sigue en PREPARANDO hasta que el cliente
+     * lo recoge y se cumple el pago (RN-M07-R-04); solo queda la hora y quién lo marcó. Todas sus
+     * líneas quedan preparadas (RN-PED-10: ya no se cambian).
+     * Si el pedido no tiene correo (invitado que no lo dejó), no hay aviso: el Mesero llama.
+     */
+    public function marcarListo(Pedido $pedido, User $actor): Pedido
+    {
+        if (! $pedido->esRecogida()) {
+            throw new RuntimeException('Solo un pedido para recoger se marca como listo para recoger.');
+        }
+        if ($pedido->estado !== 'preparando') {
+            throw new RuntimeException('Solo se marca listo un pedido en preparación.');
+        }
+        if ($pedido->listo_at !== null || $pedido->recogido_at !== null) {
+            throw new RuntimeException('Este pedido ya estaba marcado como listo para recoger.');
+        }
+
+        return DB::transaction(function () use ($pedido, $actor) {
+            $pedido->detalles()->where('preparado', false)->update(['preparado' => true]);
+            $pedido->forceFill(['listo_at' => now(), 'listo_por' => $actor->id])->save();
+            app(AvisoPedidoService::class)->programar($pedido->fresh('cliente'), 'listo_para_recoger');
+
+            return $pedido->fresh();
+        });
     }
 
     /**

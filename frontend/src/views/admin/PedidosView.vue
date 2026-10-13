@@ -8,6 +8,7 @@
 // Fase 1: también edita un pedido PENDIENTE o lo no preparado de uno CONFIRMADO (RN-PED-07/08)
 // y consulta el historial de cualquier pedido (HU-M02-020).
 // Fase 2, tarea 1: aplica o quita un descuento manual con motivo (RF-M04-036, HU-M04-015).
+// Fase 4, tarea 5: marca una recogida «Listo para recoger» y reintenta el aviso si falló (RF-M07-R-012).
 import { computed, onMounted, ref, watch } from 'vue'
 import { ChevronDown, History, Pencil, Percent, RefreshCw, ShoppingBasket } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
@@ -17,11 +18,12 @@ import DatosEntregaPedido from '@/components/pedidos/DatosEntregaPedido.vue'
 import DescuentoPedidoModal from '@/components/pedidos/DescuentoPedidoModal.vue'
 import EditarPedidoModal from '@/components/pedidos/EditarPedidoModal.vue'
 import HistorialPedidoModal from '@/components/pedidos/HistorialPedidoModal.vue'
+import ListoParaRecoger from '@/components/pedidos/ListoParaRecoger.vue'
 import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
 import { TIPOS_PEDIDO_UI, formatoHoraPedido, titularPedido } from '@/utils/pedidoUi'
 import { pedidoService } from '@/services/pedido.service'
 import { mensajeDeError } from '@/services/errors'
-import type { Pedido } from '@/types/models'
+import type { Pedido, PedidoAviso } from '@/types/models'
 
 const pedidos = ref<Pedido[]>([])
 const cargando = ref(true)
@@ -139,6 +141,24 @@ async function marcarPreparando(pedido: Pedido) {
     procesando.value = null
   }
 }
+
+// Fase 4, tarea 5 (RF-M07-R-012): la recogida está lista; el backend avisa al cliente por correo.
+async function avisar(pedido: Pedido, accion: () => Promise<{ data: Pedido }>, mensajeFallo: string) {
+  procesando.value = pedido.id
+  error.value = ''
+  try {
+    const { data } = await accion()
+    reemplazarPedido(data)
+  } catch (e) {
+    error.value = mensajeDeError(e, mensajeFallo)
+  } finally {
+    procesando.value = null
+  }
+}
+const marcarListo = (pedido: Pedido) =>
+  avisar(pedido, () => pedidoService.marcarListo(pedido.id), 'No pudimos marcar el pedido como listo para recoger.')
+const reintentarAviso = (pedido: Pedido, aviso: PedidoAviso) =>
+  avisar(pedido, () => pedidoService.reintentarAviso(pedido.id, aviso.id), 'No pudimos reintentar el aviso.')
 
 // ---- Cancelar (motivo obligatorio, CancelarPedidoRequest) ----
 // ---- Editar e historial (Fase 1, tarea 1) ----
@@ -314,6 +334,13 @@ onMounted(cargar)
                 </span>
               </div>
             </div>
+
+            <ListoParaRecoger
+              :pedido="pedido"
+              :procesando="procesando === pedido.id"
+              @marcar="marcarListo(pedido)"
+              @reintentar="(aviso) => reintentarAviso(pedido, aviso)"
+            />
 
             <div
               v-if="['pendiente', 'confirmado', 'preparando'].includes(pedido.estado)"

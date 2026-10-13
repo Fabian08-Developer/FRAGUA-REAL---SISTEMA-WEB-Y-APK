@@ -21,6 +21,8 @@ export interface CrearPedidoPayload {
   mesa_id?: number
   cliente_invitado_nombre?: string
   cliente_invitado_telefono?: string
+  // Fase 4, tarea 5: opcional, para avisarle al invitado que su pedido está listo.
+  cliente_invitado_correo?: string
   // Domicilio/recogida: el del invitado ya sirve; el Cliente con cuenta lo manda aquí.
   telefono_contacto?: string
   // Domicilio: dirección, barrio y referencia son obligatorios (RN-M07-01).
@@ -127,6 +129,13 @@ export const pedidoService = {
   },
   confirmarRecogida(id: number) {
     return api.post<Pedido>(`/pedidos/${id}/recoger`)
+  },
+  // Fase 4, tarea 5 (RF-M07-R-012): la recogida está lista; el backend avisa al cliente por correo.
+  marcarListo(id: number) {
+    return api.post<Pedido>(`/pedidos/${id}/listo`)
+  },
+  reintentarAviso(id: number, avisoId: number) {
+    return api.post<Pedido>(`/pedidos/${id}/avisos/${avisoId}/reintentar`)
   },
   finalizar(id: number) {
     return api.post<Pedido>(`/pedidos/${id}/finalizar`)

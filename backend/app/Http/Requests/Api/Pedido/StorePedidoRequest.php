@@ -99,6 +99,9 @@ class StorePedidoRequest extends FormRequest
             'cliente_invitado_nombre' => [Rule::requiredIf($requiereClienteOInvitado), 'nullable', 'string', 'max:255'],
             'cliente_invitado_telefono' => [Rule::requiredIf($requiereClienteOInvitado), ...$telefono],
             'telefono_contacto' => [Rule::requiredIf($clienteSinTelefono), ...$telefono],
+            // Fase 4, tarea 5 (RF-M07-R-012): correo opcional del invitado para avisarle cuando su
+            // pedido esté listo. El Cliente con cuenta usa el de su cuenta.
+            'cliente_invitado_correo' => ['nullable', 'email', 'max:255'],
 
             // RN-M07-01, RF-M07-005/006/007, HU-M07-003: datos de entrega obligatorios.
             'direccion_entrega' => ['required_if:tipo,domicilio', 'nullable', 'string', 'max:255'],
@@ -130,6 +133,7 @@ class StorePedidoRequest extends FormRequest
             'cliente_invitado_telefono.regex' => 'Escribe un teléfono válido (solo números, de 7 a 15 dígitos).',
             'telefono_contacto.regex' => 'Escribe un teléfono válido (solo números, de 7 a 15 dígitos).',
             'telefono_contacto.required' => 'Escribe un teléfono de contacto para este pedido.',
+            'cliente_invitado_correo.email' => 'Escribe un correo válido o déjalo vacío.',
             'barrio.required_if' => 'Escribe el barrio de la entrega.',
             'referencia.required_if' => 'Escribe un punto de referencia para ubicar la dirección.',
             'direccion_entrega.required_if' => 'Escribe la dirección de entrega.',

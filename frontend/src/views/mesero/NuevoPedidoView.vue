@@ -41,6 +41,8 @@ const canal = ref<Canal>(canalInicial === 'domicilio' || canalInicial === 'recog
 const datosCliente = reactive({
   nombre: '',
   telefono: '',
+  // Fase 4, tarea 5 (RF-M07-R-012): opcional, para avisarle que la recogida está lista.
+  correo: '',
   direccion: '',
   barrio: '',
   referencia: '',
@@ -60,6 +62,9 @@ function continuarConDatos() {
   const errores: Record<string, string> = {}
   if (!datosCliente.nombre.trim()) errores.nombre = 'Escribe el nombre del cliente.'
   if (!telefonoValido(datosCliente.telefono)) errores.telefono = 'Escribe un teléfono válido (de 7 a 15 dígitos).'
+  if (canal.value === 'recogida' && datosCliente.correo.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(datosCliente.correo.trim())) {
+    errores.correo = 'Escribe un correo válido o déjalo vacío.'
+  }
   if (canal.value === 'domicilio') {
     if (!datosCliente.direccion.trim()) errores.direccion = 'Escribe la dirección.'
     if (!datosCliente.barrio.trim()) errores.barrio = 'Escribe el barrio.'
@@ -328,6 +333,7 @@ const errorCrear = ref('')
 const CAMPOS_DATOS: Record<string, keyof typeof datosCliente> = {
   cliente_invitado_nombre: 'nombre',
   cliente_invitado_telefono: 'telefono',
+  cliente_invitado_correo: 'correo',
   direccion_entrega: 'direccion',
   barrio: 'barrio',
   referencia: 'referencia',
@@ -350,6 +356,7 @@ async function crearPedido() {
         origen: 'mesero',
         cliente_invitado_nombre: datosCliente.nombre.trim(),
         cliente_invitado_telefono: datosCliente.telefono.trim(),
+        cliente_invitado_correo: canal.value === 'recogida' ? datosCliente.correo.trim() || undefined : undefined,
         ...(canal.value === 'domicilio'
           ? {
               direccion_entrega: datosCliente.direccion.trim(),
@@ -499,6 +506,13 @@ onMounted(() => {
             <span v-if="erroresDatos.telefono" class="mt-1 block text-xs text-red-600">{{ erroresDatos.telefono }}</span>
           </label>
         </div>
+        <label v-if="canal === 'recogida'" class="block">
+          <span class="mb-1.5 block text-xs font-semibold text-gray-600">
+            Correo <span class="font-normal text-gray-400">(opcional: le avisamos cuando esté listo)</span>
+          </span>
+          <input v-model="datosCliente.correo" type="email" inputmode="email" maxlength="255" autocomplete="off" class="field" :class="{ '!border-red-400': erroresDatos.correo }" />
+          <span v-if="erroresDatos.correo" class="mt-1 block text-xs text-red-600">{{ erroresDatos.correo }}</span>
+        </label>
         <template v-if="canal === 'domicilio'">
           <label class="block">
             <span class="mb-1.5 block text-xs font-semibold text-gray-600">Dirección</span>

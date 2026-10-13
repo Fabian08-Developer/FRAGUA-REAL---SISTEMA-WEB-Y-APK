@@ -6,6 +6,7 @@
 // (RN-PED-32, RF-M07-025, RF-M07-R-013). El cobro (M06) vive en Mesero > Cobrar.
 // Fase 1: edita un pedido PENDIENTE o lo no preparado de uno CONFIRMADO (RN-PED-07/08) y
 // muestra su historial (HU-M02-020). Fase 2: descuento manual con motivo (RF-M04-036, HU-M04-015).
+// Fase 4, tarea 5: «Listo para recoger» avisa al cliente por correo (RF-M07-R-012).
 import { computed, onMounted, ref, watch } from 'vue'
 import { Check, ChevronDown, History, Pencil, Percent, Plus, ShoppingBasket } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
@@ -15,11 +16,12 @@ import DatosEntregaPedido from '@/components/pedidos/DatosEntregaPedido.vue'
 import DescuentoPedidoModal from '@/components/pedidos/DescuentoPedidoModal.vue'
 import EditarPedidoModal from '@/components/pedidos/EditarPedidoModal.vue'
 import HistorialPedidoModal from '@/components/pedidos/HistorialPedidoModal.vue'
+import ListoParaRecoger from '@/components/pedidos/ListoParaRecoger.vue'
 import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
 import { TIPOS_PEDIDO_UI, faltaParaFinalizar, formatoHoraPedido, saldoPendiente, titularPedido } from '@/utils/pedidoUi'
 import { pedidoService } from '@/services/pedido.service'
 import { mensajeDeError } from '@/services/errors'
-import type { Pedido } from '@/types/models'
+import type { Pedido, PedidoAviso } from '@/types/models'
 
 const pedidos = ref<Pedido[]>([])
 const cargando = ref(true)
@@ -161,6 +163,11 @@ const confirmarEntrega = (pedido: Pedido) =>
 const confirmarRecogida = (pedido: Pedido) =>
   ejecutar(pedido, pedidoService.confirmarRecogida, 'No pudimos confirmar la recogida.')
 const finalizar = (pedido: Pedido) => ejecutar(pedido, pedidoService.finalizar, 'No pudimos finalizar el pedido.')
+// Fase 4, tarea 5 (RF-M07-R-012): la recogida está lista; el backend avisa al cliente.
+const marcarListo = (pedido: Pedido) =>
+  ejecutar(pedido, pedidoService.marcarListo, 'No pudimos marcar el pedido como listo para recoger.')
+const reintentarAviso = (pedido: Pedido, aviso: PedidoAviso) =>
+  ejecutar(pedido, (id) => pedidoService.reintentarAviso(id, aviso.id), 'No pudimos reintentar el aviso.')
 
 // Lo que le falta a un pedido en preparación, en una línea para el Mesero.
 function pendientesDe(pedido: Pedido): string[] {
@@ -402,6 +409,13 @@ onMounted(cargar)
           >
             Para finalizar falta: {{ pendientesDe(pedido).join(' · ') }}.
           </p>
+
+          <ListoParaRecoger
+            :pedido="pedido"
+            :procesando="procesando === pedido.id"
+            @marcar="marcarListo(pedido)"
+            @reintentar="(aviso) => reintentarAviso(pedido, aviso)"
+          />
 
           <div
             v-if="['pendiente', 'confirmado', 'preparando'].includes(pedido.estado)"

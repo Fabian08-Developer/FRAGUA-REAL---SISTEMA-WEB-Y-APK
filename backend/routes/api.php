@@ -106,6 +106,9 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::middleware('role:administrador,mesero')->group(function () {
         Route::post('/pedidos/{pedido}/confirmar', [PedidoController::class, 'confirmar']);
         Route::post('/pedidos/{pedido}/preparando', [PedidoController::class, 'marcarPreparando']);
+        // Fase 4, tarea 5 (RF-M07-R-012): la recogida está lista y se avisa al cliente por correo.
+        Route::post('/pedidos/{pedido}/listo', [PedidoController::class, 'marcarListo']);
+        Route::post('/pedidos/{pedido}/avisos/{aviso}/reintentar', [PedidoController::class, 'reintentarAviso']);
         Route::post('/pedidos/{pedido}/detalles/{detalle}/preparado', [PedidoController::class, 'marcarLineaPreparada']);
         // Fase 1, tarea 1: editar un pedido PENDIENTE o las líneas no preparadas de uno
         // CONFIRMADO (RN-PED-07/08/10), con historial (RN-PED-12, HU-M02-020).

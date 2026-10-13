@@ -55,7 +55,8 @@ const pasos = computed(() => {
   return [
     { clave: 'pendiente', texto: 'Recibido' },
     { clave: 'confirmado', texto: 'Confirmado' },
-    { clave: 'preparando', texto: 'En preparación' },
+    // Fase 4, tarea 5 (RF-M07-R-012): la recogida lista sigue en preparación, pero el cliente lo ve así.
+    { clave: 'preparando', texto: p.tipo === 'recogida' && p.listo_at ? 'Listo para recoger' : 'En preparación' },
     { clave: 'finalizado', texto: p.tipo === 'domicilio' ? 'Entregado' : 'Recogido' },
   ]
 })
@@ -71,7 +72,10 @@ const mensajeEstado = computed(() => {
       return 'Tu pedido está confirmado y entra a cocina.'
     case 'preparando':
       if (p.tipo === 'domicilio') return p.entregado_at ? 'Tu pedido fue entregado.' : 'Estamos preparando tu pedido; te lo llevamos pronto.'
-      return p.recogido_at ? 'Ya recogiste tu pedido.' : 'Estamos preparando tu pedido. Te esperamos en el local.'
+      if (p.recogido_at) return 'Ya recogiste tu pedido.'
+      return p.listo_at
+        ? '¡Tu pedido está listo! Pasa a recogerlo en el local.'
+        : 'Estamos preparando tu pedido. Te avisamos cuando esté listo para recoger.'
     case 'finalizado':
       return '¡Gracias! Tu pedido está completo.'
     default:

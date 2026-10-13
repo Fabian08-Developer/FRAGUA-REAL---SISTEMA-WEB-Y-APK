@@ -11,14 +11,18 @@ use App\Http\Requests\Api\Pedido\CotizarPedidoRequest;
 use App\Http\Requests\Api\Pedido\StorePedidoRequest;
 use App\Models\Configuracion;
 use App\Models\Pedido;
+use App\Models\PedidoAviso;
 use App\Models\PedidoDetalle;
+use App\Services\AvisoPedidoService;
 use App\Services\PedidoService;
 use Illuminate\Http\Request;
 
 class PedidoController extends Controller
 {
-    public function __construct(private readonly PedidoService $pedidoService)
-    {
+    public function __construct(
+        private readonly PedidoService $pedidoService,
+        private readonly AvisoPedidoService $avisos,
+    ) {
     }
 
     // Relaciones que necesita el frontend para mostrar cada línea sin pedir el detalle
@@ -35,7 +39,8 @@ class PedidoController extends Controller
     // el nombre para invitados. Ver PedidosView.vue/CajaView.vue del Mesero (fallback a
     // pedido.cliente?.nombre).
     // Fase 2, tarea 1: 'descuentoManualPor' para mostrar quién aplicó el descuento manual.
-    public const CON_DETALLES = ['detalles.producto', 'detalles.variante', 'detalles.combo', 'detalles.extras', 'mesa', 'pagos', 'cliente', 'descuentoManualPor:id,nombre'];
+    // Fase 4, tarea 5: 'avisos' (correo «listo para recoger» enviado, en cola o fallido).
+    public const CON_DETALLES = ['detalles.producto', 'detalles.variante', 'detalles.combo', 'detalles.extras', 'mesa', 'pagos', 'cliente', 'descuentoManualPor:id,nombre', 'avisos'];
 
     // Panel de pedidos del Administrador (RF-M02-T-017): filtra por tipo/estado.
     public function index(Request $request)
@@ -117,6 +122,25 @@ class PedidoController extends Controller
         $this->authorize('marcarPreparando', $pedido);
 
         return response()->json($this->pedidoService->marcarPreparando($pedido));
+    }
+
+    // Fase 4, tarea 5 (RF-M07-R-012, HU-M07-012): la recogida está lista; se avisa al cliente.
+    public function marcarListo(Request $request, Pedido $pedido)
+    {
+        $this->authorize('marcarPreparando', $pedido);
+
+        return response()->json($this->pedidoService->marcarListo($pedido, $request->user())->load(self::CON_DETALLES));
+    }
+
+    // Fase 4, tarea 5: vuelve a enviar un aviso que falló.
+    public function reintentarAviso(Request $request, Pedido $pedido, PedidoAviso $aviso)
+    {
+        $this->authorize('marcarPreparando', $pedido);
+        abort_if($aviso->pedido_id !== $pedido->id, 404);
+
+        $this->avisos->reintentar($aviso);
+
+        return response()->json($pedido->fresh()->load(self::CON_DETALLES));
     }
 
     // RF-M02-T-017: el panel de cocina marca cada línea como preparada.

@@ -285,6 +285,29 @@ Requiere la cola corriendo y un `MAIL_MAILER` que envíe (con `log` los correos 
 - [ ] Reportes > Ventas por producto: un pedido con descuento suma lo cobrado, no el precio lleno.
 - [ ] Reportes > Ventas por tipo y método: el abono de un depósito sale como "Depósito de reserva".
 
+### 9a. Listo para recoger (Fase 4, tarea 5 — RF-M07-R-012, RN-M07-R-03, HU-M07-012)
+Requiere la cola corriendo y un `MAIL_MAILER` que envíe (con `log` el correo queda en
+`storage/logs/laravel.log`). Usar un correo al que tengas acceso.
+- [ ] Una recogida web de invitado con correo, confirmada y en preparación: los datos del cliente
+      muestran el correo y aparece "¿Ya está listo? Al marcarlo le avisamos por correo a …".
+- [ ] Pulsar "Listo para recoger": el pedido sigue en Preparando, todas sus líneas quedan marcadas
+      como preparadas y el recuadro dice "Listo para recoger desde las …" y "Aviso enviado a … a las …".
+- [ ] Llega el correo "Tu pedido #N está listo para recoger", con lo que falta por pagar (o que ya
+      está pagado) y el botón "Ver mi pedido"; el enlace abre el seguimiento con el paso
+      "Listo para recoger" (RN-M07-R-03).
+- [ ] Una recogida sin correo (invitado que no lo dejó): se marca lista y la pantalla dice
+      "Sin correo: avísale al cliente por teléfono".
+- [ ] Una recogida de un Cliente con cuenta: el aviso llega al correo de su cuenta y Mis pedidos
+      muestra "Listo para recoger".
+- [ ] Con el correo mal configurado: tras 3 intentos el aviso dice que no se pudo enviar, con el
+      motivo; corregir el SMTP y pulsar "Reintentar aviso": pasa a enviado. Auditoría muestra la
+      falla y el envío ("Aviso de pedido enviado al cliente").
+- [ ] Un domicilio o un pedido local no muestran el botón; tampoco una recogida ya marcada lista.
+- [ ] Cobrar y "Confirmar recogida" (Mesero) finalizan el pedido como siempre; "Ver historial"
+      muestra "Listo para recoger" con quién lo marcó.
+- [ ] Con el Mesero: "Nuevo pedido" → Recogida pide el correo opcional; con un correo mal escrito
+      no deja continuar.
+
 ## 9b. Invitado (sin cuenta)
 - [ ] Pedir una recogida sin iniciar sesión: el Checkout muestra el enlace de seguimiento.
 - [ ] El enlace muestra el pedido "Recibido"; al confirmarlo el Mesero, en máximo 30 segundos pasa a
@@ -295,6 +318,10 @@ Requiere la cola corriendo y un `MAIL_MAILER` que envíe (con `log` los correos 
       tendrá el pedido; el seguimiento muestra la promoción aplicada.
 - [ ] Reservar mesa sin cuenta y pagar el depósito en línea: al confirmarlo el personal, el correo
       trae el enlace de la reserva y desde ahí se puede cancelar antes de la hora (punto 5c).
+- [ ] En el Checkout de una recogida, el correo es opcional ("Te avisamos por correo cuando tu
+      pedido esté listo para recoger"); un correo mal escrito muestra "Escribe un correo válido o
+      déjalo vacío". Cuando el local lo marca listo, llega el correo y el seguimiento cambia solo a
+      "¡Tu pedido está listo! Pasa a recogerlo en el local." (punto 9a).
 
 ## 10. Transversal
 - [ ] Cerrar sesión y volver a entrar; el token anterior ya no sirve.

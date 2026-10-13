@@ -703,6 +703,35 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
     - Frontend: página pública `/reserva/:token` (`views/cliente/ReservaEnlaceView.vue`) para ver
       y cancelar; Reservas muestra en cada reserva los avisos ("enviado 3:05 pm", "en cola",
       "falló" con el error) y el botón "Reintentar".
+35. **Fase 4, tarea 5 (13/10/2026): aviso «listo para recoger» (M07).** RF-M07-R-012,
+    RN-M07-R-03, HU-M07-012; decisión D3. Migración `2026_10_18_000004` (`pedidos.listo_at`,
+    `listo_por`, `cliente_invitado_correo` y tabla `pedido_avisos`); 8 pruebas en
+    `ListoParaRecogerTest`.
+    - No es un estado nuevo (M02 y M07 no tienen LISTO; ambigüedad cerrada en el plan): la
+      recogida sigue en PREPARANDO y solo se guarda cuándo y quién la marcó lista. Sigue
+      finalizando como siempre, cuando el Mesero confirma la recogida y el pago está completo
+      (RN-M07-R-04).
+    - `POST /pedidos/{pedido}/listo` (Mesero y Administrador, `PedidoService::marcarListo()`):
+      solo para una recogida en preparación, una sola vez; marca todas sus líneas como
+      preparadas y programa el aviso por correo. 422 con el motivo en cualquier otro caso.
+    - Correo del aviso: el de la cuenta del Cliente o el que deja el invitado, opcional, en el
+      Checkout o al registrar la recogida por teléfono (`cliente_invitado_correo`, se guarda en
+      minúsculas; solo para invitados de domicilio o recogida). Sin correo no hay aviso y la
+      pantalla le pide al Mesero llamar.
+    - `AvisoPedidoService` y `App\Jobs\EnviarAvisoPedido` funcionan como los avisos de reserva:
+      registro en `pedido_avisos` (pendiente → enviado | fallido, intentos, error), 3 intentos con
+      1 minuto entre uno y otro, auditoría `enviar_aviso_pedido` / `falla_aviso_pedido`, y el
+      pedido nunca se afecta si el correo falla. `POST /pedidos/{pedido}/avisos/{aviso}/reintentar`
+      lo vuelve a enviar. El correo (`ListoParaRecogerNotification`) dice cuánto falta por pagar
+      y lleva el enlace de seguimiento del pedido.
+    - El historial del pedido muestra "Listo para recoger" con quién lo marcó; `GET /pedidos` y el
+      seguimiento por enlace traen `listo_at`.
+    - Pendiente por la decisión D3: el SMS (RF-M07-R-012 y RN-M07-R-03 quedan a medias hasta tener
+      proveedor).
+    - Frontend: `components/pedidos/ListoParaRecoger.vue` en Pedidos del Mesero y del
+      Administrador (botón, a qué correo irá el aviso, si salió o falló y "Reintentar aviso");
+      el correo del cliente aparece en los datos de entrega; Checkout y Nuevo pedido (recogida)
+      piden el correo opcional; Mis pedidos y el seguimiento muestran "Listo para recoger".
 
 ## Qué falta a propósito
 

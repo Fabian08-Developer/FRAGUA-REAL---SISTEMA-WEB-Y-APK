@@ -35,6 +35,14 @@ const ESTADOS: Record<Pedido['estado'], { texto: string; clase: string }> = {
   cancelado: { texto: 'Cancelado', clase: 'bg-red-100 text-red-800' },
 }
 
+// Fase 4, tarea 5 (RF-M07-R-012): una recogida lista sigue en preparación, pero se muestra así.
+const LISTO = { texto: 'Listo para recoger', clase: 'bg-emerald-100 text-emerald-800' }
+function estadoVisible(pedido: Pedido) {
+  return pedido.tipo === 'recogida' && pedido.estado === 'preparando' && pedido.listo_at && !pedido.recogido_at
+    ? LISTO
+    : ESTADOS[pedido.estado]
+}
+
 const TIPOS: Record<Pedido['tipo'], string> = {
   local: 'En el local',
   domicilio: 'Domicilio',
@@ -283,8 +291,8 @@ onMounted(cargarPedidos)
               </div>
             </div>
             <div class="flex items-center gap-3">
-              <span class="rounded-full px-3 py-1 text-xs font-medium" :class="ESTADOS[pedido.estado].clase">
-                {{ ESTADOS[pedido.estado].texto }}
+              <span class="rounded-full px-3 py-1 text-xs font-medium" :class="estadoVisible(pedido).clase">
+                {{ estadoVisible(pedido).texto }}
               </span>
               <span class="hidden text-sm text-ink sm:inline">{{ formatoPrecio(pedido.total) }}</span>
               <ChevronDown :size="18" class="text-[#a39c8f] transition" :class="{ 'rotate-180': abierto === pedido.id }" />

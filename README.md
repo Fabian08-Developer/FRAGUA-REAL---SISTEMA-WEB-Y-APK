@@ -67,8 +67,10 @@ caché y las sesiones web (`jobs`, `job_batches`, `failed_jobs`, `cache`, `cache
 tabla `configuraciones` y no necesita migración. `2026_10_18_000002` agrega a `reservas` cuándo se
 marcó el no-show, si fue automático y cuándo salió el recordatorio (punto 33). `2026_10_18_000003`
 agrega a `reservas` el enlace secreto (`token_publico`) para verla y cancelarla sin cuenta, y crea
-`reserva_avisos`, el registro de cada correo de reserva enviado o fallido (punto 34). Pruebas
-automáticas: `php artisan test` (232 en `tests/Feature`).
+`reserva_avisos`, el registro de cada correo de reserva enviado o fallido (punto 34).
+`2026_10_18_000004` agrega a `pedidos` cuándo y quién marcó una recogida «lista para recoger» y el
+correo opcional del invitado, y crea `pedido_avisos`, el registro de cada aviso de pedido (punto
+35). Pruebas automáticas: `php artisan test` (240 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

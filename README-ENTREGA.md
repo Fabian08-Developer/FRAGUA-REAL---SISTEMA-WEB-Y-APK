@@ -164,8 +164,10 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (Fase 4).
 - La Fase 4 empezó con la tarea 1 (cola y programador en marcha), la tarea 2 (tiempos de las
   reservas configurables), la tarea 3 (no-show automático, mesa Reservada a tiempo y
-  recordatorio) y la tarea 4 (avisos de reserva por correo y cancelación por enlace): ver
-  "Programador y cola en el VPS" y `README-BACKEND.md`, puntos 31 a 34. Decisiones del 12/10/2026: el sistema corre en un VPS de
+  recordatorio), la tarea 4 (avisos de reserva por correo y cancelación por enlace) y la tarea 5
+  (aviso «listo para recoger»): ver "Programador y cola en el VPS" y `README-BACKEND.md`,
+  puntos 31 a 35. La Fase 4 quedó completa el 13/10/2026 salvo el canal SMS, que se aplazó por
+  la decisión D3 hasta elegir proveedor. Decisiones del 12/10/2026: el sistema corre en un VPS de
   Hostinger (D2); los avisos al cliente van por correo en V1 y el SMS queda para después (D3);
   reservas con no-show a los 15 min, recordatorio 2 h antes y mesa Reservada 1 h antes,
   editables en Configuración (D6).
@@ -181,7 +183,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3 y 3 de la Fase 4, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3 y 4 de la Fase 4, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -316,6 +318,11 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   local. En Reservas, cada reserva muestra sus avisos ("enviado", "en cola" o "falló" con el
   motivo) y un botón "Reintentar" para los que fallaron. Si el correo falla, la reserva sigue
   normal. Los avisos por SMS quedan para después (decisión D3).
+- Las recogidas tienen el botón "Listo para recoger" (Mesero y Administrador): el pedido sigue en
+  Preparando, sus líneas quedan preparadas y el cliente recibe un correo con lo que falta por
+  pagar y el enlace de su pedido. El invitado puede dejar un correo opcional en el Checkout (y el
+  Mesero al registrar una recogida por teléfono); sin correo, la pantalla pide llamarlo. Mis
+  pedidos y el seguimiento muestran "Listo para recoger".
 - Se crearon las tablas que el `.env` ya esperaba (`jobs`, `failed_jobs`, `cache`,
   `cache_locks`, `sessions`…). Sin ellas, con `CACHE_STORE=database`, el límite de intentos del
   inicio de sesión y el programador fallaban en el servidor.

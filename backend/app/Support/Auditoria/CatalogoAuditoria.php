@@ -59,6 +59,8 @@ final class CatalogoAuditoria
         'cancelar_pedido' => ['Cancelación de pedido', 'pedidos'],
         'aplicar_descuento_manual' => ['Descuento manual aplicado', 'pedidos'],
         'quitar_descuento_manual' => ['Descuento manual quitado', 'pedidos'],
+        'enviar_aviso_pedido' => ['Aviso de pedido enviado al cliente', 'pedidos'],
+        'falla_aviso_pedido' => ['Falla al enviar un aviso de pedido', 'pedidos'],
 
         // Caja y pagos
         'abrir_caja' => ['Apertura de caja', 'caja'],

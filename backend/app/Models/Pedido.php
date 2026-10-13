@@ -15,13 +15,13 @@ class Pedido extends Model
 {
     protected $fillable = [
         'tipo', 'origen', 'mesa_id', 'cliente_id',
-        'cliente_invitado_nombre', 'cliente_invitado_telefono', 'telefono_contacto',
+        'cliente_invitado_nombre', 'cliente_invitado_telefono', 'cliente_invitado_correo', 'telefono_contacto',
         'direccion_entrega', 'barrio', 'referencia', 'observaciones_entrega', 'valor_domicilio',
         'metodo_pago_preferido', 'pasarela_preferida',
         'estado', 'subtotal', 'descuento', 'total',
         'promociones_vigentes', 'promociones_aplicadas',
         'descuento_manual', 'descuento_manual_motivo', 'descuento_manual_por', 'descuento_manual_at',
-        'confirmado_por', 'confirmado_at', 'preparando_at',
+        'confirmado_por', 'confirmado_at', 'preparando_at', 'listo_at', 'listo_por',
         'entregado_por', 'entregado_at', 'recogido_por', 'recogido_at',
         'finalizado_por', 'finalizado_at',
         'cancelado_por', 'cancelado_motivo', 'cancelado_at',
@@ -44,6 +44,7 @@ class Pedido extends Model
         'valor_domicilio' => 'decimal:2',
         'confirmado_at' => 'datetime',
         'preparando_at' => 'datetime',
+        'listo_at' => 'datetime',
         'entregado_at' => 'datetime',
         'recogido_at' => 'datetime',
         'finalizado_at' => 'datetime',
@@ -100,6 +101,26 @@ class Pedido extends Model
     public function modificaciones(): HasMany
     {
         return $this->hasMany(PedidoModificacion::class)->orderBy('id');
+    }
+
+    // Fase 4, tarea 5 (RF-M07-R-012): avisos al cliente, del más reciente al más antiguo.
+    public function avisos(): HasMany
+    {
+        return $this->hasMany(PedidoAviso::class)->latest('id');
+    }
+
+    // Correo para avisarle al cliente: el de su cuenta o el que dejó el invitado (opcional).
+    public function correoDeContacto(): ?string
+    {
+        $correo = $this->cliente_id ? $this->cliente?->email : $this->cliente_invitado_correo;
+
+        return $correo ?: null;
+    }
+
+    // Enlace privado de seguimiento (el mismo que recibe el invitado al terminar el Checkout).
+    public function enlaceSeguimiento(): string
+    {
+        return rtrim((string) config('fragua_real.frontend_url'), '/').'/seguimiento/'.$this->token_publico;
     }
 
     // ---- Helpers de negocio ----

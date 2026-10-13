@@ -53,6 +53,8 @@ const form = reactive({
   observaciones_entrega: '',
   nombre_invitado: '',
   telefono_invitado: '',
+  // Fase 4, tarea 5 (RF-M07-R-012): opcional, para avisarle cuando su pedido esté listo.
+  correo_invitado: '',
   telefono_contacto: auth.usuario?.telefono ?? '',
 })
 
@@ -122,6 +124,7 @@ async function confirmarPedido() {
         ? {
             cliente_invitado_nombre: form.nombre_invitado,
             cliente_invitado_telefono: form.telefono_invitado,
+            cliente_invitado_correo: form.correo_invitado.trim() || undefined,
           }
         : { telefono_contacto: form.telefono_contacto.trim() || undefined }),
     }
@@ -339,6 +342,19 @@ async function pagarEnLinea() {
                 placeholder="Tu número de contacto"
                 :error="errores.cliente_invitado_telefono"
               />
+              <div class="sm:col-span-2">
+                <BaseInput
+                  v-model="form.correo_invitado"
+                  label="Correo (opcional)"
+                  type="email"
+                  autocomplete="email"
+                  placeholder="tucorreo@ejemplo.com"
+                  :error="errores.cliente_invitado_correo"
+                />
+                <p v-if="!errores.cliente_invitado_correo" class="mt-1 text-xs text-[#6c655c]">
+                  {{ tipo === 'recogida' ? 'Te avisamos por correo cuando tu pedido esté listo para recoger.' : 'Lo usamos solo para avisarte sobre tu pedido.' }}
+                </p>
+              </div>
             </div>
           </section>
 
