@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\EnviarAvisoPedido;
 use App\Models\Pedido;
 use App\Models\PedidoAviso;
+use App\Notifications\ComprobantePagoNotification;
 use App\Notifications\ListoParaRecogerNotification;
 use Illuminate\Notifications\Notification as Aviso;
 use Illuminate\Support\Facades\Notification;
@@ -14,7 +15,8 @@ use Throwable;
 
 /**
  * M07 — Fase 4, tarea 5 (13/10/2026): avisos al cliente de un pedido por correo (decisión D3:
- * correo en V1, SMS después). Hoy: «listo para recoger» (RF-M07-R-012, RN-M07-R-03).
+ * correo en V1, SMS después): «listo para recoger» (RF-M07-R-012, RN-M07-R-03) y, desde la
+ * Fase 5, el comprobante digital en PDF (RF-M06-010).
  *
  * Funciona como AvisoReservaService: programar() deja el aviso "pendiente" en pedido_avisos y
  * encola EnviarAvisoPedido al terminar la transacción; entregar() envía el correo y el aviso
@@ -92,6 +94,7 @@ class AvisoPedidoService
     {
         return match ($tipo) {
             'listo_para_recoger' => new ListoParaRecogerNotification($pedido),
+            'comprobante' => new ComprobantePagoNotification($pedido),
         };
     }
 }

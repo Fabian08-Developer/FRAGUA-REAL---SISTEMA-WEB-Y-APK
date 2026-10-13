@@ -13,6 +13,7 @@ import { Banknote, CircleDollarSign, CreditCard, Landmark, Smartphone, Wallet } 
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import CuentaMesaModal from '@/components/pedidos/CuentaMesaModal.vue'
 import { pedidoService } from '@/services/pedido.service'
 import { pagoService } from '@/services/pago.service'
@@ -92,6 +93,8 @@ function esperaEntrega(pedido: Pedido): boolean {
 }
 
 const aviso = ref('')
+// Fase 5, tarea 1 (RF-M06-009/010): el pedido cuyo cobro completó el pago, para imprimir su comprobante.
+const recienPagado = ref<Pedido | null>(null)
 const entregando = ref<number | null>(null)
 
 async function confirmarEntrega(pedido: Pedido) {
@@ -152,6 +155,7 @@ async function confirmarCobro() {
     })
     reemplazarPedido(data)
     pedidoACobrar.value = null
+    recienPagado.value = data.comprobante ? data : null
     // RN-PED-32: un cobro completo no siempre finaliza; se le dice al Mesero qué sigue.
     const falta = faltaParaFinalizar(data)
     if (data.estado === 'finalizado') aviso.value = `Cobro registrado. ${titularPedido(data)} quedó finalizado.`
@@ -212,7 +216,10 @@ onMounted(cargar)
     />
 
     <p v-if="error" class="mt-4 alert-error">{{ error }}</p>
-    <p v-if="aviso" class="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ aviso }}</p>
+    <div v-if="aviso" class="mt-4 flex flex-col gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 sm:flex-row sm:items-center sm:justify-between">
+      <p>{{ aviso }}</p>
+      <BotonComprobante v-if="recienPagado" :pedido="recienPagado" size="sm" />
+    </div>
 
     <div v-if="cargando" class="loading-state">Cargando pedidos…</div>
 

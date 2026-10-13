@@ -732,6 +732,40 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       Administrador (botón, a qué correo irá el aviso, si salió o falló y "Reintentar aviso");
       el correo del cliente aparece en los datos de entrega; Checkout y Nuevo pedido (recogida)
       piden el correo opcional; Mis pedidos y el seguimiento muestran "Listo para recoger".
+36. **Fase 5, tarea 1 (13/10/2026): comprobante de pago (M06, M02).** RF-M06-009, 010, RN-M06-07,
+    HU-M06-006, CA-M06-006, RF-M02-L-023, RF-M02-T-013, HU-M02-019. Nueva dependencia
+    `barryvdh/laravel-dompdf` ^3.1 (dompdf 3.1). Migración `2026_10_19_000001` (completa la tabla
+    `comprobantes`, que existía vacía: `consecutivo`, `detalle` json, `anulado_at`,
+    `anulado_motivo`; un pedido puede tener varios comprobantes en su historia); 7 pruebas en
+    `ComprobantePagoTest`.
+    - `ComprobanteService::sincronizar()` lo llaman los modelos `Pago` y `Pedido` (evento `saved`)
+      cada vez que cambia un pago o el total o el estado del pedido. Con el pago completo (pagos
+      aprobados y no anulados que suman el total, también si fue mixto) genera el comprobante con
+      el siguiente consecutivo (`FR-000001`); si después el pedido deja de estar pagado (pago
+      anulado, línea agregada), se cancela o cambian sus cifras, el vigente se anula con el motivo
+      (auditoría `anular_comprobante`) y, al volver a estar pagado, sale uno nuevo con otro
+      número. Nunca se borra ni se reescribe: `detalle` guarda lo que dice el documento al
+      generarse (negocio, pedido, líneas, descuentos, domicilio, total y pagos).
+    - "impreso" en pedidos locales: ticket de 80 mm en PDF que se imprime desde el navegador (la
+      impresora POS directa es la Fase 6). "digital" en domicilio y recogida: PDF A5, que además
+      llega por correo adjunto (`ComprobantePagoNotification`, aviso `comprobante` en
+      `pedido_avisos`, con registro y reintento como el de «listo para recoger»).
+    - `GET /pedidos/{pedido}/comprobante?formato=ticket|pdf` (personal, o el Cliente dueño) y
+      `GET /pedidos/seguimiento/{token}/comprobante` (invitado). Sin formato, el del canal. 404 con
+      "Este pedido todavía no tiene comprobante…" si el pago no está completo. Los pedidos traen
+      `comprobante` (el vigente: número y tipo; el detalle no viaja en los listados) y el historial
+      muestra cada comprobante generado o anulado.
+    - Plantillas Blade `resources/views/comprobantes/pdf.blade.php` y `ticket.blade.php` (fuente
+      DejaVu, solo las letras usadas: unos 25 KB). Datos del negocio en `config/fragua_real.php`
+      (`negocio`): nombre, dirección y WhatsApp del sitio; el NIT se pone en `FRAGUA_REAL_NIT` y,
+      vacío, no se imprime. El documento dice que no es factura electrónica (M06 §16).
+    - Una mesa con varios pedidos tiene un comprobante por pedido (la tabla es por pedido).
+    - CORREGIDO de paso: en este equipo de pruebas faltaba `resources/views/welcome.blade.php`;
+      por eso `ExampleTest` fallaba aquí (en el repositorio sí existe). Ahora pasan las 249 pruebas.
+    - Frontend: `components/pedidos/BotonComprobante.vue` ("Imprimir comprobante FR-…" o
+      "Comprobante FR-… (PDF)", abre el documento en otra pestaña) en Pedidos del Mesero y del
+      Administrador, en Cobrar (apenas el cobro completa el pago), en Mis pedidos y en el
+      seguimiento del invitado.
 
 ## Qué falta a propósito
 

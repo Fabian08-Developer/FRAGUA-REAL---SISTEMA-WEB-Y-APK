@@ -6,6 +6,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { CalendarClock, ChevronDown, PackageSearch, XCircle } from 'lucide-vue-next'
 import mascota from '@/assets/img/mascota-fragua-real.png'
+import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
 import { pedidoService } from '@/services/pedido.service'
 import { reservaService } from '@/services/reserva.service'
@@ -327,6 +328,8 @@ onMounted(cargarPedidos)
                   {{ pedido.direccion_entrega }}<template v-if="pedido.barrio">, {{ pedido.barrio }}</template>
                 </div>
               </div>
+              <!-- Fase 5, tarea 1 (RF-M06-010): comprobante de pago en PDF cuando el pago está completo. -->
+              <BotonComprobante v-if="detalleCache[pedido.id].comprobante" :pedido="detalleCache[pedido.id]" size="sm" class="mt-3" />
             </template>
 
             <div v-if="puedeReintentarPago(pedido)" class="mt-4 border-t border-[#e2dbcf] pt-4">

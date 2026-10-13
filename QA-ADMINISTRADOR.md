@@ -214,6 +214,26 @@ Requiere la cola corriendo y un `MAIL_MAILER` que envíe (con `log` los correos 
 - [ ] La cuenta de una mesa liberada y vuelta a ocupar no trae los pedidos del cliente anterior.
 - [ ] Historial de turnos incluye el turno cerrado.
 
+### 6b. Comprobante de pago (Fase 5, tarea 1 — RF-M06-009/010, RN-M06-07, HU-M02-019)
+Antes de probar: `composer update barryvdh/laravel-dompdf --with-all-dependencies` y
+`php artisan migrate` en `backend`.
+- [ ] Con el Mesero, un pedido local de $40.000: cobrar $15.000 no da comprobante; cobrar el resto
+      con tarjeta muestra "Imprimir comprobante FR-000001" en Cobrar y en Pedidos.
+- [ ] El botón abre en otra pestaña un ticket de 80 mm con el negocio, el número, la mesa, las
+      líneas, el subtotal, los descuentos, el total y los dos pagos (efectivo y tarjeta); se imprime
+      con Ctrl+P (en la impresora POS, papel de 80 mm). Dice "No es factura electrónica".
+- [ ] El siguiente pedido pagado toma el número FR-000002 (consecutivo sin saltos).
+- [ ] Anular el pago de un pedido con comprobante: el botón desaparece, "Ver historial" dice
+      "Comprobante FR-… anulado: El pedido ya no está pagado por completo." y Auditoría muestra
+      "Comprobante de pago anulado". Volver a cobrar saca un comprobante con un número nuevo.
+- [ ] Un domicilio o una recogida pagados: "Comprobante FR-… (PDF)" abre un PDF media página con
+      cliente, teléfono, dirección de entrega, domicilio y pagos. Si el cliente tiene correo
+      (cuenta o correo opcional del invitado), le llega el PDF adjunto.
+- [ ] Con un pago en línea: mientras está "en revisión" no hay comprobante; al aprobarlo, sí.
+- [ ] El Cliente con cuenta lo descarga desde Mis pedidos (detalle del pedido) y el invitado desde
+      su enlace de seguimiento. Otro cliente no puede descargarlo.
+- [ ] Con `FRAGUA_REAL_NIT` en el `.env` del servidor, el comprobante muestra el NIT; vacío, no.
+
 ## 7. Compras y gastos (M03)
 - [ ] Registrar una compra y un gasto; editar uno activo (RF-M03-14).
 - [ ] Anular: nunca se borra y un anulado ya no se puede editar (RN-M03-04).

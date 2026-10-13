@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CajaController;
 use App\Http\Controllers\Api\CatalogoController;
 use App\Http\Controllers\Api\CompraGastoController;
+use App\Http\Controllers\Api\ComprobanteController;
 use App\Http\Controllers\Api\ConfiguracionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\MesaController;
@@ -61,6 +62,8 @@ Route::post('/pedidos/cotizacion', [PedidoController::class, 'cotizar'])->middle
 // token secreto que recibió al crearlo. Con límite de intentos para que no se puedan adivinar.
 Route::middleware('throttle:30,1')->group(function () {
     Route::get('/pedidos/seguimiento/{token}', [PedidoController::class, 'seguimiento']);
+    // Fase 5, tarea 1 (RF-M06-010): el invitado descarga el comprobante con su enlace.
+    Route::get('/pedidos/seguimiento/{token}/comprobante', [ComprobanteController::class, 'porEnlace']);
     Route::post('/pedidos/seguimiento/{token}/pagar-en-linea', [PagoController::class, 'pagarEnLineaConToken']);
     // Fase 1, tarea 6 (RF-M07-016, RF-M07-R-009): el invitado cancela su pedido pendiente.
     Route::post('/pedidos/seguimiento/{token}/cancelar', [PedidoController::class, 'cancelarConToken']);
@@ -97,6 +100,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::middleware('role:administrador,mesero,cliente')->group(function () {
         Route::get('/pedidos', [PedidoController::class, 'index']);
         Route::get('/pedidos/{pedido}', [PedidoController::class, 'show']);
+        // Fase 5, tarea 1 (RF-M06-009/010, HU-M02-019): comprobante vigente, ticket o PDF.
+        Route::get('/pedidos/{pedido}/comprobante', [ComprobanteController::class, 'show']);
         Route::post('/pedidos/{pedido}/pagar-en-linea', [PagoController::class, 'pagarEnLinea']); // solo Cliente dueño (PagoPolicy)
         // RN-M07-04: el Cliente puede cancelar su propio domicilio mientras esté PENDIENTE
         // (PedidoPolicy::cancelar() filtra esto; Administrador/Mesero cancelan cualquiera).

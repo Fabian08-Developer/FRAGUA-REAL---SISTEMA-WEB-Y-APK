@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Fase 4, tarea 5 (RF-M07-R-012): un aviso enviado (o que falló) al cliente de un pedido. Hoy
- * solo existe «listo para recoger»; el comprobante digital (Fase 5) puede sumarse aquí.
+ * «listo para recoger» (Fase 4) y el comprobante digital en PDF (Fase 5).
  */
 class PedidoAviso extends Model
 {
-    public const TIPOS = ['listo_para_recoger'];
+    // Fase 5, tarea 1: 'comprobante' = el comprobante digital en PDF (RF-M06-010).
+    public const TIPOS = ['listo_para_recoger', 'comprobante'];
 
     protected $table = 'pedido_avisos';
 

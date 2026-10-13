@@ -683,7 +683,7 @@ class PedidoService
      */
     public function historial(Pedido $pedido): array
     {
-        $pedido->loadMissing(['modificaciones.usuario', 'pagos']);
+        $pedido->loadMissing(['modificaciones.usuario', 'pagos', 'comprobantes']);
         $nombres = User::whereIn('id', array_filter([
             $pedido->confirmado_por, $pedido->listo_por, $pedido->entregado_por, $pedido->recogido_por,
             $pedido->finalizado_por, $pedido->cancelado_por,
@@ -715,6 +715,14 @@ class PedidoService
                 'antes' => $m->antes,
                 'despues' => $m->despues,
             ]);
+        }
+
+        // Fase 5, tarea 1: cada comprobante generado y, si se anuló, cuándo y por qué.
+        foreach ($pedido->comprobantes as $c) {
+            $eventos->push(['tipo' => 'pago', 'fecha' => $c->generado_at, 'quien' => 'Sistema', 'descripcion' => "Comprobante {$c->numero} generado"]);
+            if ($c->anulado_at) {
+                $eventos->push(['tipo' => 'pago', 'fecha' => $c->anulado_at, 'quien' => 'Sistema', 'descripcion' => "Comprobante {$c->numero} anulado: {$c->anulado_motivo}"]);
+            }
         }
 
         foreach ($pedido->pagos as $p) {

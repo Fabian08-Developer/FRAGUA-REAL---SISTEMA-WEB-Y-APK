@@ -14,6 +14,7 @@ import { ChevronDown, History, Pencil, Percent, RefreshCw, ShoppingBasket } from
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import DatosEntregaPedido from '@/components/pedidos/DatosEntregaPedido.vue'
 import DescuentoPedidoModal from '@/components/pedidos/DescuentoPedidoModal.vue'
 import EditarPedidoModal from '@/components/pedidos/EditarPedidoModal.vue'
@@ -377,6 +378,9 @@ onMounted(cargar)
                 Cancelar pedido
               </BaseButton>
             </div>
+
+            <!-- Fase 5, tarea 1 (RF-M06-009/010, HU-M02-019): comprobante cuando el pago está completo. -->
+            <BotonComprobante v-if="pedido.comprobante" :pedido="pedido" size="sm" class="mt-3" />
 
             <button
               type="button"

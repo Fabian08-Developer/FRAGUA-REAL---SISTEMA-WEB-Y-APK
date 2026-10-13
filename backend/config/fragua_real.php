@@ -21,6 +21,16 @@ return [
     // (confirmado por el usuario el 06/10/2026), editable por el Administrador.
     'deposito_reserva_default' => (float) env('FRAGUA_REAL_DEPOSITO_RESERVA', 20000),
 
+    // Fase 5, tarea 1 (RF-M06-009/010): datos del negocio que encabezan el comprobante de pago.
+    // Nombre, dirección y WhatsApp son los que ya muestra el sitio; el NIT se pone en el .env del
+    // servidor (FRAGUA_REAL_NIT) y, mientras esté vacío, el comprobante no lo imprime.
+    'negocio' => [
+        'nombre' => env('FRAGUA_REAL_NOMBRE', 'Fragua Real Burger'),
+        'nit' => env('FRAGUA_REAL_NIT', ''),
+        'direccion' => env('FRAGUA_REAL_DIRECCION', 'Esquina frente al malecón turístico, etapa 1'),
+        'telefono' => env('FRAGUA_REAL_TELEFONO', '322 725 9965'),
+    ],
+
     // RF-M01-012/013: base del enlace que RecuperarPasswordNotification arma hacia
     // /restablecer-password?email=&token= (ver RestablecerPasswordView.vue, que ya sabe
     // precargar esos dos query params). Default = puerto del servidor de Vite en este

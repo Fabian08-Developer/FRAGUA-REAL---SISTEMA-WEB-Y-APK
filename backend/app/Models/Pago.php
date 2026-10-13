@@ -7,6 +7,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Pago extends Model
 {
+    // Fase 5, tarea 1 (RN-M06-07): todo pago aprobado, anulado o ajustado pone al día el
+    // comprobante de su pedido (ComprobanteService::sincronizar).
+    protected static function booted(): void
+    {
+        static::saved(function (Pago $pago) {
+            if ($pago->pedido_id) {
+                app(\App\Services\ComprobanteService::class)->sincronizar($pago->pedido()->first());
+            }
+        });
+    }
+
     protected $fillable = [
         'pedido_id', 'tipo', 'reserva_id', 'caja_turno_id', 'metodo', 'pasarela', 'monto', 'estado',
         'registrado_por', 'anulado', 'reverso_tipo', 'anulado_motivo', 'anulado_por', 'anulado_at',

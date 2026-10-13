@@ -85,8 +85,9 @@ class AuditoriaBaseTest extends TestCase
         app(PagoService::class)->anular($pago, $this->admin, 'Cobro equivocado');
         $caja->cerrar($turno->fresh(), $this->admin, 49000, 'Faltó cambio');
 
+        // Fase 5, tarea 1: anular el pago que completaba el pedido también anula su comprobante.
         $this->assertEqualsCanonicalizing(
-            ['abrir_caja', 'anular_pago', 'cerrar_caja'],
+            ['abrir_caja', 'anular_pago', 'anular_comprobante', 'cerrar_caja'],
             Auditoria::pluck('accion')->all(),
         );
         $cierre = Auditoria::where('accion', 'cerrar_caja')->sole();

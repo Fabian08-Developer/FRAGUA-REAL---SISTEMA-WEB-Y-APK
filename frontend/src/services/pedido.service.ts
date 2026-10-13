@@ -130,6 +130,14 @@ export const pedidoService = {
   confirmarRecogida(id: number) {
     return api.post<Pedido>(`/pedidos/${id}/recoger`)
   },
+  // Fase 5, tarea 1 (RF-M06-009/010): el comprobante vigente en PDF — "ticket" (80 mm, para
+  // imprimir) o "pdf" (A5). Sin formato, el del canal: ticket en local, PDF en domicilio y recogida.
+  comprobante(id: number, formato?: 'ticket' | 'pdf') {
+    return api.get<Blob>(`/pedidos/${id}/comprobante`, { params: formato ? { formato } : undefined, responseType: 'blob' })
+  },
+  comprobantePorEnlace(token: string) {
+    return api.get<Blob>(`/pedidos/seguimiento/${token}/comprobante`, { responseType: 'blob' })
+  },
   // Fase 4, tarea 5 (RF-M07-R-012): la recogida está lista; el backend avisa al cliente por correo.
   marcarListo(id: number) {
     return api.post<Pedido>(`/pedidos/${id}/listo`)

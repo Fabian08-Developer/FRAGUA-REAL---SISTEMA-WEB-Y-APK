@@ -33,6 +33,8 @@ requisitos, con tres roles: **Cliente** (web pública, con o sin cuenta),
 # Backend
 cd backend
 composer install
+# Desde la Fase 5 (13/10/2026) el backend usa barryvdh/laravel-dompdf para los PDF. La primera vez
+# después de actualizar: composer update barryvdh/laravel-dompdf --with-all-dependencies
 # .env ya configurado (PostgreSQL + SMTP real para recuperación de contraseña)
 php artisan migrate --seed
 php artisan serve
@@ -143,7 +145,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 13/10/2026 van 466 de 579 verificables, 80 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 13/10/2026 van 473 de 579 verificables, 82 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -167,7 +169,12 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   recordatorio), la tarea 4 (avisos de reserva por correo y cancelación por enlace) y la tarea 5
   (aviso «listo para recoger»): ver "Programador y cola en el VPS" y `README-BACKEND.md`,
   puntos 31 a 35. La Fase 4 quedó completa el 13/10/2026 salvo el canal SMS, que se aplazó por
-  la decisión D3 hasta elegir proveedor. Decisiones del 12/10/2026: el sistema corre en un VPS de
+  la decisión D3 hasta elegir proveedor.
+- La Fase 5 empezó el 13/10/2026 con la tarea 1 (comprobante de pago): ver `README-BACKEND.md`,
+  punto 36. Trae una dependencia nueva de Composer (`barryvdh/laravel-dompdf`): después de
+  actualizar el código hay que correr `composer update barryvdh/laravel-dompdf
+  --with-all-dependencies` en `backend` (actualiza `composer.lock`; en el VPS, `composer install`
+  con ese lock). Para que el comprobante muestre el NIT, ponerlo en `FRAGUA_REAL_NIT`. Decisiones del 12/10/2026: el sistema corre en un VPS de
   Hostinger (D2); los avisos al cliente van por correo en V1 y el SMS queda para después (D3);
   reservas con no-show a los 15 min, recordatorio 2 h antes y mesa Reservada 1 h antes,
   editables en Configuración (D6).
@@ -183,7 +190,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3 y 4 de la Fase 4, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4 y 1 de la Fase 5, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -297,6 +304,18 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 - El historial de auditoría ya no se puede cambiar ni borrar ni siquiera desde la base de datos.
   Consecuencia: un usuario con historial no se puede borrar de la base de datos (se desactiva,
   como siempre).
+
+## Cambios de comportamiento de la Fase 5 (desde el 13/10/2026)
+
+- Todo pedido pagado por completo tiene su comprobante de pago con número consecutivo (FR-000001,
+  FR-000002…): ticket de 80 mm para imprimir en los pedidos del local y PDF en domicilio y
+  recogida, que además le llega al cliente por correo si hay a dónde. Se abre desde Pedidos, desde
+  Cobrar apenas se completa el pago, desde Mis pedidos y desde el enlace de seguimiento.
+- Si un pedido deja de estar pagado (se anula un pago, se agrega un producto) o se cancela, su
+  comprobante queda anulado con el motivo y, al volver a pagarse, sale uno nuevo con otro número.
+  Ningún comprobante se borra.
+- El comprobante no es una factura electrónica y lo dice. Una mesa con varios pedidos tiene un
+  comprobante por pedido.
 
 ## Cambios de comportamiento de la Fase 4 (desde el 12/10/2026)
 

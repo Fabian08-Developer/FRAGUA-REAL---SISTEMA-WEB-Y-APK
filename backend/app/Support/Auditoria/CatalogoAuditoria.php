@@ -67,6 +67,7 @@ final class CatalogoAuditoria
         'cerrar_caja' => ['Cierre de caja', 'caja'],
         'anular_pago' => ['Anulación de pago', 'caja'],
         'reembolsar_pago' => ['Reembolso de pago', 'caja'],
+        'anular_comprobante' => ['Comprobante de pago anulado', 'caja'],
 
         // Compras, gastos y cierre diario
         'registrar_compra_gasto' => ['Registro de compra o gasto', 'compras'],

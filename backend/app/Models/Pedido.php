@@ -13,6 +13,17 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class Pedido extends Model
 {
+    // Fase 5, tarea 1 (RN-M06-07): cuando cambia lo que vale el pedido o su estado, el comprobante
+    // se pone al día (se genera al quedar pagado; se anula si deja de estarlo o si se cancela).
+    protected static function booted(): void
+    {
+        static::saved(function (Pedido $pedido) {
+            if ($pedido->wasChanged(['total', 'estado'])) {
+                app(\App\Services\ComprobanteService::class)->sincronizar($pedido);
+            }
+        });
+    }
+
     protected $fillable = [
         'tipo', 'origen', 'mesa_id', 'cliente_id',
         'cliente_invitado_nombre', 'cliente_invitado_telefono', 'cliente_invitado_correo', 'telefono_contacto',
@@ -93,9 +104,16 @@ class Pedido extends Model
         return $this->hasMany(Pago::class);
     }
 
+    // Fase 5, tarea 1 (RF-M06-009/010, RN-M06-07): el comprobante vigente (el último no anulado)
+    // y la historia completa, con los anulados.
     public function comprobante(): HasOne
     {
-        return $this->hasOne(Comprobante::class);
+        return $this->hasOne(Comprobante::class)->whereNull('anulado_at')->latest('id');
+    }
+
+    public function comprobantes(): HasMany
+    {
+        return $this->hasMany(Comprobante::class)->orderBy('id');
     }
 
     public function modificaciones(): HasMany

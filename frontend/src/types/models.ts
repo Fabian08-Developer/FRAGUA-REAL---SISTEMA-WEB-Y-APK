@@ -301,17 +301,32 @@ export interface Pedido {
   listo_at?: string | null
   listo_por?: number | null
   avisos?: PedidoAviso[]
+  // Fase 5, tarea 1 (RF-M06-009/010): el comprobante vigente; el documento se pide aparte.
+  comprobante?: Comprobante | null
   mesa?: Mesa
   cliente?: Usuario | null
   detalles?: PedidoDetalle[]
   pagos?: Pago[]
 }
 
+// Fase 5, tarea 1 (RF-M06-009/010, RN-M06-07): comprobante de pago. "impreso" = ticket de 80 mm
+// (pedido local); "digital" = PDF (domicilio y recogida). Se genera solo al completar el pago.
+export interface Comprobante {
+  id: number
+  pedido_id: number
+  consecutivo: number
+  numero: string
+  tipo: 'impreso' | 'digital'
+  generado_at: string
+  anulado_at: string | null
+  anulado_motivo: string | null
+}
+
 // Fase 4, tarea 5: aviso al cliente de un pedido (hoy, «listo para recoger»), del más reciente al más antiguo.
 export interface PedidoAviso {
   id: number
   pedido_id: number
-  tipo: 'listo_para_recoger'
+  tipo: 'listo_para_recoger' | 'comprobante'
   canal: 'correo' | 'sms'
   destino: string
   estado: 'pendiente' | 'enviado' | 'fallido'

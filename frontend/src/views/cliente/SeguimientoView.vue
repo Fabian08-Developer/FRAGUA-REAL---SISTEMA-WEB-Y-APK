@@ -8,6 +8,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Bike, CheckCircle2, ShoppingBag, XCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
+import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
 import { pedidoService } from '@/services/pedido.service'
 import { mensajeDeError } from '@/services/errors'
@@ -204,6 +205,8 @@ async function cancelar() {
         <p v-if="pedido.direccion_entrega" class="mt-3 text-xs text-[#6c655c]">
           Entrega en {{ pedido.direccion_entrega }}<template v-if="pedido.barrio">, {{ pedido.barrio }}</template>
         </p>
+        <!-- Fase 5, tarea 1 (RF-M06-010): el comprobante en PDF, con el mismo enlace. -->
+        <BotonComprobante v-if="pedido.comprobante" :pedido="pedido" :token="token" size="sm" class="mt-4" />
       </section>
 
       <!-- Pagar en línea -->
