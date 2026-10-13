@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Reserva extends Model
 {
@@ -16,6 +18,16 @@ class Reserva extends Model
         'pedido_id', 'deposito_abonado', 'llegada_at', 'deposito_caja_turno_id', 'deposito_reembolso_caja_turno_id',
         'no_show_at', 'no_show_automatico', 'recordatorio_enviado_at',
     ];
+
+    // Fase 4, tarea 4: el enlace secreto de la reserva solo viaja en los correos al cliente.
+    protected $hidden = ['token_publico'];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Reserva $reserva) {
+            $reserva->token_publico ??= Str::random(48);
+        });
+    }
 
     protected $casts = [
         'fecha_hora' => 'datetime',
@@ -36,6 +48,18 @@ class Reserva extends Model
     public function mesa(): BelongsTo
     {
         return $this->belongsTo(Mesa::class);
+    }
+
+    // Fase 4, tarea 4 (RF-M05-027): avisos enviados al cliente, del más reciente al más antiguo.
+    public function avisos(): HasMany
+    {
+        return $this->hasMany(ReservaAviso::class)->latest('id');
+    }
+
+    // Enlace público para ver y cancelar la reserva sin cuenta (RF-M05-018, RN-M05-09).
+    public function enlacePublico(): string
+    {
+        return rtrim((string) config('fragua_real.frontend_url'), '/').'/reserva/'.$this->token_publico;
     }
 
     // Fase 2, tarea 2 (RF-M05-034): primer pedido de la visita al que se abonó el depósito.

@@ -183,7 +183,7 @@ class ReservasAutomaticasTest extends TestCase
         $reserva = $this->reservaConfirmada();
 
         $this->irA($this->hora->subMinutes(121));
-        Notification::assertNothingSent();
+        Notification::assertSentTimes(RecordatorioReservaNotification::class, 0); // la confirmación sí sale (tarea 4)
 
         $this->irA($this->hora->subMinutes(119));
         Notification::assertSentTo(new AnonymousNotifiable, RecordatorioReservaNotification::class, function ($aviso, $canales, $destino) use ($reserva) {
@@ -207,7 +207,7 @@ class ReservasAutomaticasTest extends TestCase
         $this->reservaConfirmada();
 
         $this->irA($this->hora->subMinutes(80));
-        Notification::assertNothingSent();
+        Notification::assertSentTimes(RecordatorioReservaNotification::class, 0); // la confirmación sí sale (tarea 4)
     }
 
     public function test_cancelar_dentro_de_la_ventana_devuelve_la_mesa_a_libre(): void

@@ -57,6 +57,12 @@ const router = createRouter({
           name: 'seguimiento-pedido',
           component: () => import('@/views/cliente/SeguimientoView.vue'),
         },
+        // Fase 4, tarea 4 (RF-M05-018): ver o cancelar una reserva con el enlace del correo, sin cuenta.
+        {
+          path: 'reserva/:token',
+          name: 'reserva-enlace',
+          component: () => import('@/views/cliente/ReservaEnlaceView.vue'),
+        },
         {
           path: 'pedidos',
           name: 'cliente-pedidos',

@@ -73,7 +73,9 @@ PHP-FPM. Los archivos listos están en `backend/deploy/` (ajustar la ruta
    `sudo supervisorctl reread && sudo supervisorctl update`. Ejecuta
    `php artisan queue:work database` y lo reinicia si se cae.
 3. En el `.env` del servidor: `QUEUE_CONNECTION=database` y `CACHE_STORE=database` (las tablas
-   las crea `php artisan migrate`), y un `MAIL_MAILER` que envíe de verdad (SMTP).
+   las crea `php artisan migrate`), un `MAIL_MAILER` que envíe de verdad (SMTP) y
+   `FRONTEND_URL` con la dirección pública del sitio (los correos de reserva llevan un enlace
+   a esa dirección).
 4. Después de cada despliegue del código: `php artisan migrate --force`,
    `php artisan config:cache` y `php artisan queue:restart` (Supervisor levanta el trabajador
    con el código nuevo).
@@ -141,7 +143,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 13/10/2026 van 462 de 579 verificables, 80 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 13/10/2026 van 466 de 579 verificables, 80 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -161,8 +163,9 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   limpieza diaria de sesiones vencidas (`sesiones:limpiar`) necesita el cron de Laravel en el VPS
   (Fase 4).
 - La Fase 4 empezó con la tarea 1 (cola y programador en marcha), la tarea 2 (tiempos de las
-  reservas configurables) y la tarea 3 (no-show automático, mesa Reservada a tiempo y
-  recordatorio): ver "Programador y cola en el VPS" y `README-BACKEND.md`, puntos 31 a 33. Decisiones del 12/10/2026: el sistema corre en un VPS de
+  reservas configurables), la tarea 3 (no-show automático, mesa Reservada a tiempo y
+  recordatorio) y la tarea 4 (avisos de reserva por correo y cancelación por enlace): ver
+  "Programador y cola en el VPS" y `README-BACKEND.md`, puntos 31 a 34. Decisiones del 12/10/2026: el sistema corre en un VPS de
   Hostinger (D2); los avisos al cliente van por correo en V1 y el SMS queda para después (D3);
   reservas con no-show a los 15 min, recordatorio 2 h antes y mesa Reservada 1 h antes,
   editables en Configuración (D6).
@@ -178,7 +181,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3 y 2 de la Fase 4, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3 y 3 de la Fase 4, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -306,6 +309,13 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   día); si el cliente no llega en 15 min, la reserva pasa sola a "No asistió" y el depósito se
   retiene; y 2 h antes le llega un correo de recordatorio. "Marcar no-show" a mano solo aparece
   cuando ya pasó la tolerancia.
+- Cada reserva avisa al cliente por correo cuando se confirma el depósito, cuando se cancela
+  (dice si el depósito se devuelve) y cuando se marca "No asistió", además del recordatorio.
+  Cada correo trae un enlace para ver la reserva y cancelarla sin cuenta, mientras no haya
+  llegado su hora; si el depósito se pagó en efectivo, el enlace pide llamar o pasar por el
+  local. En Reservas, cada reserva muestra sus avisos ("enviado", "en cola" o "falló" con el
+  motivo) y un botón "Reintentar" para los que fallaron. Si el correo falla, la reserva sigue
+  normal. Los avisos por SMS quedan para después (decisión D3).
 - Se crearon las tablas que el `.env` ya esperaba (`jobs`, `failed_jobs`, `cache`,
   `cache_locks`, `sessions`…). Sin ellas, con `CACHE_STORE=database`, el límite de intentos del
   inicio de sesión y el programador fallaban en el servidor.

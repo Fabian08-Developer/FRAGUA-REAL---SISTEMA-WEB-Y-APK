@@ -22,7 +22,7 @@ import { mesaService } from '@/services/mesa.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import { useAuthStore } from '@/stores/auth'
 import { configuracionService } from '@/services/configuracion.service'
-import type { EstadoReserva, Mesa, Reserva } from '@/types/models'
+import type { EstadoReserva, Mesa, Reserva, ReservaAviso } from '@/types/models'
 
 const route = useRoute()
 const router = useRouter()
@@ -308,6 +308,27 @@ async function crearNueva() {
   }
 }
 
+// ---- Avisos al cliente (Fase 4, tarea 4: RF-M05-023/024/025/027) ----
+const TIPOS_AVISO: Record<ReservaAviso['tipo'], string> = {
+  confirmacion: 'Confirmación',
+  recordatorio: 'Recordatorio',
+  cancelacion: 'Cancelación',
+  no_show: 'No-show',
+}
+
+async function reintentarAviso(reserva: Reserva, aviso: ReservaAviso) {
+  procesando.value = reserva.id
+  error.value = ''
+  try {
+    const { data } = await reservaService.reintentarAviso(reserva.id, aviso.id)
+    reemplazar(data)
+  } catch (e) {
+    error.value = mensajeDeError(e, 'No pudimos reintentar el aviso.')
+  } finally {
+    procesando.value = null
+  }
+}
+
 // ---- No-show / completar / cancelar ----
 async function marcarNoShow(reserva: Reserva) {
   procesando.value = reserva.id
@@ -485,6 +506,34 @@ onBeforeUnmount(() => clearInterval(reloj))
             <p v-else-if="reserva.estado === 'no_show' && reserva.no_show_at" class="mt-1 text-xs text-gray-500">
               {{ reserva.no_show_automatico ? 'Liberada automáticamente' : 'Marcada no-show por el personal' }} a las {{ horaCorta(reserva.no_show_at) }}.
             </p>
+            <!-- Fase 4, tarea 4 (RF-M05-027): avisos por correo al cliente y su resultado. -->
+            <div v-if="reserva.avisos?.length" class="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+              <span class="text-gray-500">Avisos:</span>
+              <span
+                v-for="aviso in reserva.avisos"
+                :key="aviso.id"
+                class="badge"
+                :class="{
+                  'bg-emerald-50 text-emerald-700 ring-emerald-600/20': aviso.estado === 'enviado',
+                  'bg-red-50 text-red-700 ring-red-600/20': aviso.estado === 'fallido',
+                  'bg-gray-100 text-gray-600 ring-gray-500/20': aviso.estado === 'pendiente',
+                }"
+                :title="aviso.error ?? `${aviso.destino}`"
+              >
+                {{ TIPOS_AVISO[aviso.tipo] }}:
+                {{ aviso.estado === 'enviado' ? `enviado ${horaCorta(aviso.enviado_at ?? aviso.created_at)}` : aviso.estado === 'fallido' ? 'falló' : 'en cola' }}
+              </span>
+              <button
+                v-for="aviso in reserva.avisos.filter((a) => a.estado === 'fallido')"
+                :key="`r-${aviso.id}`"
+                type="button"
+                class="min-h-8 font-semibold text-brand-700 underline disabled:opacity-50"
+                :disabled="procesando === reserva.id"
+                @click="reintentarAviso(reserva, aviso)"
+              >
+                Reintentar {{ TIPOS_AVISO[aviso.tipo].toLowerCase() }}
+              </button>
+            </div>
             <p class="mt-1 text-xs text-gray-500">
               Depósito: {{ formatoPesos.format(reserva.deposito_valor) }}
               <template v-if="reserva.deposito_pagado">

@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\PedidoController;
 use App\Http\Controllers\Api\PromocionController;
 use App\Http\Controllers\Api\ReporteController;
 use App\Http\Controllers\Api\ReservaController;
+use App\Http\Controllers\Api\ReservaPublicaController;
 use App\Http\Controllers\Api\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
@@ -71,6 +72,11 @@ Route::post('/reservas', [ReservaController::class, 'store'])->middleware('throt
 // Fase 1, tarea 4 (RN-M05-07): mesas libres de reservas a una fecha y hora.
 Route::get('/mesas/disponibles', [ReservaController::class, 'mesasDisponibles'])->middleware('throttle:60,1');
 Route::post('/reservas/{reserva}/deposito/en-linea', [ReservaController::class, 'registrarDepositoEnLinea'])->middleware('throttle:30,1');
+// Fase 4, tarea 4 (RF-M05-018, RN-M05-09): ver y cancelar una reserva con el enlace del correo, sin cuenta.
+Route::middleware('throttle:30,1')->group(function () {
+    Route::get('/reservas/enlace/{token}', [ReservaPublicaController::class, 'ver']);
+    Route::post('/reservas/enlace/{token}/cancelar', [ReservaPublicaController::class, 'cancelar']);
+});
 
 // 'activo' (Fase 0, tarea 6): una cuenta desactivada no usa ninguna ruta con sesión.
 Route::middleware(['auth:sanctum', 'activo'])->group(function () {
@@ -142,6 +148,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
 
         Route::post('/reservas/{reserva}/no-show', [ReservaController::class, 'marcarNoShow']);
         Route::post('/reservas/{reserva}/completar', [ReservaController::class, 'completar']);
+        // Fase 4, tarea 4 (RF-M05-027): volver a enviar un aviso que falló.
+        Route::post('/reservas/{reserva}/avisos/{aviso}/reintentar', [ReservaController::class, 'reintentarAviso']);
 
         // RF-M05-009/010: abrir/liberar una mesa manualmente (sin pedido de por medio).
         Route::post('/mesas/{mesa}/abrir', [MesaController::class, 'abrir']);

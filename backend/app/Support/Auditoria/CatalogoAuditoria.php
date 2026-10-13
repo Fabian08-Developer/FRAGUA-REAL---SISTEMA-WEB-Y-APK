@@ -104,6 +104,11 @@ final class CatalogoAuditoria
         'confirmar_llegada_reserva' => ['Llegada de reserva confirmada', 'mesas'],
         'abonar_deposito_reserva' => ['Depósito abonado a la cuenta', 'mesas'],
         'ajustar_abono_deposito' => ['Ajuste del abono del depósito', 'mesas'],
+        'cancelar_reserva' => ['Cancelación de reserva', 'mesas'],
+        'marcar_no_show' => ['No-show marcado por el personal', 'mesas'],
+        'no_show_automatico' => ['No-show automático (venció la tolerancia)', 'mesas'],
+        'enviar_aviso_reserva' => ['Aviso de reserva enviado al cliente', 'mesas'],
+        'falla_aviso_reserva' => ['Falla al enviar un aviso de reserva', 'mesas'],
 
         // Reportes
         'exportar_reporte' => ['Exportación de reporte', 'reportes'],

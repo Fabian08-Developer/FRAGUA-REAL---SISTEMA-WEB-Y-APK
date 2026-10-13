@@ -170,6 +170,28 @@ debe decir "activo".
       previa, ese primer pedido cuenta como su llegada y se abona el depósito.
 - [ ] Cambiar la tolerancia a 30 en Configuración: la siguiente reserva se libera a los 30 min.
 
+### 5c. Avisos de reserva y cancelación por enlace (Fase 4, tarea 4 — RF-M05-018/023/025/027)
+Requiere la cola corriendo y un `MAIL_MAILER` que envíe (con `log` los correos quedan en
+`storage/logs/laravel.log`). Usar un correo de cliente al que tengas acceso.
+- [ ] Confirmar el depósito de una reserva web: llega "Reserva confirmada" con fecha, hora, mesa,
+      depósito y el botón "Ver o cancelar mi reserva". En Reservas la reserva dice
+      "Confirmación · enviado h:mm".
+- [ ] Registrar un depósito en el local (reserva por teléfono con correo): también llega la
+      confirmación.
+- [ ] Cancelar una reserva desde Reservas: llega "Reserva cancelada" y dice cómo se devuelve el
+      depósito. Auditoría muestra "Cancelación de reserva" con tu nombre.
+- [ ] Un no-show (manual o automático): llega el aviso de "No asistió" con el depósito retenido.
+- [ ] Con el correo mal configurado (p. ej. contraseña SMTP errada): la reserva igual se confirma;
+      tras 3 intentos el aviso dice "falló" con el motivo. Corregir el SMTP y pulsar "Reintentar":
+      pasa a "enviado". Auditoría muestra la falla y el envío.
+- [ ] Abrir el enlace del correo en una ventana privada (sin sesión): muestra estado, fecha, mesa,
+      depósito y tolerancia, sin datos de contacto. "Cancelar reserva" pide confirmar, la deja
+      Cancelada con el depósito reembolsado y Auditoría la muestra "por enlace", sin usuario.
+- [ ] El mismo enlace después de la hora de la reserva: ya no ofrece cancelar.
+- [ ] Una reserva con depósito en efectivo: el enlace no la cancela y pide llamar o pasar por el
+      local.
+- [ ] Un enlace inventado o incompleto: "No encontramos esa reserva".
+
 ## 6. Caja (M06)
 - [ ] Abrir turno (un solo turno por día, RN-M06-03); intentar abrir otro → rechazado.
 - [ ] Sin turno abierto, la pantalla dice "sin turno" y el Mesero no puede cobrar (bug del 01/10).
@@ -271,6 +293,8 @@ debe decir "activo".
 - [ ] Un enlace inventado muestra "No encontramos ese pedido".
 - [ ] Con una promoción vigente, el carrito y el Checkout muestran la rebaja y el mismo total que
       tendrá el pedido; el seguimiento muestra la promoción aplicada.
+- [ ] Reservar mesa sin cuenta y pagar el depósito en línea: al confirmarlo el personal, el correo
+      trae el enlace de la reserva y desde ahí se puede cancelar antes de la hora (punto 5c).
 
 ## 10. Transversal
 - [ ] Cerrar sesión y volver a entrar; el token anterior ya no sirve.

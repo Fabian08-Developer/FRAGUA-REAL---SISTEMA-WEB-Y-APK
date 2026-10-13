@@ -669,6 +669,40 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
     - Frontend: Reservas (Administrador y Mesero) muestra "Si no llega, se libera sola a las …",
       el recordatorio enviado y si el no-show fue automático; "Marcar no-show" solo aparece cuando
       ya pasó la tolerancia.
+34. **Fase 4, tarea 4 (13/10/2026): avisos de reserva por correo y cancelación por enlace (M05).**
+    RF-M05-018, 023, 025, 027, RN-M05-09, 17, 18, HU-M05-008, 011, 014; decisión D3 (correo en
+    V1, SMS después). Migración `2026_10_18_000003` (`reservas.token_publico`, único, y tabla
+    `reserva_avisos`); 9 pruebas en `AvisosDeReservaTest`.
+    - Cuatro avisos por correo, cada uno con el enlace de la reserva: confirmación (al confirmar
+      el depósito en línea o registrar el depósito en el local), recordatorio (tarea 3),
+      cancelación (dice si el depósito se devuelve y cómo) y no-show (depósito retenido). Las
+      notificaciones comparten `Notifications\Concerns\DescribeReserva` (fecha, hora y valores
+      en pesos).
+    - `AvisoReservaService::programar()` crea el registro en `reserva_avisos` (tipo, canal
+      `correo`, destino, estado `pendiente` → `enviado` | `fallido`, intentos, error, hora de
+      envío) y encola `App\Jobs\EnviarAvisoReserva` después del commit. El trabajo hace hasta 3
+      intentos con 1 minuto entre uno y otro; si el último falla, el aviso queda `fallido` con el
+      error (auditoría `falla_aviso_reserva`) y la reserva sigue normal: un correo que no sale
+      nunca rompe la acción que lo generó. Cada envío se audita como `enviar_aviso_reserva`.
+    - `POST /reservas/{reserva}/avisos/{aviso}/reintentar` (Administrador y Mesero): vuelve a
+      enviar un aviso fallido (422 si ya salió). `GET /reservas` trae los avisos de cada reserva.
+    - Enlace público sin sesión (`ReservaPublicaController`, límite 30 por minuto):
+      `GET /reservas/enlace/{token}` muestra estado, mesa, fecha, depósito y tolerancia (sin
+      correo ni teléfono) y `POST /reservas/enlace/{token}/cancelar` la cancela. El token son 48
+      caracteres al azar, se crea con cada reserva (las existentes se rellenaron en la migración)
+      y nunca sale en las respuestas del personal (`$hidden`). Solo cancela si la reserva está
+      pendiente o confirmada y aún no llega su hora; si el depósito se pagó en efectivo, pide
+      llamar o pasar por el local (la devolución en efectivo se hace en caja).
+    - `ReservaService::cancelar()` ahora audita `cancelar_reserva` con quien la canceló (o sin
+      usuario y `por_enlace` si fue el cliente) y si el depósito se reembolsó.
+    - El enlace usa `FRONTEND_URL` (`config/fragua_real.php`): en el VPS debe ser la dirección
+      pública del sitio. Para que los correos salgan de verdad hace falta `MAIL_MAILER=smtp` con
+      sus credenciales (Configuración > Tareas automáticas avisa si sigue en `log`).
+    - Pendiente por la decisión D3: el canal SMS (RF-M05-023/025 quedan a medias hasta tener
+      proveedor); la tabla ya guarda el canal de cada aviso.
+    - Frontend: página pública `/reserva/:token` (`views/cliente/ReservaEnlaceView.vue`) para ver
+      y cancelar; Reservas muestra en cada reserva los avisos ("enviado 3:05 pm", "en cola",
+      "falló" con el error) y el botón "Reintentar".
 
 ## Qué falta a propósito
 

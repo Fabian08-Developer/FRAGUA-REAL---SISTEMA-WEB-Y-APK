@@ -146,6 +146,8 @@ class ReservaService
         $reserva->save();
 
         $this->marcarMesaReservada($reserva);
+        // Fase 4, tarea 4 (RF-M05-023): correo de confirmación con el enlace de la reserva.
+        app(AvisoReservaService::class)->programar($reserva, 'confirmacion');
 
         // RF-M05-036: cada confirmación, rechazo o registro manual de un depósito queda auditado.
         app(AuditoriaService::class)->registrar('confirmar_deposito_reserva', 'Reserva', $reserva->id, [
@@ -207,6 +209,7 @@ class ReservaService
         $reserva->save();
 
         $this->marcarMesaReservada($reserva);
+        app(AvisoReservaService::class)->programar($reserva, 'confirmacion'); // Fase 4, tarea 4
         if ($metodo === 'efectivo') {
             $cajaService->recalcularEfectivoEsperado($turno);
         }
@@ -245,6 +248,8 @@ class ReservaService
             'tolerancia_minutos' => PoliticaReservas::toleranciaMinutos(),
             'deposito_retenido' => $reserva->deposito_pagado ? (float) $reserva->deposito_valor : 0,
         ], $actor);
+        // Fase 4, tarea 4 (RF-M05-025): aviso de no-show al cliente.
+        app(AvisoReservaService::class)->programar($reserva, 'no_show');
 
         return $reserva;
     }
@@ -333,7 +338,9 @@ class ReservaService
     }
 
     // RN-M05-17: cancelar antes de la hora reservada reembolsa el depósito completo.
-    public function cancelar(Reserva $reserva): Reserva
+    // Fase 4, tarea 4: queda en la auditoría (quién, o "por enlace" si fue el cliente desde el
+    // correo) y se avisa al cliente por correo (RF-M05-025).
+    public function cancelar(Reserva $reserva, ?User $actor = null, bool $porEnlace = false): Reserva
     {
         if (! in_array($reserva->estado, ['pendiente_pago', 'confirmada'], true)) {
             throw new RuntimeException('Esta reserva no puede cancelarse en su estado actual.');
@@ -362,6 +369,12 @@ class ReservaService
         }
 
         $this->liberarMesa($reserva);
+
+        app(AuditoriaService::class)->registrar('cancelar_reserva', 'Reserva', $reserva->id, array_filter([
+            'por_enlace' => $porEnlace ?: null,
+            'deposito_reembolsado' => $reserva->deposito_pagado ? (float) $reserva->deposito_valor : null,
+        ], fn ($v) => $v !== null), $actor);
+        app(AvisoReservaService::class)->programar($reserva, 'cancelacion');
 
         return $reserva;
     }

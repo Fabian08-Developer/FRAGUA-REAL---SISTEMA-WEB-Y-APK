@@ -3,22 +3,20 @@
 namespace App\Notifications;
 
 use App\Models\Reserva;
+use App\Notifications\Concerns\DescribeReserva;
 use App\Support\Reservas\PoliticaReservas;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
  * M05 — RF-M05-024, RN-M05-12/13 (Fase 4, tarea 3, 13/10/2026): recordatorio por correo antes
- * de la hora de la reserva (decisión D3: correo en V1; el SMS queda para después). Va en la cola
- * para no frenar el proceso de cada minuto si el servidor de correo tarda.
+ * de la hora de la reserva (decisión D3: correo en V1; el SMS queda para después). Desde la
+ * tarea 4 lo envía el trabajo EnviarAvisoReserva desde la cola, que registra si salió o falló
+ * (RF-M05-027).
  */
-class RecordatorioReservaNotification extends Notification implements ShouldQueue
+class RecordatorioReservaNotification extends Notification
 {
-    use Queueable;
-
-    public int $tries = 3;
+    use DescribeReserva;
 
     public function __construct(public readonly Reserva $reserva)
     {
@@ -35,11 +33,11 @@ class RecordatorioReservaNotification extends Notification implements ShouldQueu
         $mesa = $this->reserva->mesa?->nombre;
         $tolerancia = PoliticaReservas::toleranciaMinutos();
 
-        return (new MailMessage)
-            ->subject('Te esperamos hoy a las '.$hora->format('g:i a').' — Fragua Real Burger')
-            ->greeting('Hola '.$this->reserva->cliente_nombre.',')
-            ->line('Te recordamos tu reserva en Fragua Real Burger para el '.$hora->locale('es')->isoFormat('dddd D [de] MMMM [a las] h:mm a').($mesa ? " ({$mesa})." : '.'))
+        $mensaje = $this->mensajeBase($this->reserva, 'Te esperamos a las '.$hora->format('g:i a'))
+            ->line('Te recordamos tu reserva en Fragua Real Burger para el '.$this->fechaTexto($this->reserva).($mesa ? " ({$mesa})." : '.'))
             ->line("Te guardamos la mesa hasta {$tolerancia} minutos después de esa hora. Si no alcanzas a llegar, la reserva se libera y el depósito no se devuelve.")
             ->line('Si necesitas cancelar, hazlo antes de la hora y te devolvemos el depósito completo.');
+
+        return $this->conEnlace($mensaje, $this->reserva);
     }
 }

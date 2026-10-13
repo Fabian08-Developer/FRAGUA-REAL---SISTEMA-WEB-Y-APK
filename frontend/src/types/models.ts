@@ -337,7 +337,36 @@ export interface Reserva {
   no_show_at?: string | null
   no_show_automatico?: boolean
   recordatorio_enviado_at?: string | null
+  // Fase 4, tarea 4 (RF-M05-027): avisos por correo al cliente, del más reciente al más antiguo.
+  avisos?: ReservaAviso[]
   mesa?: Mesa
+}
+
+export interface ReservaAviso {
+  id: number
+  reserva_id: number
+  tipo: 'confirmacion' | 'recordatorio' | 'cancelacion' | 'no_show'
+  canal: 'correo' | 'sms'
+  destino: string
+  estado: 'pendiente' | 'enviado' | 'fallido'
+  intentos: number
+  error: string | null
+  enviado_at: string | null
+  created_at: string
+}
+
+// Fase 4, tarea 4 (RF-M05-018): lo que ve quien abre el enlace de su reserva (sin cuenta).
+export interface ReservaPublica {
+  cliente_nombre: string
+  mesa: string | null
+  fecha_hora: string
+  estado: EstadoReserva
+  deposito_valor: number
+  deposito_pagado: boolean
+  deposito_reembolsado: boolean
+  tolerancia_minutos: number
+  puede_cancelar: boolean
+  motivo_no_cancela: string | null
 }
 
 // Espeja app/Models/CompraGasto.php (M03). 'estado' en vez de "anulado": el backend lo

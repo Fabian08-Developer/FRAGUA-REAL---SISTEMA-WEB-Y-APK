@@ -8,6 +8,8 @@ use App\Http\Requests\Api\Reserva\RegistrarDepositoManualRequest;
 use App\Http\Requests\Api\Reserva\StoreReservaRequest;
 use App\Models\Configuracion;
 use App\Models\Reserva;
+use App\Models\ReservaAviso;
+use App\Services\AvisoReservaService;
 use App\Services\ReservaService;
 use Illuminate\Http\Request;
 
@@ -42,7 +44,8 @@ class ReservaController extends Controller
                 ->orderBy('fecha_hora');
         }
 
-        return response()->json($query->with('registradaPorUsuario:id,nombre')->paginate(20));
+        // Fase 4, tarea 4 (RF-M05-027): con los avisos enviados al cliente (o los que fallaron).
+        return response()->json($query->with(['registradaPorUsuario:id,nombre', 'avisos'])->paginate(20));
     }
 
     // Cliente web, Mesero o Administrador (RN-M05-06): creado_por distingue el origen.
@@ -65,7 +68,7 @@ class ReservaController extends Controller
         );
         $reserva = $this->reservaService->crear($data, $depositoValor, $esPersonal ? $usuario : null);
 
-        return response()->json($reserva->load('mesa'), 201);
+        return response()->json($reserva->load(['mesa', 'avisos']), 201);
     }
 
     // Fase 1, tarea 4 (RN-M05-07): mesas activas que no tienen otra reserva a esa hora. Pública:
@@ -81,33 +84,33 @@ class ReservaController extends Controller
     // RN-M05-16: el Cliente inicia el pago del depósito por Nequi/Bancolombia (público).
     public function registrarDepositoEnLinea(ConfirmarDepositoReservaRequest $request, Reserva $reserva)
     {
-        return response()->json($this->reservaService->registrarDepositoEnLinea($reserva, $request->pasarela)->load('mesa'));
+        return response()->json($this->reservaService->registrarDepositoEnLinea($reserva, $request->pasarela)->load(['mesa', 'avisos']));
     }
 
     // Hoy: acción manual de Administrador/Mesero; mañana la reemplaza el webhook real de
     // la pasarela (ver README-BACKEND.md, "Pasarela de pago real").
-    // ->load('mesa') en todas las acciones de abajo: la vista de Administrador reemplaza
+    // ->load(['mesa', 'avisos']) en todas las acciones de abajo: la vista de Administrador reemplaza
     // la reserva en su lista con esta misma respuesta y necesita mesa.nombre, igual que
     // index() (sin esto, tras cualquier acción la mesa se vería como "Mesa #id").
     public function confirmarDepositoEnLinea(Request $request, Reserva $reserva)
     {
         abort_if(! ($request->user()->esAdministrador() || $request->user()->esMesero()), 403);
 
-        return response()->json($this->reservaService->confirmarDepositoEnLinea($reserva, $request->user())->load('mesa'));
+        return response()->json($this->reservaService->confirmarDepositoEnLinea($reserva, $request->user())->load(['mesa', 'avisos']));
     }
 
     public function rechazarDepositoEnLinea(Request $request, Reserva $reserva)
     {
         abort_if(! ($request->user()->esAdministrador() || $request->user()->esMesero()), 403);
 
-        return response()->json($this->reservaService->rechazarDepositoEnLinea($reserva, $request->user())->load('mesa'));
+        return response()->json($this->reservaService->rechazarDepositoEnLinea($reserva, $request->user())->load(['mesa', 'avisos']));
     }
 
     // RN-M05-16: depósito manual registrado por el Mesero o el Administrador.
     public function registrarDepositoManual(RegistrarDepositoManualRequest $request, Reserva $reserva)
     {
         return response()->json(
-            $this->reservaService->registrarDepositoManual($reserva, $request->metodo, $request->user())->load('mesa')
+            $this->reservaService->registrarDepositoManual($reserva, $request->metodo, $request->user())->load(['mesa', 'avisos'])
         );
     }
 
@@ -115,14 +118,25 @@ class ReservaController extends Controller
     {
         abort_if(! ($request->user()->esAdministrador() || $request->user()->esMesero()), 403);
 
-        return response()->json($this->reservaService->marcarNoShow($reserva, $request->user())->load('mesa'));
+        return response()->json($this->reservaService->marcarNoShow($reserva, $request->user())->load(['mesa', 'avisos']));
+    }
+
+    // Fase 4, tarea 4 (RF-M05-027): reintentar un aviso por correo que falló.
+    public function reintentarAviso(Request $request, Reserva $reserva, ReservaAviso $aviso, AvisoReservaService $avisos)
+    {
+        abort_if(! ($request->user()->esAdministrador() || $request->user()->esMesero()), 403);
+        abort_if($aviso->reserva_id !== $reserva->id, 404);
+
+        $avisos->reintentar($aviso);
+
+        return response()->json($reserva->fresh(['mesa', 'avisos']));
     }
 
     public function completar(Request $request, Reserva $reserva)
     {
         abort_if(! ($request->user()->esAdministrador() || $request->user()->esMesero()), 403);
 
-        return response()->json($this->reservaService->completar($reserva, $request->user())->load('mesa'));
+        return response()->json($this->reservaService->completar($reserva, $request->user())->load(['mesa', 'avisos']));
     }
 
     public function cancelar(Request $request, Reserva $reserva)
@@ -133,7 +147,7 @@ class ReservaController extends Controller
         // ReservaPolicy::cancelar() (ver ahí por qué se identifica por correo).
         $this->authorize('cancelar', $reserva);
 
-        return response()->json($this->reservaService->cancelar($reserva)->load('mesa'));
+        return response()->json($this->reservaService->cancelar($reserva, $request->user())->load(['mesa', 'avisos']));
     }
 
     // "Mis reservas" del Cliente (HU-M05, pantalla "Mis pedidos y reservas"): Reserva no

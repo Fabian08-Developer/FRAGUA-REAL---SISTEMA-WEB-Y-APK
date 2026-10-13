@@ -4,10 +4,8 @@ namespace App\Services;
 
 use App\Models\Mesa;
 use App\Models\Reserva;
-use App\Notifications\RecordatorioReservaNotification;
 use App\Support\Reservas\PoliticaReservas;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification;
 use Throwable;
 
 /**
@@ -111,8 +109,8 @@ class ReservaAutomaticaService
                 }
 
                 try {
-                    Notification::route('mail', [$reserva->cliente_correo => $reserva->cliente_nombre])
-                        ->notify(new RecordatorioReservaNotification($reserva));
+                    // Fase 4, tarea 4: el aviso se registra y se envía desde la cola (RF-M05-027).
+                    app(AvisoReservaService::class)->programar($reserva, 'recordatorio');
                     $reserva->recordatorio_enviado_at = now();
                     $reserva->save();
                     $cantidad++;

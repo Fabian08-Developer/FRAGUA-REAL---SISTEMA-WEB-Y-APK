@@ -4,7 +4,7 @@
 // HU-M05-015): el filtro por estado se resuelve en el backend, no en el frontend, para
 // no traer más páginas de las necesarias.
 import api from './api'
-import type { EstadoReserva, Mesa, Reserva } from '@/types/models'
+import type { EstadoReserva, Mesa, Reserva, ReservaPublica } from '@/types/models'
 
 export interface CrearReservaPayload {
   mesa_id: number
@@ -66,6 +66,17 @@ export const reservaService = {
   },
   marcarNoShow(id: number) {
     return api.post<Reserva>(`/reservas/${id}/no-show`)
+  },
+  // Fase 4, tarea 4 (RF-M05-027): reenviar un aviso por correo que falló.
+  reintentarAviso(id: number, avisoId: number) {
+    return api.post<Reserva>(`/reservas/${id}/avisos/${avisoId}/reintentar`)
+  },
+  // Fase 4, tarea 4 (RF-M05-018, RN-M05-09): ver y cancelar con el enlace del correo, sin cuenta.
+  verPorEnlace(token: string) {
+    return api.get<ReservaPublica>(`/reservas/enlace/${encodeURIComponent(token)}`)
+  },
+  cancelarPorEnlace(token: string) {
+    return api.post<ReservaPublica>(`/reservas/enlace/${encodeURIComponent(token)}/cancelar`)
   },
   completar(id: number) {
     return api.post<Reserva>(`/reservas/${id}/completar`)
