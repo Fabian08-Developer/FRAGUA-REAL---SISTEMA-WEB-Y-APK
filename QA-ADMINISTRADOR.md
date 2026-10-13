@@ -19,6 +19,10 @@ permitía editar los valores, pero no había dónde hacerlo).
 - [ ] Valor vacío o con letras: error bajo el campo, sin llamar al servidor.
 - [ ] "Guardar cambios" queda desactivado mientras no haya cambios.
 - [ ] Un Mesero no puede abrir `/admin/configuracion` ni llamar `PUT /configuraciones` (403).
+- [ ] "Tareas automáticas" (Fase 4, tarea 1): sin cron ni trabajador, dice "detenido" en ambos.
+      Con `php artisan schedule:work` y `php artisan queue:work` corriendo (o el cron y
+      Supervisor en el VPS), al minuto ambos dicen "activo". Muestra pendientes, fallidos y si el
+      correo se envía de verdad. El botón de recargar vuelve a consultar.
 
 ## 1. Dashboard
 - [ ] Muestra ventas del día, pedidos activos por canal y mesas ocupadas.

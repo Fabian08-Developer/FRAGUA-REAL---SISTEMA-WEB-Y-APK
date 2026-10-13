@@ -18,3 +18,13 @@ Artisan::command('sesiones:limpiar', function (\App\Services\SesionService $sesi
 })->purpose('Borra las sesiones vencidas o inactivas');
 
 \Illuminate\Support\Facades\Schedule::command('sesiones:limpiar')->dailyAt('03:30')->timezone('America/Bogota');
+
+// Fase 4, tarea 1: latido del programador y de la cola, cada minuto. Si el cron o el
+// trabajador de la cola no están corriendo en el servidor, el Administrador lo ve en
+// Configuración > Tareas automáticas (EstadoSistemaService).
+Artisan::command('fragua:latido', function (\App\Services\EstadoSistemaService $estado) {
+    $estado->latido();
+    $this->info('Latido registrado.');
+})->purpose('Registra que el programador corre y encola una prueba para la cola');
+
+\Illuminate\Support\Facades\Schedule::command('fragua:latido')->everyMinute();

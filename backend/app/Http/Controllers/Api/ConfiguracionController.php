@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Configuracion\UpdateConfiguracionesRequest;
 use App\Models\Configuracion;
 use App\Services\AuditoriaService;
+use App\Services\EstadoSistemaService;
 
 /**
  * M05/M07 — Valores del sistema editables por el Administrador "en cualquier momento"
@@ -24,6 +25,12 @@ class ConfiguracionController extends Controller
     public function index()
     {
         return response()->json(Configuracion::query()->orderBy('clave')->get());
+    }
+
+    // Fase 4, tarea 1: ¿están corriendo el programador y la cola en el servidor? Solo lectura.
+    public function estadoSistema(EstadoSistemaService $estado)
+    {
+        return response()->json($estado->estado());
     }
 
     public function update(UpdateConfiguracionesRequest $request)

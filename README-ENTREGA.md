@@ -59,6 +59,30 @@ anterior se entra con el correo o se le pone desde Usuarios.
 
 El Cliente también puede navegar y pedir como invitado, sin cuenta.
 
+## Programador y cola en el VPS (Fase 4)
+
+Desde la Fase 4 el sistema hace tareas solo (no-show, recordatorios, avisos por correo, limpieza
+de sesiones). Para eso, en el VPS de Hostinger tienen que correr dos procesos además de Nginx y
+PHP-FPM. Los archivos listos están en `backend/deploy/` (ajustar la ruta
+`/var/www/fragua-real/backend` y el usuario `www-data` si en el servidor son otros):
+
+1. **Programador (cron)**: copiar `backend/deploy/cron-fragua-real` a `/etc/cron.d/fragua-real`
+   (dueño root, permisos 644). Ejecuta `php artisan schedule:run` cada minuto.
+2. **Trabajador de la cola (Supervisor)**: `sudo apt install supervisor`, copiar
+   `backend/deploy/supervisor-fragua-real-cola.conf` a `/etc/supervisor/conf.d/` y correr
+   `sudo supervisorctl reread && sudo supervisorctl update`. Ejecuta
+   `php artisan queue:work database` y lo reinicia si se cae.
+3. En el `.env` del servidor: `QUEUE_CONNECTION=database` y `CACHE_STORE=database` (las tablas
+   las crea `php artisan migrate`), y un `MAIL_MAILER` que envíe de verdad (SMTP).
+4. Después de cada despliegue del código: `php artisan migrate --force`,
+   `php artisan config:cache` y `php artisan queue:restart` (Supervisor levanta el trabajador
+   con el código nuevo).
+
+Comprobación: Administrador > Configuración > **Tareas automáticas** muestra si el programador y
+la cola están activos (cada uno deja un latido cada minuto), los trabajos pendientes y fallidos,
+y si el correo sale de verdad. En el equipo de desarrollo se puede probar con
+`php artisan schedule:work` y `php artisan queue:work` en dos terminales.
+
 ## QA final — estado por rol
 
 Verificado en vivo contra los servidores de desarrollo del usuario
@@ -136,6 +160,11 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (`FRAGUA_REAL_SESION_INACTIVIDAD_MINUTOS`, `FRAGUA_REAL_SESION_DURACION_MAXIMA_MINUTOS`). La
   limpieza diaria de sesiones vencidas (`sesiones:limpiar`) necesita el cron de Laravel en el VPS
   (Fase 4).
+- La Fase 4 empezó con la tarea 1 (cola y programador en marcha): ver "Programador y cola en el
+  VPS" y `README-BACKEND.md`, punto 31. Decisiones del 12/10/2026: el sistema corre en un VPS de
+  Hostinger (D2); los avisos al cliente van por correo en V1 y el SMS queda para después (D3);
+  reservas con no-show a los 15 min, recordatorio 2 h antes y mesa Reservada 1 h antes,
+  editables en Configuración (D6).
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr
@@ -148,7 +177,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2 y 3 de la Fase 3, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3 y 1 de la Fase 4, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -262,6 +291,15 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 - El historial de auditoría ya no se puede cambiar ni borrar ni siquiera desde la base de datos.
   Consecuencia: un usuario con historial no se puede borrar de la base de datos (se desactiva,
   como siempre).
+
+## Cambios de comportamiento de la Fase 4 (desde el 12/10/2026)
+
+- Configuración tiene la tarjeta "Tareas automáticas": dice si el programador de tareas y la cola
+  de avisos están corriendo en el servidor, cuántos trabajos hay pendientes o fallidos y si el
+  correo sale de verdad o solo se registra.
+- Se crearon las tablas que el `.env` ya esperaba (`jobs`, `failed_jobs`, `cache`,
+  `cache_locks`, `sessions`…). Sin ellas, con `CACHE_STORE=database`, el límite de intentos del
+  inicio de sesión y el programador fallaban en el servidor.
 
 ## Artefactos de prueba dejados en la base de datos
 

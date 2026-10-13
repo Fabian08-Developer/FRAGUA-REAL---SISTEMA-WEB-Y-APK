@@ -12,7 +12,26 @@ export interface Configuracion {
   deposito_reserva: number
 }
 
+// Fase 4, tarea 1: estado del programador de tareas (cron) y de la cola de trabajos en el
+// servidor, con su último latido. GET /sistema/estado, solo Administrador.
+export interface EstadoSistema {
+  programador: { ultimo_latido: string | null; activo: boolean }
+  cola: {
+    conexion: string
+    sincronica: boolean
+    ultimo_latido: string | null
+    activa: boolean
+    pendientes: number | null
+    fallidos: number | null
+  }
+  correo: { transporte: string; envia_de_verdad: boolean }
+  minutos_activo: number
+}
+
 export const configuracionService = {
+  estadoSistema() {
+    return api.get<EstadoSistema>('/sistema/estado')
+  },
   obtener() {
     return api.get<Configuracion>('/configuracion')
   },

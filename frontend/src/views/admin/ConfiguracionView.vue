@@ -10,6 +10,7 @@ import { Bike, CalendarClock } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import EstadoTareasAutomaticas from '@/components/configuracion/EstadoTareasAutomaticas.vue'
 import { configuracionService } from '@/services/configuracion.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 
@@ -171,5 +172,10 @@ onMounted(cargar)
         </BaseButton>
       </div>
     </form>
+
+    <!-- Fase 4, tarea 1: estado del programador y de la cola en el servidor. -->
+    <div v-if="!cargando" class="mt-8 max-w-2xl">
+      <EstadoTareasAutomaticas />
+    </div>
   </div>
 </template>

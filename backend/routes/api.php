@@ -236,6 +236,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         // el Administrador "en cualquier momento" — tabla `configuraciones` (clave/valor).
         Route::get('/configuraciones', [ConfiguracionController::class, 'index']);
         Route::put('/configuraciones', [ConfiguracionController::class, 'update']);
+        // Fase 4, tarea 1: estado del programador de tareas y de la cola de trabajos.
+        Route::get('/sistema/estado', [ConfiguracionController::class, 'estadoSistema']);
 
         // Caja (M06)
         Route::get('/caja/turnos', [CajaController::class, 'index']);

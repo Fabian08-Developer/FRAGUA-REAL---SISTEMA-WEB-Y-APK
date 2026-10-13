@@ -1,0 +1,5 @@
+# Fase 4, tarea 1 — Programador de tareas de Fragua Real (no-show, recordatorios, limpieza de
+# sesiones, latido). Copiar a /etc/cron.d/fragua-real en el VPS (dueño root, permisos 644) y
+# ajustar la ruta y el usuario si no son estos. Corre cada minuto; Laravel decide qué toca.
+SHELL=/bin/bash
+* * * * * www-data cd /var/www/fragua-real/backend && php artisan schedule:run >> /dev/null 2>&1

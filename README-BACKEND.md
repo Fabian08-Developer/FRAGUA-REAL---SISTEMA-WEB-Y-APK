@@ -604,6 +604,30 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
     - Frontend: Mi perfil tiene "Sesiones abiertas" (cerrar una o "Cerrar las demás", con la
       política explicada); en Usuarios el botón "Sesiones (n)" reemplaza a "Revocar sesiones" y
       abre la lista de esa cuenta para cerrar una o todas.
+31. **Fase 4, tarea 1 (12/10/2026): cola de trabajos y programador de tareas en marcha.** Base de
+    RF-M05-016/024 y de todos los avisos de la Fase 4. Migración `2026_10_18_000001` (tablas
+    `jobs`, `job_batches`, `failed_jobs`, `cache`, `cache_locks` y `sessions`, cada una solo si no
+    existe); 6 pruebas en `ColaYProgramadorTest`.
+    - CORREGIDO: el `.env` de ejemplo usa `QUEUE_CONNECTION`, `CACHE_STORE` y `SESSION_DRIVER` en
+      `database`, pero esas tablas nunca se habían creado; las pruebas no lo notaban porque usan
+      `sync`/`array`. En el servidor, el límite de intentos del login (vive en la caché) y el
+      bloqueo del programador habrían fallado.
+    - Latido (`EstadoSistemaService`, comando `fragua:latido`, programado cada minuto): deja en la
+      caché la hora del programador y encola `App\Jobs\LatidoCola`, que al procesarse deja la
+      hora de la cola. `GET /sistema/estado` (solo Administrador) dice si cada proceso está
+      activo (latido de hace 3 minutos o menos), los trabajos pendientes y fallidos, y si el
+      correo sale de verdad (`MAIL_MAILER` distinto de `log`/`array`).
+    - Tareas programadas hoy (`routes/console.php`): `fragua:latido` cada minuto y
+      `sesiones:limpiar` a las 3:30 a. m. (hora de Colombia). `php artisan schedule:list` las
+      muestra.
+    - Despliegue: `backend/deploy/cron-fragua-real` (cron con `schedule:run` cada minuto) y
+      `backend/deploy/supervisor-fragua-real-cola.conf` (Supervisor con
+      `queue:work database --tries=3 --backoff=60 --max-time=3600`). Pasos en README-ENTREGA,
+      "Programador y cola en el VPS".
+    - Decisiones del 12/10/2026 para la Fase 4: VPS de Hostinger (D2), correo en V1 y SMS después
+      (D3), y no-show 15 min / recordatorio 2 h / mesa Reservada 1 h (D6).
+    - Frontend: Configuración > "Tareas automáticas"
+      (`components/configuracion/EstadoTareasAutomaticas.vue`).
 
 ## Qué falta a propósito
 
