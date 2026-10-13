@@ -103,4 +103,9 @@ export const compraGastoService = {
   verCierre(id: number) {
     return api.get<ConsultaCierre>(`/cierres-diarios/${id}`)
   },
+  // Fase 5, tarea 2 (RF-M03-28/29): el cierre en PDF, para imprimir o archivar. Cada impresión
+  // queda en la auditoría y desde la segunda sale marcado "REIMPRESIÓN".
+  pdfCierre(id: number) {
+    return api.get<Blob>(`/cierres-diarios/${id}/pdf`, { responseType: 'blob' })
+  },
 }

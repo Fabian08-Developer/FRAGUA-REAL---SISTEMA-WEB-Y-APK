@@ -77,6 +77,7 @@ final class CatalogoAuditoria
         'adjuntar_soporte_compra_gasto' => ['Soporte adjuntado a compra o gasto', 'compras'],
         'cierre_diario' => ['Cierre diario', 'compras'],
         'ajuste_cierre_diario' => ['Corrección posterior al cierre diario', 'compras'],
+        'imprimir_cierre_diario' => ['Impresión o reimpresión del cierre diario (PDF)', 'compras'],
 
         // Menú y catálogo
         'crear_categoria' => ['Creación de categoría', 'catalogo'],

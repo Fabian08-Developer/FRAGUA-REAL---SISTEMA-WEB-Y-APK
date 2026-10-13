@@ -16,7 +16,7 @@ class CierreDiario extends Model
 
     protected $fillable = [
         'fecha', 'total_ventas', 'total_compras', 'total_gastos',
-        'resultado_operativo', 'cerrado_por', 'detalle', 'caja_turno_id',
+        'resultado_operativo', 'cerrado_por', 'detalle', 'caja_turno_id', 'impresiones',
     ];
 
     protected $casts = [
@@ -26,6 +26,8 @@ class CierreDiario extends Model
         'total_gastos' => 'decimal:2',
         'resultado_operativo' => 'decimal:2',
         'detalle' => 'array',
+        // Fase 5, tarea 2: veces que se imprimió el PDF; desde la segunda sale "REIMPRESIÓN".
+        'impresiones' => 'integer',
     ];
 
     // Mismo nombre colisionaba con la columna 'cerrado_por' al serializar (ver el mismo

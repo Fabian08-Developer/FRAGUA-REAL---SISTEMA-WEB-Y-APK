@@ -786,6 +786,23 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       imprimió n veces: saldrá marcado «REIMPRESIÓN»"; Administrador > Pedidos tiene
       "Comprobantes" (`ComprobantesPedidoModal.vue`) con la lista y "Abrir"; `utils/documentos.ts`
       abre los PDF en otra pestaña y lee el mensaje de error que llega como Blob.
+38. **Fase 5, tarea 2 (13/10/2026): cierre diario impreso y en PDF (M03).** RF-M03-28, 29,
+    RNF-M03-09, 10, HU-M03-11, 12. Migración `2026_10_19_000003` (`cierres_diarios.impresiones`);
+    5 pruebas en `CierreDiarioPdfTest`.
+    - `GET /cierres-diarios/{cierre}/pdf` (solo Administrador, `CierreDiarioService::pdf()`): PDF
+      tamaño carta con la plantilla `resources/views/cierres/pdf.blade.php`: negocio, día en
+      letras, quién lo cerró y cuándo, los cuatro totales tal como se cerraron, el desglose
+      guardado (ventas por tipo y por forma de pago, compras y gastos por categoría y por forma de
+      pago), el arqueo de caja, las correcciones posteriores con quién las autorizó y los valores
+      actualizados, la nota de resultado no contable (RF-M03-34), líneas de firma ("Cerró" y
+      "Revisó") y al pie quién lo imprimió, cuándo y "Página n de m". Un cierre anterior a la Fase 2
+      (sin desglose guardado) sale con sus totales y lo explica.
+    - Regla de reimpresión: `App\Support\Documentos\RegistroImpresiones` (la usan ahora el
+      comprobante y el cierre) suma la impresión con bloqueo de fila, la audita
+      (`imprimir_cierre_diario`) y, desde la segunda, el PDF dice "REIMPRESIÓN · copia n".
+    - Frontend: en un día cerrado, Compras y gastos > Cierre diario tiene "Imprimir / PDF del
+      cierre" (luego "Reimprimir PDF del cierre", con aviso); en un día sin cerrar queda
+      "Imprimir vista previa" (impresión del navegador) y la hoja dice que es una vista previa.
 
 ## Qué falta a propósito
 

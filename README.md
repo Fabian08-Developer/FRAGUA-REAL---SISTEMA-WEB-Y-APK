@@ -75,7 +75,8 @@ correo opcional del invitado, y crea `pedido_avisos`, el registro de cada aviso 
 Fase 5 (13/10/2026): `2026_10_19_000001` completa la tabla `comprobantes` (consecutivo, copia del
 documento en `detalle`, anulación con motivo; un pedido puede tener varios en su historia) para el
 comprobante de pago (punto 36). `2026_10_19_000002` agrega `comprobantes.impresiones` para marcar
-las reimpresiones (punto 37). Pruebas automáticas: `php artisan test` (252 en `tests/Feature`).
+las reimpresiones (punto 37). `2026_10_19_000003` agrega `cierres_diarios.impresiones` para el
+cierre en PDF (punto 38). Pruebas automáticas: `php artisan test` (257 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

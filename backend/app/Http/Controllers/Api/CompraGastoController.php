@@ -134,6 +134,15 @@ class CompraGastoController extends Controller
         );
     }
 
+    // Fase 5, tarea 2 (RF-M03-28/29, HU-M03-11/12): el cierre en PDF para imprimir o archivar.
+    // Cada impresión queda en la auditoría; desde la segunda sale marcado "REIMPRESIÓN".
+    public function pdfCierre(Request $request, CierreDiario $cierre)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+
+        return $this->cierreDiarioService->pdf($cierre, $request->user());
+    }
+
     // RN-M03-15, HU-M03-09: un cierre tal como se hizo, sus ajustes posteriores y los valores actualizados.
     public function verCierre(Request $request, CierreDiario $cierre)
     {

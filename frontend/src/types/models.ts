@@ -453,6 +453,8 @@ export interface CierreDiario {
   detalle?: CalculoCierre | null
   caja_turno_id?: number | null
   ajustes_count?: number
+  // Fase 5, tarea 2: veces que se imprimió el PDF; desde la segunda sale "REIMPRESIÓN".
+  impresiones?: number
 }
 
 // Fase 2, tarea 5 — CierreDiarioService::calcular(): el día con su desglose (RF-M03-21 a 24).

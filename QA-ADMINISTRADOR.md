@@ -269,6 +269,23 @@ Antes de probar: `composer update barryvdh/laravel-dompdf --with-all-dependencie
       corrección y los valores actualizados, y el cierre original no cambia (RF-M03-20, HU-M03-09).
 - [ ] Corregir el valor y anular un registro de un día cerrado también piden la contraseña.
 
+### 7b. Cierre diario impreso y en PDF (Fase 5, tarea 2 — RF-M03-28/29, RNF-M03-09/10, HU-M03-11/12)
+- [ ] En un día cerrado, "Imprimir / PDF del cierre" abre en otra pestaña un PDF tamaño carta con
+      el negocio, el día ("Martes 13 de octubre de 2026"), quién lo cerró y a qué hora, los cuatro
+      totales, ventas por tipo y por forma de pago, compras y gastos por categoría y por forma de
+      pago, el arqueo de caja, la nota de que no es la utilidad contable, las líneas de firma
+      ("Cerró" y "Revisó") y al pie quién lo imprimió y "Página 1 de 1". Se imprime con Ctrl+P o se
+      guarda.
+- [ ] Un día con correcciones después del cierre: el PDF trae el cuadro "Correcciones después del
+      cierre" (fecha, quién autorizó, qué cambió, motivo y montos) y los valores actualizados; los
+      totales del cierre original no cambian.
+- [ ] La segunda vez el botón dice "Reimprimir PDF del cierre" y avisa que ya se imprimió; el PDF
+      dice "REIMPRESIÓN · copia 2". Auditoría muestra cada impresión ("Impresión o reimpresión del
+      cierre diario") con quién la hizo.
+- [ ] Un día sin cerrar solo ofrece "Imprimir vista previa": la hoja impresa dice "VISTA PREVIA —
+      este día todavía no está cerrado".
+- [ ] Abrir un cierre viejo desde "Cierres anteriores" y sacar su PDF también funciona.
+
 ## 8. Reportes (M08)
 - [ ] Los 6 reportes cargan con la semana actual por defecto (RN-M08-03).
 - [ ] Cambiar a mes y a rango personalizado.

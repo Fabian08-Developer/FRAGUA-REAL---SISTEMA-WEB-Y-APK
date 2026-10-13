@@ -5,11 +5,15 @@
 // historial de cierres (RF-M03-27) y, en un día cerrado, sus correcciones autorizadas con los
 // valores actualizados (RF-M03-20, RN-M03-15, HU-M03-09). El resultado es estimado, no la
 // utilidad contable (RF-M03-34).
+// Fase 5, tarea 2 (RF-M03-28/29, HU-M03-11/12): un día cerrado se imprime o se guarda en PDF con la
+// plantilla del cierre (con responsables, correcciones y reimpresión marcada y auditada). Un día sin
+// cerrar solo se imprime como vista previa desde el navegador, y la hoja lo dice.
 import { computed, onMounted, ref } from 'vue'
-import { History, Lock, Printer } from 'lucide-vue-next'
+import { FileText, History, Lock, Printer } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import { compraGastoService } from '@/services/compra-gasto.service'
 import { mensajeDeError } from '@/services/errors'
+import { abrirPdf } from '@/utils/documentos'
 import type { CalculoCierre, CierreDiario, ConsultaCierre, PreviaCierre } from '@/types/models'
 
 const props = defineProps<{ fechaInicial: string }>()
@@ -85,8 +89,26 @@ async function cerrarDia() {
   }
 }
 
-function imprimir() {
+// Vista previa de un día sin cerrar: impresión del navegador (no es el cierre formal).
+function imprimirVistaPrevia() {
   window.print()
+}
+
+// RF-M03-28/29: el cierre formal en PDF (se imprime desde la pestaña que se abre o se guarda).
+const abriendoPdf = ref(false)
+async function abrirPdfCierre() {
+  const cierre = consulta.value?.cierre
+  if (!cierre) return
+  abriendoPdf.value = true
+  error.value = ''
+  try {
+    await abrirPdf(() => compraGastoService.pdfCierre(cierre.id), 'No pudimos generar el PDF del cierre.')
+    cierre.impresiones = (cierre.impresiones ?? 0) + 1
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'No pudimos generar el PDF del cierre.'
+  } finally {
+    abriendoPdf.value = false
+  }
 }
 
 function abrirDelHistorial(c: CierreDiario) {
@@ -130,10 +152,22 @@ onMounted(() => {
           <span v-if="consulta" class="ml-1 badge bg-emerald-50 text-emerald-700 ring-emerald-600/20"><Lock :size="12" class="mr-1 inline" />Cerrado</span>
           <span v-else class="ml-1 badge bg-amber-50 text-amber-700 ring-amber-600/20">Sin cerrar</span>
         </p>
-        <button type="button" class="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 print:hidden" @click="imprimir">
-          <Printer :size="14" /> Imprimir
+        <div v-if="consulta" class="flex flex-col items-end gap-0.5 print:hidden">
+          <BaseButton variant="secondary" size="sm" :disabled="abriendoPdf" @click="abrirPdfCierre">
+            <FileText :size="14" />
+            {{ abriendoPdf ? 'Generando…' : (consulta.cierre.impresiones ?? 0) > 0 ? 'Reimprimir PDF del cierre' : 'Imprimir / PDF del cierre' }}
+          </BaseButton>
+          <span v-if="(consulta.cierre.impresiones ?? 0) > 0" class="text-[11px] text-gray-500">
+            Ya se imprimió {{ consulta.cierre.impresiones === 1 ? '1 vez' : `${consulta.cierre.impresiones} veces` }}: saldrá marcado «REIMPRESIÓN».
+          </span>
+        </div>
+        <button v-else type="button" class="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 print:hidden" @click="imprimirVistaPrevia">
+          <Printer :size="14" /> Imprimir vista previa
         </button>
       </div>
+      <p v-if="!consulta" class="mt-2 hidden rounded border border-gray-400 px-2 py-1 text-xs font-semibold print:block">
+        VISTA PREVIA — este día todavía no está cerrado; los valores pueden cambiar.
+      </p>
       <p v-if="consulta" class="mt-1 text-xs text-gray-500">
         Cerrado por {{ consulta.cierre.cerrado_por_usuario?.nombre ?? '—' }} el {{ formatoFechaHora(consulta.cierre.created_at) }}.
       </p>

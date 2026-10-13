@@ -145,7 +145,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 13/10/2026 van 473 de 579 verificables, 82 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 13/10/2026 van 479 de 579 verificables, 83 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -171,7 +171,8 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   puntos 31 a 35. La Fase 4 quedó completa el 13/10/2026 salvo el canal SMS, que se aplazó por
   la decisión D3 hasta elegir proveedor.
 - La Fase 5 empezó el 13/10/2026 con la tarea 1 (comprobante de pago): ver `README-BACKEND.md`,
-  punto 36, y con la reimpresión controlada que pediste el mismo día (punto 37). Trae una dependencia nueva de Composer (`barryvdh/laravel-dompdf`): después de
+  punto 36, con la reimpresión controlada que pediste el mismo día (punto 37) y con la tarea 2
+  (cierre diario impreso y en PDF, punto 38). Trae una dependencia nueva de Composer (`barryvdh/laravel-dompdf`): después de
   actualizar el código hay que correr `composer update barryvdh/laravel-dompdf
   --with-all-dependencies` en `backend` (actualiza `composer.lock`; en el VPS, `composer install`
   con ese lock). Para que el comprobante muestre el NIT, ponerlo en `FRAGUA_REAL_NIT`. Decisiones del 12/10/2026: el sistema corre en un VPS de
@@ -190,7 +191,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4 y 2 de la Fase 5, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4 y 3 de la Fase 5, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -321,6 +322,10 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   Auditoría con quién la hizo. Lo que descarga el cliente no se marca. El Administrador ve en
   Pedidos > "Comprobantes" todos los del pedido, también los anulados, y abre cualquiera (el anulado
   sale con su sello).
+- El cierre diario de un día cerrado se imprime o se guarda en PDF (tamaño carta) con el día, los
+  totales, el desglose, el arqueo, las correcciones posteriores, quién cerró y quién imprime, y
+  líneas de firma. Sigue la misma regla de reimpresión. Un día sin cerrar se imprime solo como
+  vista previa y la hoja lo dice.
 
 ## Cambios de comportamiento de la Fase 4 (desde el 12/10/2026)
 

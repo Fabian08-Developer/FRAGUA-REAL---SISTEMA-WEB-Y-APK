@@ -7,6 +7,7 @@ use App\Models\Pago;
 use App\Models\Pedido;
 use App\Models\PedidoDetalle;
 use App\Models\User;
+use App\Support\Documentos\RegistroImpresiones;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPdf;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -37,7 +38,7 @@ class ComprobanteService
     public const ANCHO_TICKET_PUNTOS = 226.77; // 80 mm
 
     // Solo las letras usadas de la fuente (el PDF va por correo) y nada remoto al dibujar.
-    private const OPCIONES = ['isFontSubsettingEnabled' => true, 'isRemoteEnabled' => false];
+    private const OPCIONES = RegistroImpresiones::OPCIONES_PDF;
 
     public function sincronizar(?Pedido $pedido): ?Comprobante
     {
@@ -91,23 +92,11 @@ class ComprobanteService
      */
     public function imprimir(Comprobante $comprobante, string $formato, User $actor): Response
     {
-        $vez = DB::transaction(function () use ($comprobante) {
-            $fila = Comprobante::whereKey($comprobante->id)->lockForUpdate()->firstOrFail();
-            $fila->forceFill(['impresiones' => $fila->impresiones + 1])->save();
-
-            return $fila->impresiones;
-        });
-        $comprobante->impresiones = $vez;
-
-        app(AuditoriaService::class)->registrar('imprimir_comprobante', 'Pedido', $comprobante->pedido_id, [
+        $marca = RegistroImpresiones::registrar($comprobante, 'imprimir_comprobante', 'Pedido', $comprobante->pedido_id, [
             'comprobante' => $comprobante->numero,
-            'vez' => $vez,
-            'reimpresion' => $vez > 1,
             'formato' => $formato,
             'anulado' => $comprobante->anulado_at !== null,
         ], $actor);
-
-        $marca = $vez > 1 ? ['vez' => $vez, 'fecha' => now()->toIso8601String()] : null;
 
         return $this->pdf($comprobante, $formato, $marca)->stream($this->nombreArchivo($comprobante));
     }

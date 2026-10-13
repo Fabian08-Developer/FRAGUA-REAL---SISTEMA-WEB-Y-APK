@@ -9,10 +9,13 @@ use App\Models\CompraGasto;
 use App\Models\Pago;
 use App\Models\Pedido;
 use App\Models\User;
+use App\Support\Documentos\RegistroImpresiones;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * M03 — Cierre Diario. Igual que CompraGastoService, este Service no estaba en el
@@ -203,6 +206,50 @@ class CierreDiarioService
             'calculo_hoy' => $this->calcular($cierre->fecha),
             'nota' => self::NOTA_RESULTADO,
         ];
+    }
+
+    /**
+     * Fase 5, tarea 2 — RF-M03-28/29, RNF-M03-09/10, HU-M03-11/12: el cierre en PDF (carta), para
+     * imprimirlo o archivarlo. Lleva el día, los totales tal como se cerraron, el desglose, el arqueo,
+     * las correcciones posteriores con los valores actualizados, quién lo cerró y quién lo imprime.
+     * Regla de reimpresión (13/10/2026): cada impresión queda en la auditoría y, desde la segunda, el
+     * documento dice "REIMPRESIÓN · copia n".
+     */
+    public function pdf(CierreDiario $cierre, User $actor): Response
+    {
+        $cierre->loadMissing(['cerradoPorUsuario', 'ajustes.autorizadoPorUsuario', 'ajustes.compraGasto']);
+        $fecha = $cierre->fecha->toDateString();
+
+        $reimpresion = RegistroImpresiones::registrar($cierre, 'imprimir_cierre_diario', 'CierreDiario', $cierre->id, [
+            'fecha' => $fecha,
+        ], $actor);
+
+        $deltaCompras = (float) $cierre->ajustes->sum('delta_compras');
+        $deltaGastos = (float) $cierre->ajustes->sum('delta_gastos');
+
+        $pdf = Pdf::loadView('cierres.pdf', [
+            'cierre' => $cierre,
+            'd' => $cierre->detalle,
+            'ajustes' => $cierre->ajustes,
+            'actualizado' => [
+                'total_compras' => round((float) $cierre->total_compras + $deltaCompras, 2),
+                'total_gastos' => round((float) $cierre->total_gastos + $deltaGastos, 2),
+                'resultado_operativo' => round((float) $cierre->resultado_operativo - $deltaCompras - $deltaGastos, 2),
+            ],
+            'negocio' => config('fragua_real.negocio'),
+            'nota' => self::NOTA_RESULTADO,
+            'impresoPor' => $actor->nombre,
+            'reimpresion' => $reimpresion,
+        ])->setOption(RegistroImpresiones::OPCIONES_PDF)->setPaper('letter', 'portrait');
+
+        // "Página n de m" al pie: dompdf solo sabe el total después de dibujar todo.
+        $pdf->render();
+        $dompdf = $pdf->getDomPDF();
+        $lienzo = $dompdf->getCanvas();
+        $lienzo->page_text($lienzo->get_width() - 100, $lienzo->get_height() - 32, 'Página {PAGE_NUM} de {PAGE_COUNT}',
+            $dompdf->getFontMetrics()->getFont('DejaVu Sans'), 7.5, [0.42, 0.4, 0.36]);
+
+        return $pdf->stream("cierre-diario-{$fecha}.pdf");
     }
 
     /** Registra una corrección autorizada sobre un día cerrado (la llama CompraGastoService). */

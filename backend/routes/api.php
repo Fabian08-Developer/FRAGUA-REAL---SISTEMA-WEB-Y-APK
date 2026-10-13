@@ -284,6 +284,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::get('/cierres-diarios/previa', [CompraGastoController::class, 'previaCierre']);
         Route::get('/cierres-diarios', [CompraGastoController::class, 'cierres']);
         Route::get('/cierres-diarios/{cierre}', [CompraGastoController::class, 'verCierre']);
+        // Fase 5, tarea 2 (RF-M03-28/29): el cierre en PDF, con reimpresión marcada y auditada.
+        Route::get('/cierres-diarios/{cierre}/pdf', [CompraGastoController::class, 'pdfCierre']);
 
         // Reportes (M08) — los 6 reportes reales del documento (RF-M08-002 a 009), cada
         // uno con periodo (RF-M08-001), comparación (RF-M08-010) y exportación
