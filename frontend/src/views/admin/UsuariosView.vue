@@ -2,7 +2,7 @@
 // M01 — Usuarios del Administrador: listar (staff y clientes), crear cuentas de
 // Mesero/Administrador, activar/desactivar y revocar sesiones. Ver UsuarioController.
 import { computed, onMounted, ref } from 'vue'
-import { KeyRound, Plus, Users as UsersIcon } from 'lucide-vue-next'
+import { History, KeyRound, Plus, Users as UsersIcon } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -227,7 +227,16 @@ onMounted(cargar)
             </div>
           </div>
 
-          <div v-if="usuario.id !== auth.usuario?.id" class="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+          <div class="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+            <!-- Fase 3, tarea 1 (RF-M01-025): lo que hizo este usuario, en Auditoría. -->
+            <router-link
+              :to="{ name: 'admin-auditoria', query: { user_id: String(usuario.id) } }"
+              class="col-span-2 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 hover:text-ink sm:min-h-9"
+            >
+              <History :size="14" />
+              Actividad
+            </router-link>
+            <template v-if="usuario.id !== auth.usuario?.id">
             <BaseButton variant="ghost" size="sm" :disabled="procesando === usuario.id" @click="revocarSesiones(usuario)">
               <KeyRound :size="14" />
               Revocar sesiones
@@ -240,6 +249,7 @@ onMounted(cargar)
             >
               {{ usuario.activo ? 'Desactivar' : 'Activar' }}
             </BaseButton>
+            </template>
           </div>
         </li>
       </ul>

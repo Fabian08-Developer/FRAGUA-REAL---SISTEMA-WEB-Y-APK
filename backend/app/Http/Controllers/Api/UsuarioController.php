@@ -48,6 +48,12 @@ class UsuarioController extends Controller
             'password' => Hash::make($request->password),
             'activo' => true,
         ]);
+        // RF-M01-017 (Fase 3, tarea 1): el alta de una cuenta del personal queda auditada.
+        app(AuditoriaService::class)->registrar('crear_usuario', 'User', $usuario->id, [
+            'rol' => $usuario->role,
+            'nombre' => $usuario->nombre,
+            'correo' => $usuario->email,
+        ], $request->user());
 
         return response()->json($usuario, 201);
     }

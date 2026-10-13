@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Configuracion\UpdateConfiguracionesRequest;
 use App\Models\Configuracion;
+use App\Services\AuditoriaService;
 
 /**
  * M05/M07 — Valores del sistema editables por el Administrador "en cualquier momento"
@@ -27,8 +28,19 @@ class ConfiguracionController extends Controller
 
     public function update(UpdateConfiguracionesRequest $request)
     {
+        $cambios = [];
         foreach ($request->validated() as $clave => $valor) {
+            $antes = Configuracion::obtener($clave);
             Configuracion::fijar($clave, (string) $valor);
+            if ($antes !== (string) $valor) {
+                $cambios[$clave] = ['antes' => $antes, 'despues' => (string) $valor];
+            }
+        }
+
+        // RF-M01-017 (Fase 3, tarea 1): cambiar el valor del domicilio o del depósito es una
+        // acción administrativa crítica; queda el antes y el después de lo que cambió.
+        if ($cambios) {
+            app(AuditoriaService::class)->registrar('editar_configuracion', 'Configuracion', null, ['cambios' => $cambios], $request->user());
         }
 
         return response()->json(Configuracion::query()->orderBy('clave')->get());

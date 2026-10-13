@@ -22,7 +22,10 @@ class AuditoriaService
     {
         $request = app()->bound('request') ? request() : null;
 
-        return Auditoria::create([
+        // Fase 3, tarea 1: la hora la pone la aplicación (UTC, como el resto de fechas), no el
+        // valor por defecto de la base de datos — en PostgreSQL ese depende de la zona horaria
+        // del servidor y podía quedar corrido frente a los filtros por fecha de la consulta.
+        return Auditoria::forceCreate([
             'user_id' => $actor?->id ?? Auth::id(),
             'accion' => $accion,
             'entidad' => $entidad,
@@ -30,6 +33,7 @@ class AuditoriaService
             'detalles' => $detalles ?: null,
             'ip' => $request?->ip(),
             'user_agent' => $request ? mb_substr((string) $request->userAgent(), 0, 255) : null,
+            'created_at' => now(),
         ]);
     }
 }

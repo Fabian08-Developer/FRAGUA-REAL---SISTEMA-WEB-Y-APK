@@ -12,6 +12,7 @@ import {
   Wallet,
   BarChart3,
   Settings,
+  ShieldCheck,
   LogOut,
   Menu,
   X,
@@ -39,7 +40,7 @@ async function cerrarSesion() {
 // RESPONSIVO (rediseño 02/10/2026) — tres modos según el ancho, porque el Mesero y el
 // Administrador usan mayormente teléfono o tablet:
 //   · < md  (teléfono): barra superior oscura. Mesero → barra de pestañas INFERIOR (el pulgar la
-//           alcanza; hay solo 3 secciones). Administrador → menú lateral deslizable (9 secciones
+//           alcanza; hay solo 3 secciones). Administrador → menú lateral deslizable (10 secciones
 //           no caben en una barra inferior).
 //   · md–lg (tablet): "riel" angosto de solo íconos con su etiqueta corta — siempre visible, sin
 //           tapar el contenido ni obligar a abrir un menú.
@@ -72,6 +73,7 @@ const enlacesAdmin: Enlace[] = [
   { to: '/admin/mesas', label: 'Mesas y Reservas', corto: 'Mesas', icon: Armchair, tambien: ['/admin/reservas'] }, // M05
   { to: '/admin/caja', label: 'Caja', corto: 'Caja', icon: Wallet }, // M06
   { to: '/admin/reportes', label: 'Reportes', corto: 'Reportes', icon: BarChart3 }, // M08
+  { to: '/admin/auditoria', label: 'Auditoría', corto: 'Auditoría', icon: ShieldCheck }, // M01 (Fase 3)
   { to: '/admin/configuracion', label: 'Configuración', corto: 'Ajustes', icon: Settings }, // M05/M07
 ]
 

@@ -436,3 +436,46 @@ export interface ConsultaCierre {
   calculo_hoy: CalculoCierre
   nota: string
 }
+
+// Fase 3, tarea 1 (RF-M01-025, HU-M01-020): un registro del historial de auditoría tal como lo
+// entrega GET /auditorias (solo lectura). accion_texto/categoria_texto/entidad_texto vienen ya
+// traducidos desde el backend (App\Support\Auditoria\CatalogoAuditoria).
+export interface RegistroAuditoria {
+  id: number
+  created_at: string
+  accion: string
+  accion_texto: string
+  categoria: string
+  categoria_texto: string
+  entidad: string
+  entidad_texto: string
+  entidad_id: number | null
+  detalles: Record<string, unknown> | null
+  ip: string | null
+  user_agent: string | null
+  navegador: string | null
+  usuario: Pick<Usuario, 'id' | 'nombre' | 'email' | 'role'> | null
+}
+
+export interface OpcionAuditoria {
+  valor: string
+  texto: string
+}
+
+// Eventos de seguridad de las últimas 24 horas (RF-M01-017/024).
+export interface ResumenSeguridad {
+  desde: string
+  inicios_fallidos_24h: number
+  inicios_exitosos_24h: number
+  restablecimientos_24h: number
+  ips_con_intentos_repetidos: { ip: string; intentos: number }[]
+}
+
+// GET /auditorias/opciones: valores de los filtros y resumen de seguridad.
+export interface OpcionesAuditoria {
+  categorias: OpcionAuditoria[]
+  acciones: (OpcionAuditoria & { categoria: string })[]
+  entidades: OpcionAuditoria[]
+  usuarios: Pick<Usuario, 'id' | 'nombre' | 'email' | 'role'>[]
+  seguridad: ResumenSeguridad
+}

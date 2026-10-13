@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AuditoriaController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CajaController;
 use App\Http\Controllers\Api\CatalogoController;
@@ -216,6 +217,11 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::post('/usuarios/{usuario}/activar', [UsuarioController::class, 'activar']);
         Route::post('/usuarios/{usuario}/desactivar', [UsuarioController::class, 'desactivar']);
         Route::post('/usuarios/{usuario}/revocar-sesiones', [UsuarioController::class, 'revocarSesiones']);
+
+        // Fase 3, tarea 1 (RF-M01-025, HU-M01-020, RNF-TRANS-023): consulta de la auditoría y
+        // de los eventos de seguridad. Solo lectura.
+        Route::get('/auditorias', [AuditoriaController::class, 'index']);
+        Route::get('/auditorias/opciones', [AuditoriaController::class, 'opciones']);
 
         // RF-M07-030, RN-M05-08 a 13: valor de domicilio y depósito de reserva, editables por
         // el Administrador "en cualquier momento" — tabla `configuraciones` (clave/valor).

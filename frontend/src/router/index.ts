@@ -118,6 +118,8 @@ const router = createRouter({
         { path: 'reservas', name: 'admin-reservas', component: () => import('@/views/admin/ReservasView.vue') },
         { path: 'caja', name: 'admin-caja', component: () => import('@/views/admin/CajaView.vue') },
         { path: 'reportes', name: 'admin-reportes', component: () => import('@/views/admin/ReportesView.vue') },
+        // Fase 3, tarea 1 (RF-M01-025, HU-M01-020): auditoría y eventos de seguridad, solo lectura.
+        { path: 'auditoria', name: 'admin-auditoria', component: () => import('@/views/admin/AuditoriaView.vue') },
         {
           path: 'configuracion',
           name: 'admin-configuracion',

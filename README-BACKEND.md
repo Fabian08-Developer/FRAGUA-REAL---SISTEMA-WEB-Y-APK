@@ -499,6 +499,41 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       abierta), cierres anteriores, y en un día cerrado sus correcciones y los valores
       actualizados. Al guardar o anular algo de un día cerrado, el formulario pide la contraseña y
       el motivo.
+27. **Fase 3, tarea 1 (12/10/2026): consulta de auditoría y eventos de seguridad (M01).**
+    RF-M01-017, 024, 025, HU-M01-015, 020, RNF-TRANS-022, 023, RN-USR-12, 13, CA-M01-015/020.
+    Migración `2026_10_17_000001` (triggers que impiden cambiar o borrar `auditorias` e índice por
+    fecha); 7 pruebas en `AuditoriaConsultaTest`.
+    - Eventos de seguridad auditados (`AuthController`): inicio de sesión (`inicio_sesion`), intento
+      fallido (`inicio_sesion_fallido`, con el correo usado y el motivo: contraseña incorrecta,
+      cuenta inexistente o desactivada; nunca la contraseña), cierre de sesión (uno o todos los
+      dispositivos), registro de cliente, cambio de contraseña, solicitud de recuperación (solo si
+      la cuenta existe; la respuesta sigue siendo la misma), restablecimiento y restablecimiento
+      fallido (enlace no válido o vencido), y actualización del perfil propio (antes y después).
+      También el alta de usuarios del personal (`crear_usuario`) y los cambios de configuración
+      (`editar_configuracion`, valor de domicilio y depósito con antes y después). Cada registro
+      guarda IP y navegador (RF-M01-024).
+    - Consulta (RF-M01-025, RNF-TRANS-023): `GET /auditorias` y `GET /auditorias/opciones`, solo
+      Administrador y solo lectura. Filtros: días del negocio (`desde`/`hasta`, hora de Colombia),
+      usuario que hizo la acción, grupo (seguridad, usuarios, pedidos, caja, compras, catálogo,
+      mesas, reportes, configuración), acción, registro afectado (`entidad`, `entidad_id`), IP y
+      texto en los detalles (con o sin tildes). Cada registro llega con el texto de la acción, su
+      grupo y un resumen del navegador ("Chrome en Android"). `opciones` trae los valores de los
+      filtros y el resumen de seguridad de las últimas 24 horas: inicios fallidos y exitosos,
+      restablecimientos e IPs con 3 o más intentos fallidos. El catálogo de acciones vive en
+      `App\Support\Auditoria\CatalogoAuditoria`; una acción nueva que no esté ahí se muestra igual,
+      en el grupo "Otros".
+    - Historial protegido (RNF-TRANS-022, RN-USR-13, CA-M01-020.2): además del bloqueo en el modelo
+      (Fase 0), la base de datos rechaza cualquier `UPDATE`, `DELETE` o `TRUNCATE` sobre
+      `auditorias` (trigger en PostgreSQL; en SQLite para las pruebas). Por eso un usuario con
+      registros de auditoría no se puede borrar de la base de datos: el sistema nunca borra
+      usuarios, los desactiva.
+    - CORREGIDO de paso: la hora de cada registro la ponía la base de datos (`CURRENT_TIMESTAMP`),
+      que en PostgreSQL depende de la zona horaria del servidor; ahora la pone la aplicación en
+      UTC, como el resto de fechas, para que los filtros por día sean exactos.
+    - Frontend: `views/admin/AuditoriaView.vue` (menú "Auditoría") con el resumen de seguridad,
+      atajo "Solo seguridad y sesiones", filtros y el detalle legible de cada registro (motivo,
+      antes → después, navegador completo). En Usuarios, el botón "Actividad" abre la auditoría
+      filtrada por ese usuario, con un atajo para ver también lo que pasó sobre su cuenta.
 
 ## Qué falta a propósito
 

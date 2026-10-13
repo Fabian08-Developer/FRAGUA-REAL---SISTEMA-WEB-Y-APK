@@ -52,8 +52,11 @@ punto 23. `2026_10_16_000001` crea `producto_extra`, los extras generales que of
 (punto 24). `2026_10_16_000002` completa `compras_gastos`: cantidad, unidad, observaciones, el
 soporte guardado en almacenamiento privado y quién corrigió o anuló cada registro (punto 25).
 `2026_10_16_000003` guarda el desglose del cierre diario y su turno de caja, y crea
-`cierre_ajustes`, las correcciones autorizadas después del cierre (punto 26). Pruebas
-automáticas: `php artisan test` (175 en `tests/Feature`).
+`cierre_ajustes`, las correcciones autorizadas después del cierre (punto 26).
+
+Fase 3 (12/10/2026): `2026_10_17_000001` protege el historial de auditoría en la base de datos
+(triggers que rechazan cambios y borrados en `auditorias`) y agrega un índice por fecha; detalle en
+`README-BACKEND.md`, punto 27. Pruebas automáticas: `php artisan test` (182 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

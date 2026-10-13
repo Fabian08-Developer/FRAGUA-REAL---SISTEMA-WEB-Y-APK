@@ -32,6 +32,31 @@ permitía editar los valores, pero no había dónde hacerlo).
 - [ ] Activar de nuevo: vuelve a entrar.
 - [ ] Revocar sesiones: el token abierto en otra ventana deja de funcionar (RF-M01-010/023).
 - [ ] Un Mesero no puede abrir `/admin` ni llamar `/usuarios` (403).
+- [ ] "Actividad" en un usuario abre Auditoría filtrada por él; el aviso azul permite ver también
+      lo que pasó sobre su cuenta (intentos fallidos con su correo, desactivación…).
+
+## 2b. Auditoría (M01 — Fase 3, tarea 1)
+RF-M01-017/024/025, HU-M01-015/020, RNF-TRANS-022/023, RN-USR-12/13.
+- [ ] Se abre desde el menú ("Auditoría") y muestra los últimos 7 días, del más reciente al más
+      antiguo.
+- [ ] En otra ventana, intentar entrar con una contraseña mala: aparece "Intento de inicio de
+      sesión fallido" en rojo, sin usuario, con el correo usado, el motivo y la IP; la tarjeta
+      "Inicios fallidos (24 h)" sube. La contraseña escrita no aparece en ningún lado.
+- [ ] 3 intentos fallidos desde el mismo equipo: aparece el aviso de la IP y "Ver intentos" la
+      filtra.
+- [ ] Entrar bien, cerrar sesión, cambiar la contraseña en Mi perfil y recuperar la contraseña
+      por correo: cada paso aparece con su texto (inicio, cierre, cambio, solicitud y
+      restablecimiento).
+- [ ] Crear un Mesero y cambiar el valor del domicilio en Configuración: aparecen "Alta de usuario
+      del personal" y "Cambio de configuración" con el antes → después.
+- [ ] Filtros: fechas, usuario, grupo (la lista de acciones se reduce al grupo), acción, "Sobre
+      qué" + número (p. ej. Pedido 12), IP y texto (prueba un motivo con tilde). "Limpiar" vuelve
+      a los últimos 7 días. "Solo seguridad y sesiones" deja solo ese grupo.
+- [ ] Abrir un registro muestra sus detalles legibles (motivo, antes → después, navegador
+      completo) y el número del registro de auditoría.
+- [ ] No hay botones para editar ni borrar registros. Un Mesero no puede abrir
+      `/admin/auditoria` ni llamar `GET /auditorias` (403).
+- [ ] En el teléfono (~390 px) la pantalla no tiene scroll horizontal.
 
 ## 3. Catálogo (M04)
 - [ ] Crear, editar y desactivar categoría y producto.
@@ -200,6 +225,6 @@ permitía editar los valores, pero no había dónde hacerlo).
 ## 10. Transversal
 - [ ] Cerrar sesión y volver a entrar; el token anterior ya no sirve.
 - [ ] Desactivar un Mesero con sesión abierta: en su siguiente acción la app lo saca (RF-M01-023).
-- [ ] Usuarios: cada desactivación queda registrada en auditoría (se consulta en la Fase 3).
+- [ ] Usuarios: cada desactivación queda registrada y se ve en Auditoría (sección 2b).
 - [ ] Cada pantalla en teléfono (ancho ~390 px): sin scroll horizontal ni botones cortados.
 - [ ] Errores del servidor (422/500) muestran un mensaje legible, no una pantalla en blanco.

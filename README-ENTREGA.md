@@ -114,7 +114,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 11/10/2026 van 434 de 579 verificables, 75 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 12/10/2026 van 441 de 579 verificables, 76 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -124,7 +124,8 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (promociones aplicadas al pedido y descuento manual) y la tarea 2 (el depósito de la reserva
   se abona a la cuenta de la visita), la tarea 3 (el mismo catálogo en todos los canales) y la
   tarea 4 (compras y gastos completos). Con la tarea 5 (cierre diario completo) la Fase 2 quedó
-  completa el 12/10/2026; ver los puntos 22 a 26.
+  completa el 12/10/2026; ver los puntos 22 a 26. La Fase 3 empezó con la tarea 1 (consulta
+  de auditoría y eventos de seguridad); ver el punto 27.
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr
@@ -137,7 +138,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1 y 5 de la Fase 2, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2 y 1 de la Fase 3, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -227,6 +228,20 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 - Registrar, corregir o anular una compra o un gasto de un día ya cerrado pide la contraseña del
   Administrador y un motivo. El cierre no cambia: la corrección se ve debajo, con los valores
   actualizados.
+
+## Cambios de comportamiento de la Fase 3 (desde el 12/10/2026)
+
+- Nueva pantalla Administrador > Auditoría: quién hizo cada acción crítica, cuándo, sobre qué
+  registro, desde qué IP y con qué navegador, con filtros por fechas, usuario, grupo, acción,
+  registro, IP y texto. Es solo de consulta. Arriba muestra los inicios de sesión fallidos de las
+  últimas 24 horas y avisa si una misma IP acumula 3 o más intentos.
+- Ahora quedan registrados los inicios de sesión (también los fallidos, con el motivo), los
+  cierres de sesión, el registro de clientes, los cambios y restablecimientos de contraseña, el
+  alta de usuarios del personal y los cambios de configuración (domicilio y depósito).
+- En Usuarios, cada usuario tiene el botón "Actividad", que abre la auditoría filtrada por él.
+- El historial de auditoría ya no se puede cambiar ni borrar ni siquiera desde la base de datos.
+  Consecuencia: un usuario con historial no se puede borrar de la base de datos (se desactiva,
+  como siempre).
 
 ## Artefactos de prueba dejados en la base de datos
 
