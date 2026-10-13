@@ -39,9 +39,21 @@ export interface EstadoSistema {
   minutos_activo: number
 }
 
+// Endurecimiento (13/10/2026): revisión antes de abrir al público, la misma de
+// `php artisan fragua:revisar-produccion`. GET /sistema/revision-produccion, solo Administrador.
+export interface ItemRevisionProduccion {
+  clave: string
+  nivel: 'ok' | 'aviso' | 'error'
+  titulo: string
+  detalle: string
+}
+
 export const configuracionService = {
   estadoSistema() {
     return api.get<EstadoSistema>('/sistema/estado')
+  },
+  revisionProduccion() {
+    return api.get<{ items: ItemRevisionProduccion[]; listo: boolean }>('/sistema/revision-produccion')
   },
   obtener() {
     return api.get<Configuracion>('/configuracion')

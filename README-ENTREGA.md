@@ -109,6 +109,43 @@ Comprobación: Administrador > Caja > "Pagos en línea" dice "Wompi activo (prue
 paga con los datos de prueba de Wompi (Nequi de prueba aprobado o rechazado); el pedido o la reserva
 debe confirmarse solo y aparecer en Caja como "Confirmado por Wompi".
 
+## Antes de abrir al público (seguridad)
+
+Endurecimiento del 13/10/2026 (`README-BACKEND.md`, punto 43). En el VPS, después de cada despliegue:
+
+1. Nginx: copiar `backend/deploy/nginx-fragua-real.conf` a `/etc/nginx/sites-available/fragua-real`,
+   ajustar dominio, rutas y la versión de PHP-FPM, enlazarlo en `sites-enabled`, sacar el certificado
+   con `sudo certbot --nginx -d <dominio>` y probar con `sudo nginx -t && sudo systemctl reload nginx`.
+   Trae https obligatorio, HSTS, la política de contenido (CSP) y demás cabeceras.
+2. En el `.env`:
+   - `APP_ENV=production` y `APP_DEBUG=false`;
+   - `APP_URL` y `FRONTEND_URL` con `https://`;
+   - `LOG_LEVEL=warning`;
+   - SMTP real;
+   - `QUEUE_CONNECTION=database`;
+   - llaves de Wompi de producción con `WOMPI_AMBIENTE=produccion`;
+   - `CORS_ORIGENES` vacío.
+3. Cambiar la contraseña de las cuentas sembradas (admin, mesero y cliente con `password`) o
+   desactivarlas.
+4. `composer install --no-dev --optimize-autoloader`, `php artisan config:cache` y
+   `php artisan route:cache`.
+5. Correr `php artisan fragua:revisar-produccion`. No debe quedar ningún `[ERROR]`. Lo mismo se ve
+   en Administrador > Configuración > "Revisión antes de producción".
+6. Revisar dependencias:
+   - `composer audit` en `backend`: el 13/10/2026 no encontró nada.
+   - En `frontend`, `npm audit --omit=dev` debe dar 0. Eso es lo que llega al navegador.
+   - El `npm audit` completo del 13/10/2026 mostró 8 alertas, todas en herramientas de compilación
+     que solo corren en el equipo de desarrollo y no van en `dist`: Tailwind 3 y lo que usa
+     (chokidar, braces, micromatch, fast-glob, postcss-nested, postcss-selector-parser) y
+     source-map-js.
+   - Se corrige lo seguro con `npm audit fix`, sin `--force`, y se vuelve a correr `npm run build`.
+   - No usar `npm audit fix --force`: instala Tailwind 4, que cambia la configuración y rompería
+     los estilos. Pasar a Tailwind 4 sería una tarea aparte.
+
+La sesión del navegador se guarda en `localStorage` (decisión del 13/10/2026). Por eso la CSP de
+Nginx solo deja ejecutar el código del propio sitio: no agregar scripts de terceros (analítica,
+chats) sin revisar antes la CSP.
+
 ## QA final — estado por rol
 
 Verificado en vivo contra los servidores de desarrollo del usuario
@@ -162,7 +199,8 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 
 ## Pendientes conocidos al 10/10/2026
 
-- Las cuentas de prueba (`password`) deben desactivarse o cambiarse antes de producción.
+- Las cuentas de prueba (`password`) deben desactivarse o cambiarse antes de producción; la
+  revisión antes de producción lo detecta (ver "Antes de abrir al público").
 - En el VPS, PHP y Nginx deben aceptar archivos de hasta 8 MB para los soportes de compras
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
@@ -209,8 +247,9 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 - La Fase 6 empezó el 13/10/2026 con la tarea 1 (pasarela Wompi con confirmación automática):
   ver "Pasarela de pago Wompi" arriba y `README-BACKEND.md`, punto 41. Falta la cuenta comercial
   de producción; mientras tanto se prueba con las llaves del sandbox. Con la tarea 2 (comandas de
-  cocina impresas desde el navegador, punto 42) la Fase 6 quedó completa el 13/10/2026. Sigue la
-  prueba de un día completo de operación.
+  cocina impresas desde el navegador, punto 42) la Fase 6 quedó completa el 13/10/2026. Después
+  se hizo el endurecimiento de seguridad (punto 43, "Antes de abrir al público"). Sigue la prueba de
+  un día completo de operación.
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr

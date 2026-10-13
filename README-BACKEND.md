@@ -969,6 +969,65 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       cocina con "abrir solas" y Chrome en impresión automática se acerca, pero el navegador no puede
       saber si el papel salió: lo confirma una persona. La impresión 100 % automática necesita un
       agente local junto a la impresora.
+43. **Endurecimiento de seguridad (13/10/2026), antes de la prueba del día completo.** Sin
+    migración; 5 pruebas en `EndurecimientoTest` y 1 más en `PasarelaWompiTest`. Decisión del usuario
+    (13/10/2026): la sesión sigue en `localStorage` del navegador; para cuidarla, la CSP de abajo solo
+    deja ejecutar el código propio.
+    - Cabeceras de la API: el middleware `App\Http\Middleware\CabecerasSeguridad` (global, solo
+      para `api/*`, también en los errores) pone:
+      - `X-Content-Type-Options: nosniff`;
+      - `X-Frame-Options: DENY`;
+      - `Referrer-Policy: no-referrer` (los enlaces secretos no se filtran);
+      - `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`;
+      - `Permissions-Policy`;
+      - `Cache-Control: no-store` (pedidos, pagos y documentos no quedan en cachés);
+      - y quita `X-Powered-By`.
+    - CORS (`config/cors.php`): antes regía el valor por defecto de Laravel (cualquier origen). Ahora
+      solo `FRONTEND_URL` y lo que se agregue en `CORS_ORIGENES`, sin credenciales de navegador.
+    - Wompi: un evento con firma válida pero con `timestamp` de más de 72 h
+      (`PASARELA_EVENTOS_MAX_HORAS`), o del futuro, no se aplica: responde `vencido`. No se pierde
+      nada, porque la conciliación (punto 41) pregunta el estado real a Wompi.
+    - Revisión antes de producción (`RevisionProduccionService`):
+      - Revisa:
+        - `APP_ENV=production` y `APP_DEBUG=false`;
+        - `APP_KEY`;
+        - `APP_URL` y `FRONTEND_URL` con https;
+        - que ninguna cuenta activa del personal o de las de demostración tenga una contraseña de
+          prueba (o una guardada sin cifrar);
+        - que el correo salga de verdad y la cola no sea `sync`;
+        - `LOG_LEVEL`;
+        - que la pasarela no siga en sandbox;
+        - que CORS no esté abierto.
+      - Nunca muestra llaves ni contraseñas.
+      - En el servidor: `php artisan fragua:revisar-produccion` (sale con código 1 si hay errores).
+      - En la aplicación: Administrador > Configuración > "Revisión antes de producción"
+        (`GET /sistema/revision-produccion`, solo Administrador).
+    - Nginx para el VPS (`backend/deploy/nginx-fragua-real.conf`):
+      - http → https y HSTS;
+      - CSP del sitio (`script-src 'self'`, fuentes de Google, imágenes https, `connect-src 'self'`,
+        `frame-ancestors 'none'`);
+      - nosniff, `X-Frame-Options`, `Referrer-Policy` y `Permissions-Policy`;
+      - `server_tokens off`;
+      - archivos ocultos (`.env`, `.git`) bloqueados;
+      - solo `index.php` se ejecuta;
+      - límite de subida de 8 MB;
+      - sitio y API en el mismo dominio.
+    - Revisado sin cambios:
+      - todas las consultas SQL escritas a mano usan parámetros;
+      - ninguna pantalla usa `v-html`;
+      - toda contraseña se guarda con `Hash::make`;
+      - mínimo de 8 caracteres;
+      - límites de intentos en inicio de sesión, recuperación y rutas públicas.
+    - Dependencias, revisadas por el usuario el 13/10/2026 (desde aquí no hay acceso a Packagist ni
+      a npm):
+      - `composer audit`: sin alertas.
+      - `npm audit`: 8 alertas (6 altas, 2 moderadas), todas de denegación de servicio en
+        herramientas de compilación (Tailwind 3 → chokidar, braces, micromatch, fast-glob,
+        postcss-nested, postcss-selector-parser; source-map-js). Son `devDependencies`: corren en
+        el equipo de desarrollo y no van en el sitio publicado (`frontend/dist`).
+      - Se aplica `npm audit fix` sin `--force`. `--force` instalaría Tailwind 4, un cambio mayor
+        que rompería los estilos.
+      - Comprobación: `npm audit --omit=dev` debe dar 0.
 
 ## Qué falta a propósito
 

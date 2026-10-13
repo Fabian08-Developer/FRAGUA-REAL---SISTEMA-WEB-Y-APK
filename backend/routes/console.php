@@ -48,3 +48,27 @@ Artisan::command('pasarela:conciliar', function (\App\Services\PasarelaPagoServi
 })->purpose('Concilia con la pasarela los pagos en línea pendientes');
 
 \Illuminate\Support\Facades\Schedule::command('pasarela:conciliar')->everyFiveMinutes()->withoutOverlapping(10);
+
+// Endurecimiento (13/10/2026): revisión antes de abrir al público (APP_DEBUG, HTTPS, cuentas de prueba,
+// correo, cola, pasarela, CORS). Sale con código 1 si hay algo grave. Correrlo en el VPS después de
+// cada despliegue; lo mismo se ve en Administrador > Configuración.
+Artisan::command('fragua:revisar-produccion', function (\App\Services\RevisionProduccionService $revision) {
+    $items = $revision->revisar();
+    $marcas = ['ok' => '[OK]   ', 'aviso' => '[AVISO]', 'error' => '[ERROR]'];
+    foreach ($items as $i) {
+        $linea = "{$marcas[$i['nivel']]} {$i['titulo']}: {$i['detalle']}";
+        match ($i['nivel']) {
+            'error' => $this->error($linea),
+            'aviso' => $this->warn($linea),
+            default => $this->line($linea),
+        };
+    }
+    if ($revision->hayErrores($items)) {
+        $this->error('Hay puntos por corregir antes de abrir al público.');
+
+        return 1;
+    }
+    $this->info('Listo para producción (revisa los avisos, si hay).');
+
+    return 0;
+})->purpose('Revisa la configuración de seguridad antes de abrir al público');

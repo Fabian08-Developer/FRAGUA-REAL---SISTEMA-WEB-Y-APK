@@ -12,6 +12,7 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import EstadoTareasAutomaticas from '@/components/configuracion/EstadoTareasAutomaticas.vue'
+import RevisionProduccion from '@/components/configuracion/RevisionProduccion.vue'
 import { configuracionService, RANGOS_TIEMPOS_RESERVA } from '@/services/configuracion.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 
@@ -242,6 +243,11 @@ onMounted(cargar)
     <!-- Fase 4, tarea 1: estado del programador y de la cola en el servidor. -->
     <div v-if="!cargando" class="mt-8 max-w-2xl">
       <EstadoTareasAutomaticas />
+    </div>
+
+    <!-- Endurecimiento (13/10/2026): revisión de seguridad antes de abrir al público. -->
+    <div v-if="!cargando" class="mt-6 max-w-2xl">
+      <RevisionProduccion />
     </div>
   </div>
 </template>

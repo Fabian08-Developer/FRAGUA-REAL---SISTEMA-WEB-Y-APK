@@ -282,6 +282,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::put('/configuraciones', [ConfiguracionController::class, 'update']);
         // Fase 4, tarea 1: estado del programador de tareas y de la cola de trabajos.
         Route::get('/sistema/estado', [ConfiguracionController::class, 'estadoSistema']);
+        // Endurecimiento (13/10/2026): revisión de seguridad antes de abrir al público.
+        Route::get('/sistema/revision-produccion', [ConfiguracionController::class, 'revisionProduccion']);
 
         // Caja (M06)
         Route::get('/caja/turnos', [CajaController::class, 'index']);

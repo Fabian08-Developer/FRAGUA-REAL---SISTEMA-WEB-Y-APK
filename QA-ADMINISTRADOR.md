@@ -28,6 +28,17 @@ permitía editar los valores, pero no había dónde hacerlo).
       Supervisor en el VPS), al minuto ambos dicen "activo". Muestra pendientes, fallidos y si el
       correo se envía de verdad. El botón de recargar vuelve a consultar.
 
+- [ ] "Revisión antes de producción" (endurecimiento, 13/10/2026): en el equipo de desarrollo
+      muestra errores en rojo (entorno, depuración, HTTPS, correo) y la cuenta `admin@fraguareal.com`
+      con contraseña de prueba. Cambiar esa contraseña en Mi perfil y volver a revisar: ese punto
+      pasa a verde. Nunca aparecen llaves ni contraseñas. Con el Mesero, `/api/sistema/revision-produccion`
+      responde 403.
+- [ ] En el servidor, `php artisan fragua:revisar-produccion` muestra la misma lista y termina en
+      error mientras haya puntos en rojo.
+- [ ] Seguridad de la API: en las herramientas del navegador (pestaña Red), cualquier respuesta de
+      `/api/...` trae `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y
+      `Cache-Control: no-store`.
+
 ## 1. Dashboard
 - [ ] Muestra ventas del día, pedidos activos por canal y mesas ocupadas.
 - [ ] Con un pedido finalizado hoy, las ventas coinciden con Reportes > Ventas totales del mismo día (RNF-M08-002).

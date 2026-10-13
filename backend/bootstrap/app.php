@@ -20,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
             'activo' => \App\Http\Middleware\EnsureUserIsActive::class,
         ]);
+        // Endurecimiento (13/10/2026): cabeceras de seguridad en toda respuesta de la API.
+        // Global (no solo en el grupo api) para que también vayan en los errores, como un 401 sin sesión.
+        $middleware->append(\App\Http\Middleware\CabecerasSeguridad::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

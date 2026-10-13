@@ -33,6 +33,15 @@ class ConfiguracionController extends Controller
         return response()->json($estado->estado());
     }
 
+    // Endurecimiento (13/10/2026): revisión antes de producción, la misma de
+    // `php artisan fragua:revisar-produccion`. Solo lectura; no muestra secretos.
+    public function revisionProduccion(\App\Services\RevisionProduccionService $revision)
+    {
+        $items = $revision->revisar();
+
+        return response()->json(['items' => $items, 'listo' => ! $revision->hayErrores($items)]);
+    }
+
     public function update(UpdateConfiguracionesRequest $request)
     {
         $cambios = [];

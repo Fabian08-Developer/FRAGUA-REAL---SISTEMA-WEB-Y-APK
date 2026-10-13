@@ -83,9 +83,9 @@ class PasarelaWompiTest extends TestCase
         return $this->postJson("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => $pasarela, 'monto' => 20000]);
     }
 
-    private function evento(string $referencia, string $estado, int $centavos = 2000000, string $id = '1234-1760000000-00001', string $metodo = 'NEQUI'): array
+    private function evento(string $referencia, string $estado, int $centavos = 2000000, string $id = '1234-1760000000-00001', string $metodo = 'NEQUI', ?int $timestamp = null): array
     {
-        $timestamp = 1760380800;
+        $timestamp ??= now()->getTimestamp();
 
         return [
             'event' => 'transaction.updated',
@@ -177,6 +177,25 @@ class PasarelaWompiTest extends TestCase
 
         // Un evento válido de otra cosa, o de una referencia ajena, se acepta sin hacer nada.
         $this->enviarEvento($this->evento('OTRO-SISTEMA-1', 'APPROVED'))->assertOk()->assertJsonPath('resultado', 'desconocido');
+    }
+
+    public function test_un_evento_firmado_pero_viejo_no_se_aplica_y_la_conciliacion_lo_resuelve(): void
+    {
+        [, $token] = $this->pedidoInvitado();
+        $this->pagar($token);
+        $tx = TransaccionPasarela::sole();
+
+        // Firma correcta, pero de hace 4 días (por ejemplo, uno capturado y reenviado).
+        $viejo = $this->evento($tx->referencia, 'APPROVED', 2000000, 'tx-v', 'NEQUI', now()->subDays(4)->getTimestamp());
+        $this->enviarEvento($viejo)->assertOk()->assertJsonPath('resultado', 'vencido');
+        $futuro = $this->evento($tx->referencia, 'APPROVED', 2000000, 'tx-v', 'NEQUI', now()->addHour()->getTimestamp());
+        $this->enviarEvento($futuro)->assertOk()->assertJsonPath('resultado', 'vencido');
+        $this->assertSame('pendiente', Pago::sole()->estado);
+
+        Http::fake([self::API.'/transactions?*' => Http::response(['data' => [['id' => 'tx-v', 'reference' => $tx->referencia, 'status' => 'APPROVED', 'amount_in_cents' => 2000000, 'payment_method_type' => 'NEQUI']]])]);
+        $this->travel(3)->minutes();
+        app(PasarelaPagoService::class)->conciliar();
+        $this->assertSame('aprobado', Pago::sole()->estado);
     }
 
     public function test_RF_M06_008_rechazado_por_la_pasarela_y_el_reintento_abre_otro_intento(): void

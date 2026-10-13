@@ -118,13 +118,24 @@ class PasarelaPagoService
 
     /**
      * POST /api/pasarela/wompi/eventos. Lanza FirmaInvalidaException si la firma no es válida.
-     * Devuelve qué se hizo: aplicado | ignorado | desconocido.
+     * Devuelve qué se hizo: aplicado | ignorado | desconocido | vencido.
      */
     public function procesarEvento(array $evento, array $encabezados = []): string
     {
         $resultado = $this->pasarela->leerEvento($evento, $encabezados);
         if (! $resultado || ! $resultado->referencia) {
             return 'ignorado';
+        }
+
+        // Endurecimiento (13/10/2026): la firma incluye el timestamp, así que no se puede cambiar;
+        // un evento muy viejo (o del futuro) no se aplica. El estado real llega por la conciliación.
+        $momento = (int) ($evento['timestamp'] ?? 0);
+        $maximo = max(1, (int) config('fragua_real.pasarela.eventos_max_horas', 72)) * 3600;
+        $ahora = now()->getTimestamp();
+        if ($momento < $ahora - $maximo || $momento > $ahora + 600) {
+            Log::warning('Evento de la pasarela fuera de tiempo: no se aplica.', ['referencia' => $resultado->referencia, 'timestamp' => $momento]);
+
+            return 'vencido';
         }
 
         $transaccion = TransaccionPasarela::where('proveedor', $this->pasarela->nombre())->where('referencia', $resultado->referencia)->first();

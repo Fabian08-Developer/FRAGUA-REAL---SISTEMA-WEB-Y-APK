@@ -80,5 +80,8 @@ return [
         // Cuánto vale el enlace del checkout. Pasado este tiempo, un pago que nunca llegó a la
         // pasarela se da por abandonado y el Cliente puede intentar de nuevo.
         'minutos_checkout' => (int) env('PASARELA_MINUTOS_CHECKOUT', 30),
+        // Endurecimiento: un evento firmado más viejo que esto no se aplica (podría ser uno
+        // capturado y reenviado). No se pierde nada: la conciliación pregunta el estado a Wompi.
+        'eventos_max_horas' => (int) env('PASARELA_EVENTOS_MAX_HORAS', 72),
     ],
 ];
