@@ -575,6 +575,35 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       Crear cuenta y Mi perfil tienen el campo opcional; Usuarios lo muestra como "@usuario" y
       lo pide al crear y editar. `BaseInput` acepta `autocomplete`.
     - La recuperación de contraseña sigue siendo por correo.
+30. **Fase 3, tarea 4 (12/10/2026): sesiones abiertas con su origen y su vencimiento (M01).**
+    RF-M01-010, 023, 024, HU-M01-010, RNF-M01-005, 015. Migración `2026_10_17_000003` (IP y
+    navegador en `personal_access_tokens`); 7 pruebas en `SesionesActivasTest`. Con esta tarea la
+    Fase 3 quedó completa.
+    - `SesionService`: cada inicio de sesión o registro abre la sesión guardando IP, navegador y
+      su vencimiento máximo (`expires_at`). Política en `config/fragua_real.php` (`sesiones`) y en
+      el `.env`: se cierra sola tras `FRAGUA_REAL_SESION_INACTIVIDAD_MINUTOS` sin uso (7 días) y,
+      aunque se use, a los `FRAGUA_REAL_SESION_DURACION_MAXIMA_MINUTOS` (30 días). Son valores
+      iniciales propuestos; el negocio los ajusta sin tocar código. `AppServiceProvider` le pasa
+      la regla de inactividad a Sanctum (`authenticateAccessTokensUsing`): una sesión vencida
+      responde 401 y la app vuelve al login.
+    - Mis sesiones: `GET /auth/sesiones` (dispositivo, IP, abierta, último uso, vence y cuál es la
+      actual, más la política), `DELETE /auth/sesiones/{id}` (cerrar una, solo las propias) y
+      `POST /auth/sesiones/cerrar-otras` (todas menos la actual).
+    - Administrador: `GET /usuarios/{id}/sesiones` y `DELETE /usuarios/{id}/sesiones/{sesion}`
+      (no sobre su propia cuenta; sus sesiones las maneja desde Mi perfil). `GET /usuarios` trae
+      `sesiones_activas` de cada cuenta. "Revocar todas" sigue igual.
+    - Auditoría: el inicio de sesión guarda el número de la sesión; cerrar una sesión propia
+      (`cerrar_sesion_dispositivo`), las demás (`cerrar_otras_sesiones`) o una ajena
+      (`revocar_sesion`) queda registrado con el dispositivo y la IP.
+    - Limpieza: `php artisan sesiones:limpiar` borra las sesiones vencidas o abandonadas; está
+      programado a diario a las 3:30 a. m. (hora de Colombia) en `routes/console.php`. Corre
+      solo cuando el cron del VPS ejecute `php artisan schedule:run` cada minuto (Fase 4); sin
+      eso las sesiones vencidas igual dejan de servir, solo quedan en la tabla.
+    - `App\Support\Navegador` describe el navegador ("Chrome en Android") para la auditoría y las
+      sesiones.
+    - Frontend: Mi perfil tiene "Sesiones abiertas" (cerrar una o "Cerrar las demás", con la
+      política explicada); en Usuarios el botón "Sesiones (n)" reemplaza a "Revocar sesiones" y
+      abre la lista de esa cuenta para cerrar una o todas.
 
 ## Qué falta a propósito
 

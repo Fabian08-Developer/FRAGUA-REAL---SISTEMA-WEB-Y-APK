@@ -12,6 +12,7 @@ use App\Http\Requests\Api\Auth\UpdatePerfilRequest;
 use App\Models\User;
 use App\Notifications\RecuperarPasswordNotification;
 use App\Services\AuditoriaService;
+use App\Services\SesionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,8 +39,9 @@ class AuthController extends Controller
             'activo' => true,
         ]);
 
-        $token = $user->createToken('cliente')->plainTextToken;
-        $this->auditar('registro_cliente', $user, [], $user);
+        // Fase 3, tarea 4: la sesión guarda IP, navegador y su vencimiento máximo.
+        ['token' => $token, 'sesion' => $sesion] = app(SesionService::class)->abrir($user, $request, 'cliente');
+        $this->auditar('registro_cliente', $user, ['sesion_id' => $sesion->id], $user);
 
         return response()->json(['user' => $user, 'token' => $token], 201);
     }
@@ -71,8 +73,8 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('acceso')->plainTextToken;
-        $this->auditar('inicio_sesion', $user, ['via' => $esCorreo ? 'correo' : 'usuario'], $user);
+        ['token' => $token, 'sesion' => $sesion] = app(SesionService::class)->abrir($user, $request);
+        $this->auditar('inicio_sesion', $user, ['via' => $esCorreo ? 'correo' : 'usuario', 'sesion_id' => $sesion->id], $user);
 
         return response()->json(['user' => $user, 'token' => $token]);
     }
@@ -93,6 +95,41 @@ class AuthController extends Controller
         $this->auditar('cierre_sesion_todos', $request->user());
 
         return response()->json(['message' => 'Sesión cerrada en todos los dispositivos.']);
+    }
+
+    // RF-M01-010, RF-M01-024, HU-M01-010 (Fase 3, tarea 4): las sesiones abiertas de quien
+    // consulta, con su dispositivo, IP, último uso y cuándo vencen; la actual va marcada.
+    public function sesiones(Request $request, SesionService $sesiones)
+    {
+        return response()->json([
+            'sesiones' => $sesiones->listar($request->user(), $request->user()->currentAccessToken()),
+            'politica' => $sesiones->politica(),
+        ]);
+    }
+
+    // Cerrar una sesión propia en particular (p. ej. el celular que se quedó en otro lado).
+    public function cerrarSesion(Request $request, SesionService $sesiones, int $sesion)
+    {
+        $usuario = $request->user();
+        $esActual = $usuario->currentAccessToken()?->getKey() === $sesion;
+        $cerrada = $sesiones->cerrar($usuario, $sesion);
+        abort_if(! $cerrada, 404, 'Esa sesión ya no está abierta.');
+
+        $this->auditar('cerrar_sesion_dispositivo', $usuario, [
+            'sesion_id' => $sesion, 'dispositivo' => $cerrada['dispositivo'], 'ip' => $cerrada['ip'], 'era_la_actual' => $esActual,
+        ]);
+
+        return response()->json(['message' => 'Sesión cerrada.', 'era_la_actual' => $esActual]);
+    }
+
+    // Cerrar todas las demás sesiones y quedarse con la actual.
+    public function cerrarOtrasSesiones(Request $request, SesionService $sesiones)
+    {
+        $usuario = $request->user();
+        $cerradas = $sesiones->cerrarOtras($usuario, $usuario->currentAccessToken());
+        $this->auditar('cerrar_otras_sesiones', $usuario, ['sesiones_cerradas' => $cerradas]);
+
+        return response()->json(['message' => 'Se cerraron tus demás sesiones.', 'cerradas' => $cerradas]);
     }
 
     // revocarSesiones() se trasladó a UsuarioController (M01 — Gestión de Usuarios ya tiene

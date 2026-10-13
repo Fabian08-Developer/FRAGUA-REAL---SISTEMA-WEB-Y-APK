@@ -49,6 +49,12 @@ permitía editar los valores, pero no había dónde hacerlo).
       contraseña equivocados muestran el mismo mensaje. En Auditoría el inicio de sesión dice por
       dónde entró.
 - [ ] Mi perfil: elegir o cambiar el propio nombre de usuario y entrar con él.
+- [ ] Sesiones (Fase 3, tarea 4 — RF-M01-010/024): entrar como Mesero en el celular y en el PC.
+      En Usuarios, su botón dice "Sesiones (2)"; la ventana muestra cada dispositivo con IP,
+      último uso y vencimiento. "Cerrar" en el celular: en el celular la app vuelve al login y el
+      PC sigue. "Cerrar todas sus sesiones" lo saca de todos. Queda en Auditoría.
+- [ ] Mi perfil > Sesiones abiertas: la actual dice "Esta sesión"; "Cerrar las demás" deja solo
+      la actual; cambiar la contraseña también cierra las demás y la lista se actualiza.
 - [ ] "Actividad" en un usuario abre Auditoría filtrada por él; el aviso azul permite ver también
       lo que pasó sobre su cuenta (intentos fallidos con su correo, desactivación…).
 

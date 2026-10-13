@@ -41,4 +41,13 @@ return [
 
     // RF-M03-07, RNF-M03-06: soporte de una compra o gasto — tamaño máximo en KB.
     'soporte_max_kb' => (int) env('FRAGUA_REAL_SOPORTE_MAX_KB', 5120),
+
+    // Fase 3, tarea 4 (RF-M01-010, RNF-M01-005, decisión de seguridad): política de las sesiones.
+    // Una sesión se cierra sola si pasa este tiempo sin usarse (inactividad) o, aunque se use
+    // todos los días, al cumplir la duración máxima; después hay que volver a iniciar sesión.
+    // Valores iniciales propuestos: 7 días sin uso y 30 días como máximo. Se cambian en el .env.
+    'sesiones' => [
+        'inactividad_minutos' => (int) env('FRAGUA_REAL_SESION_INACTIVIDAD_MINUTOS', 60 * 24 * 7),
+        'duracion_maxima_minutos' => (int) env('FRAGUA_REAL_SESION_DURACION_MAXIMA_MINUTOS', 60 * 24 * 30),
+    ],
 ];

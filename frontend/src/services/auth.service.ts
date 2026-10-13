@@ -1,5 +1,5 @@
 import api from './api'
-import type { Usuario } from '@/types/models'
+import type { ListaSesiones, Usuario } from '@/types/models'
 
 // Espeja exactamente los Form Requests de AuthController (routes/api.php) —
 // nombres de campo iguales a los del backend (email, no correo).
@@ -38,6 +38,16 @@ export interface CambiarPasswordPayload {
 }
 
 export const authService = {
+  // Fase 3, tarea 4 (RF-M01-010/024): mis sesiones abiertas.
+  sesiones() {
+    return api.get<ListaSesiones>('/auth/sesiones')
+  },
+  cerrarSesion(id: number) {
+    return api.delete<{ message: string; era_la_actual: boolean }>(`/auth/sesiones/${id}`)
+  },
+  cerrarOtrasSesiones() {
+    return api.post<{ message: string; cerradas: number }>('/auth/sesiones/cerrar-otras')
+  },
   login(payload: LoginPayload) {
     return api.post<AuthResponse>('/auth/login', payload)
   },

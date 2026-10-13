@@ -2,10 +2,13 @@
 // M01 — el usuario autenticado (Cliente, Mesero o Administrador) edita sus propios
 // datos y cambia su propia contraseña. Dos formularios independientes: cada uno
 // envía y valida por separado (AuthController::actualizarPerfil / cambiarPassword).
-import { reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { AtSign, CheckCircle2, KeyRound, Lock, Mail, Phone, User } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
+import SesionesLista from '@/components/common/SesionesLista.vue'
+import { authService } from '@/services/auth.service'
+import type { PoliticaSesiones, SesionAbierta } from '@/types/models'
 import { useAuthStore } from '@/stores/auth'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 
@@ -77,6 +80,7 @@ async function cambiarPassword() {
       password_confirmation: password.confirmacion,
     })
     exitoPassword.value = true
+    cargarSesiones() // el cambio cerró las demás sesiones
     password.actual = ''
     password.nueva = ''
     password.confirmacion = ''
@@ -91,6 +95,62 @@ async function cambiarPassword() {
     guardandoPassword.value = false
   }
 }
+
+// ---- Sesiones abiertas (Fase 3, tarea 4: RF-M01-010/024, HU-M01-010) ----
+const sesiones = ref<SesionAbierta[]>([])
+const politica = ref<PoliticaSesiones | null>(null)
+const cargandoSesiones = ref(false)
+const errorSesiones = ref('')
+const mensajeSesiones = ref('')
+const cerrandoSesion = ref<number | null>(null)
+const cerrandoOtras = ref(false)
+
+async function cargarSesiones() {
+  cargandoSesiones.value = true
+  errorSesiones.value = ''
+  try {
+    const { data } = await authService.sesiones()
+    sesiones.value = data.sesiones
+    politica.value = data.politica
+  } catch (error) {
+    errorSesiones.value = mensajeDeError(error, 'No pudimos cargar tus sesiones.')
+  } finally {
+    cargandoSesiones.value = false
+  }
+}
+
+async function cerrarSesion(sesion: SesionAbierta) {
+  cerrandoSesion.value = sesion.id
+  errorSesiones.value = ''
+  mensajeSesiones.value = ''
+  try {
+    await authService.cerrarSesion(sesion.id)
+    sesiones.value = sesiones.value.filter((s) => s.id !== sesion.id)
+    mensajeSesiones.value = `Se cerró la sesión de ${sesion.dispositivo}.`
+  } catch (error) {
+    errorSesiones.value = mensajeDeError(error, 'No pudimos cerrar esa sesión.')
+    await cargarSesiones()
+  } finally {
+    cerrandoSesion.value = null
+  }
+}
+
+async function cerrarOtras() {
+  cerrandoOtras.value = true
+  errorSesiones.value = ''
+  mensajeSesiones.value = ''
+  try {
+    const { data } = await authService.cerrarOtrasSesiones()
+    mensajeSesiones.value = data.cerradas === 1 ? 'Se cerró 1 sesión.' : `Se cerraron ${data.cerradas} sesiones.`
+    await cargarSesiones()
+  } catch (error) {
+    errorSesiones.value = mensajeDeError(error, 'No pudimos cerrar tus demás sesiones.')
+  } finally {
+    cerrandoOtras.value = false
+  }
+}
+
+onMounted(cargarSesiones)
 </script>
 
 <template>
@@ -173,6 +233,41 @@ async function cambiarPassword() {
             {{ guardandoPassword ? 'Actualizando…' : 'Cambiar contraseña' }}
           </BaseButton>
         </form>
+      </section>
+
+      <!-- Sesiones abiertas (Fase 3, tarea 4) -->
+      <section class="rounded-2xl border border-[#e2dbcf] bg-white p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 class="font-display text-lg text-ink">Sesiones abiertas</h2>
+            <p class="mt-1 text-xs text-[#6c655c]">Los dispositivos donde tu cuenta está abierta. Si no reconoces uno, ciérralo y cambia tu contraseña.</p>
+          </div>
+          <BaseButton
+            v-if="sesiones.some((s) => !s.actual)"
+            variant="secondary"
+            size="sm"
+            :disabled="cerrandoOtras"
+            @click="cerrarOtras"
+          >
+            {{ cerrandoOtras ? 'Cerrando…' : 'Cerrar las demás' }}
+          </BaseButton>
+        </div>
+
+        <p v-if="errorSesiones" class="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorSesiones }}</p>
+        <p v-if="mensajeSesiones" class="mt-4 flex items-center gap-2 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">
+          <CheckCircle2 :size="16" />
+          {{ mensajeSesiones }}
+        </p>
+
+        <p v-if="cargandoSesiones && !sesiones.length" class="mt-4 text-sm text-[#6c655c]">Cargando sesiones…</p>
+        <SesionesLista
+          v-else
+          class="mt-3"
+          :sesiones="sesiones"
+          :politica="politica"
+          :procesando="cerrandoSesion"
+          @cerrar="cerrarSesion"
+        />
       </section>
     </div>
   </div>

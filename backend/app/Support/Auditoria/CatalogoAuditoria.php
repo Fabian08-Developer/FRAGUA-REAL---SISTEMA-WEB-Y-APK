@@ -41,6 +41,9 @@ final class CatalogoAuditoria
         'restablecer_contrasena' => ['Restablecimiento de contraseña', 'seguridad'],
         'restablecer_contrasena_fallido' => ['Intento fallido de restablecer la contraseña', 'seguridad'],
         'revocar_sesiones' => ['Revocación de sesiones de un usuario', 'seguridad'],
+        'revocar_sesion' => ['Cierre de una sesión de un usuario por el Administrador', 'seguridad'],
+        'cerrar_sesion_dispositivo' => ['Cierre de una sesión propia en otro dispositivo', 'seguridad'],
+        'cerrar_otras_sesiones' => ['Cierre de las demás sesiones propias', 'seguridad'],
 
         // Usuarios
         'registro_cliente' => ['Registro de cliente', 'usuarios'],

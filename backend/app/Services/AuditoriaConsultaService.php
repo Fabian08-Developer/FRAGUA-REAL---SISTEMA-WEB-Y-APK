@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Auditoria;
 use App\Models\User;
 use App\Support\Auditoria\CatalogoAuditoria;
+use App\Support\Navegador;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -186,33 +187,6 @@ class AuditoriaConsultaService
     // Texto corto y legible del navegador ("Chrome en Android"); el texto completo sigue en user_agent.
     public function describirNavegador(?string $userAgent): ?string
     {
-        if (! $userAgent) {
-            return null;
-        }
-
-        $navegador = match (true) {
-            str_contains($userAgent, 'Edg/') => 'Edge',
-            str_contains($userAgent, 'OPR/') || str_contains($userAgent, 'Opera') => 'Opera',
-            str_contains($userAgent, 'SamsungBrowser') => 'Samsung Internet',
-            str_contains($userAgent, 'Firefox/') => 'Firefox',
-            str_contains($userAgent, 'Chrome/') || str_contains($userAgent, 'CriOS/') => 'Chrome',
-            str_contains($userAgent, 'Safari/') => 'Safari',
-            default => null,
-        };
-
-        $sistema = match (true) {
-            str_contains($userAgent, 'Android') => 'Android',
-            str_contains($userAgent, 'iPhone') || str_contains($userAgent, 'iPad') => 'iOS',
-            str_contains($userAgent, 'Windows') => 'Windows',
-            str_contains($userAgent, 'Mac OS X') || str_contains($userAgent, 'Macintosh') => 'macOS',
-            str_contains($userAgent, 'Linux') => 'Linux',
-            default => null,
-        };
-
-        if (! $navegador && ! $sistema) {
-            return 'Otro cliente';
-        }
-
-        return trim(($navegador ?? 'Navegador').($sistema ? " en {$sistema}" : ''));
+        return Navegador::describir($userAgent);
     }
 }

@@ -7,6 +7,7 @@ use App\Http\Requests\Api\Usuario\StoreUsuarioRequest;
 use App\Http\Requests\Api\Usuario\UpdateUsuarioRequest;
 use App\Models\User;
 use App\Services\AuditoriaService;
+use App\Services\SesionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -26,7 +27,9 @@ class UsuarioController extends Controller
     // ve staff y clientes desde la misma pantalla.
     public function index(Request $request)
     {
+        // Fase 3, tarea 4: cuántas sesiones vigentes tiene cada cuenta.
         $usuarios = User::query()
+            ->withCount(['tokens as sesiones_activas' => fn ($q) => app(SesionService::class)->vigentes($q)])
             ->when($request->rol, fn ($q) => $q->where('role', $request->rol))
             ->when($request->busqueda, fn ($q) => $q->where(
                 fn ($q2) => $q2->where('nombre', 'like', "%{$request->busqueda}%")
@@ -147,6 +150,29 @@ class UsuarioController extends Controller
         app(AuditoriaService::class)->registrar('revocar_sesiones', 'User', $usuario->id, [], $request->user());
 
         return response()->json(['message' => 'Sesiones revocadas.']);
+    }
+
+    // RF-M01-010, RF-M01-024, HU-M01-010 (Fase 3, tarea 4): las sesiones abiertas de una cuenta,
+    // con dispositivo, IP, último uso y vencimiento, para revisar o cerrar una en particular.
+    public function sesiones(User $usuario, SesionService $sesiones)
+    {
+        return response()->json([
+            'sesiones' => $sesiones->listar($usuario),
+            'politica' => $sesiones->politica(),
+        ]);
+    }
+
+    public function revocarSesion(Request $request, User $usuario, SesionService $sesiones, int $sesion)
+    {
+        $this->impedirAutogestion($request, $usuario);
+        $cerrada = $sesiones->cerrar($usuario, $sesion);
+        abort_if(! $cerrada, 404, 'Esa sesión ya no está abierta.');
+
+        app(AuditoriaService::class)->registrar('revocar_sesion', 'User', $usuario->id, [
+            'sesion_id' => $sesion, 'dispositivo' => $cerrada['dispositivo'], 'ip' => $cerrada['ip'],
+        ], $request->user());
+
+        return response()->json(['message' => 'Sesión cerrada.']);
     }
 
     // Un Administrador no puede desactivarse ni revocarse sus propias sesiones desde esta

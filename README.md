@@ -58,8 +58,9 @@ Fase 3 (12/10/2026): `2026_10_17_000001` protege el historial de auditoría en l
 (triggers que rechazan cambios y borrados en `auditorias`) y agrega un índice por fecha; detalle en
 `README-BACKEND.md`, punto 27. La tarea 2 (editar usuario y cambiar su rol, punto 28) no necesita
 migración. `2026_10_17_000002` agrega `users.username`, opcional y único, para iniciar sesión con
-el correo o con un nombre de usuario (punto 29). Pruebas automáticas: `php artisan test` (194 en
-`tests/Feature`).
+el correo o con un nombre de usuario (punto 29). `2026_10_17_000003` agrega IP y navegador a
+`personal_access_tokens` para listar las sesiones abiertas (punto 30). Pruebas automáticas:
+`php artisan test` (201 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

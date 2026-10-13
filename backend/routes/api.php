@@ -77,6 +77,10 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     // RF-M01-010/023: cerrar sesión en todos los dispositivos (revoca todos los tokens).
     Route::post('/auth/logout-todos', [AuthController::class, 'logoutTodos']);
+    // Fase 3, tarea 4 (RF-M01-010/024, HU-M01-010): mis sesiones abiertas.
+    Route::get('/auth/sesiones', [AuthController::class, 'sesiones']);
+    Route::post('/auth/sesiones/cerrar-otras', [AuthController::class, 'cerrarOtrasSesiones']);
+    Route::delete('/auth/sesiones/{sesion}', [AuthController::class, 'cerrarSesion'])->whereNumber('sesion');
     Route::get('/auth/me', [AuthController::class, 'me']);
     // RF-M01: el usuario autenticado edita su propio perfil / cambia su propia contraseña
     // (cualquier rol, no solo Cliente — Mesero y Administrador también tienen esta pantalla).
@@ -219,6 +223,9 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::post('/usuarios/{usuario}/activar', [UsuarioController::class, 'activar']);
         Route::post('/usuarios/{usuario}/desactivar', [UsuarioController::class, 'desactivar']);
         Route::post('/usuarios/{usuario}/revocar-sesiones', [UsuarioController::class, 'revocarSesiones']);
+        // Fase 3, tarea 4: ver y cerrar una sesión en particular de una cuenta.
+        Route::get('/usuarios/{usuario}/sesiones', [UsuarioController::class, 'sesiones']);
+        Route::delete('/usuarios/{usuario}/sesiones/{sesion}', [UsuarioController::class, 'revocarSesion'])->whereNumber('sesion');
 
         // Fase 3, tarea 1 (RF-M01-025, HU-M01-020, RNF-TRANS-023): consulta de la auditoría y
         // de los eventos de seguridad. Solo lectura.

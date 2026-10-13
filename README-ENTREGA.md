@@ -117,7 +117,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 12/10/2026 van 451 de 579 verificables, 78 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 12/10/2026 van 455 de 579 verificables, 79 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -128,8 +128,14 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   se abona a la cuenta de la visita), la tarea 3 (el mismo catálogo en todos los canales) y la
   tarea 4 (compras y gastos completos). Con la tarea 5 (cierre diario completo) la Fase 2 quedó
   completa el 12/10/2026; ver los puntos 22 a 26. La Fase 3 empezó con la tarea 1 (consulta
-  de auditoría y eventos de seguridad), la tarea 2 (editar usuario y cambiar su rol) y la tarea 3
-  (iniciar sesión con correo o nombre de usuario); ver los puntos 27 a 29.
+  de auditoría y eventos de seguridad), la tarea 2 (editar usuario y cambiar su rol), la tarea 3
+  (iniciar sesión con correo o nombre de usuario) y la tarea 4 (sesiones abiertas con su origen y
+  vencimiento); la Fase 3 quedó completa el 12/10/2026. Ver los puntos 27 a 30.
+- Política de sesiones con valores iniciales: una sesión se cierra sola tras 7 días sin uso y, como
+  máximo, a los 30 días. Se cambian en el `.env` del servidor
+  (`FRAGUA_REAL_SESION_INACTIVIDAD_MINUTOS`, `FRAGUA_REAL_SESION_DURACION_MAXIMA_MINUTOS`). La
+  limpieza diaria de sesiones vencidas (`sesiones:limpiar`) necesita el cron de Laravel en el VPS
+  (Fase 4).
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr
@@ -142,7 +148,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2 y 2 de la Fase 3, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2 y 3 de la Fase 3, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -249,6 +255,10 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 - Se puede iniciar sesión con el correo o con un nombre de usuario. El nombre de usuario es
   opcional: se elige al crear la cuenta, en Mi perfil o lo pone el Administrador en Usuarios. Las
   cuentas que ya existían siguen entrando con su correo hasta que se les ponga uno.
+- Mi perfil muestra las sesiones abiertas (dispositivo, IP, último uso y cuándo vence) y permite
+  cerrar una o todas las demás. En Usuarios, "Sesiones (n)" muestra las de cada cuenta y cierra
+  una o todas. Una sesión se cierra sola tras 7 días sin uso o a los 30 días; después hay que
+  volver a entrar. Las sesiones abiertas antes de esta versión no tienen IP ni dispositivo.
 - El historial de auditoría ya no se puede cambiar ni borrar ni siquiera desde la base de datos.
   Consecuencia: un usuario con historial no se puede borrar de la base de datos (se desactiva,
   como siempre).

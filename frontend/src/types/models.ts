@@ -16,6 +16,8 @@ export interface Usuario {
   telefono: string | null
   role: Rol
   activo: boolean
+  // Solo en GET /usuarios (Fase 3, tarea 4): cuántas sesiones vigentes tiene.
+  sesiones_activas?: number
 }
 
 // Espeja app/Models/Mesa.php. OJO: el backend usa "nombre" y "qr_code" (no
@@ -480,4 +482,28 @@ export interface OpcionesAuditoria {
   entidades: OpcionAuditoria[]
   usuarios: Pick<Usuario, 'id' | 'nombre' | 'email' | 'role'>[]
   seguridad: ResumenSeguridad
+}
+
+// Fase 3, tarea 4 (RF-M01-010/024, HU-M01-010): una sesión abierta (token) con su origen y su
+// vencimiento, tal como la entregan GET /auth/sesiones y GET /usuarios/{id}/sesiones.
+export interface SesionAbierta {
+  id: number
+  dispositivo: string
+  ip: string | null
+  user_agent: string | null
+  creada_at: string | null
+  ultimo_uso_at: string | null
+  vence_at: string | null
+  actual: boolean
+}
+
+// Política de vencimiento (config/fragua_real.php, "sesiones").
+export interface PoliticaSesiones {
+  inactividad_minutos: number
+  duracion_maxima_minutos: number
+}
+
+export interface ListaSesiones {
+  sesiones: SesionAbierta[]
+  politica: PoliticaSesiones
 }

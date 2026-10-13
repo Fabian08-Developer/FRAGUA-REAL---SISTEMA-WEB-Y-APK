@@ -1,7 +1,7 @@
 // M01 — espeja UsuarioController del backend (routes/api.php: GET/POST /usuarios,
 // PUT /usuarios/{id}, POST /usuarios/{id}/activar|desactivar|revocar-sesiones). Exclusivo Administrador.
 import api from './api'
-import type { Rol, Usuario } from '@/types/models'
+import type { ListaSesiones, Rol, Usuario } from '@/types/models'
 
 export interface CrearUsuarioPayload {
   role: Extract<Rol, 'mesero' | 'administrador'>
@@ -51,6 +51,13 @@ export const usuarioService = {
   },
   desactivar(id: number) {
     return api.post<Usuario>(`/usuarios/${id}/desactivar`)
+  },
+  // Fase 3, tarea 4: sesiones abiertas de una cuenta y cerrar una en particular.
+  sesiones(id: number) {
+    return api.get<ListaSesiones>(`/usuarios/${id}/sesiones`)
+  },
+  revocarSesion(id: number, sesionId: number) {
+    return api.delete<{ message: string }>(`/usuarios/${id}/sesiones/${sesionId}`)
   },
   revocarSesiones(id: number) {
     return api.post<{ message: string }>(`/usuarios/${id}/revocar-sesiones`)

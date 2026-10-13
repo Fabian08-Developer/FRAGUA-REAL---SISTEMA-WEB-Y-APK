@@ -3,13 +3,14 @@
 // Mesero/Administrador, activar/desactivar y revocar sesiones. Ver UsuarioController.
 import { computed, onMounted, ref } from 'vue'
 import { History, KeyRound, Pencil, Plus, Users as UsersIcon } from 'lucide-vue-next'
+import SesionesLista from '@/components/common/SesionesLista.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useAuthStore } from '@/stores/auth'
 import { usuarioService } from '@/services/usuario.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
-import type { Rol, Usuario } from '@/types/models'
+import type { PoliticaSesiones, Rol, SesionAbierta, Usuario } from '@/types/models'
 
 const auth = useAuthStore()
 
@@ -88,15 +89,76 @@ async function alternarActivo(usuario: Usuario) {
 }
 
 const mensajeRevocar = ref('')
+
+// ---- Sesiones de una cuenta (Fase 3, tarea 4: RF-M01-010/023/024, HU-M01-010) ----
+// "Sesiones" abre la lista de dispositivos donde la cuenta está abierta: se cierra una en
+// particular o todas a la vez (lo que antes hacía "Revocar sesiones").
+const usuarioSesiones = ref<Usuario | null>(null)
+const sesionesUsuario = ref<SesionAbierta[]>([])
+const politicaSesiones = ref<PoliticaSesiones | null>(null)
+const cargandoSesiones = ref(false)
+const errorSesiones = ref('')
+const cerrandoSesion = ref<number | null>(null)
+
+const modalSesionesAbierto = computed({
+  get: () => usuarioSesiones.value !== null,
+  set: (abierto: boolean) => {
+    if (!abierto) usuarioSesiones.value = null
+  },
+})
+
+function actualizarConteo(usuario: Usuario, cantidad: number) {
+  const i = usuarios.value.findIndex((u) => u.id === usuario.id)
+  const actual = usuarios.value[i]
+  if (actual) usuarios.value[i] = { ...actual, sesiones_activas: cantidad }
+}
+
+async function abrirSesiones(usuario: Usuario) {
+  usuarioSesiones.value = usuario
+  sesionesUsuario.value = []
+  errorSesiones.value = ''
+  cargandoSesiones.value = true
+  try {
+    const { data } = await usuarioService.sesiones(usuario.id)
+    sesionesUsuario.value = data.sesiones
+    politicaSesiones.value = data.politica
+    actualizarConteo(usuario, data.sesiones.length)
+  } catch (e) {
+    errorSesiones.value = mensajeDeError(e, 'No pudimos cargar sus sesiones.')
+  } finally {
+    cargandoSesiones.value = false
+  }
+}
+
+async function cerrarSesionDe(sesion: SesionAbierta) {
+  const usuario = usuarioSesiones.value
+  if (!usuario) return
+  cerrandoSesion.value = sesion.id
+  errorSesiones.value = ''
+  try {
+    await usuarioService.revocarSesion(usuario.id, sesion.id)
+    sesionesUsuario.value = sesionesUsuario.value.filter((s) => s.id !== sesion.id)
+    actualizarConteo(usuario, sesionesUsuario.value.length)
+  } catch (e) {
+    errorSesiones.value = mensajeDeError(e, 'No pudimos cerrar esa sesión.')
+  } finally {
+    cerrandoSesion.value = null
+  }
+}
+
 async function revocarSesiones(usuario: Usuario) {
   procesando.value = usuario.id
   error.value = ''
+  errorSesiones.value = ''
   mensajeRevocar.value = ''
   try {
     await usuarioService.revocarSesiones(usuario.id)
     mensajeRevocar.value = `Sesiones de ${usuario.nombre} revocadas.`
+    sesionesUsuario.value = []
+    actualizarConteo(usuario, 0)
+    usuarioSesiones.value = null
   } catch (e) {
-    error.value = mensajeDeError(e, 'No pudimos revocar las sesiones.')
+    errorSesiones.value = mensajeDeError(e, 'No pudimos revocar las sesiones.')
   } finally {
     procesando.value = null
   }
@@ -321,9 +383,9 @@ onMounted(cargar)
               Editar
             </BaseButton>
             <template v-if="usuario.id !== auth.usuario?.id">
-            <BaseButton variant="ghost" size="sm" :disabled="procesando === usuario.id" @click="revocarSesiones(usuario)">
+            <BaseButton variant="ghost" size="sm" :disabled="procesando === usuario.id" @click="abrirSesiones(usuario)">
               <KeyRound :size="14" />
-              Revocar sesiones
+              Sesiones<template v-if="usuario.sesiones_activas !== undefined"> ({{ usuario.sesiones_activas }})</template>
             </BaseButton>
             <BaseButton
               size="sm"
@@ -410,6 +472,36 @@ onMounted(cargar)
           </BaseButton>
         </div>
       </form>
+    </BaseModal>
+
+    <!-- Sesiones abiertas de una cuenta (Fase 3, tarea 4) -->
+    <BaseModal v-model="modalSesionesAbierto" :title="usuarioSesiones ? `Sesiones de ${usuarioSesiones.nombre}` : 'Sesiones'">
+      <div v-if="usuarioSesiones" class="space-y-4">
+        <p class="text-sm text-gray-600">
+          Dispositivos donde esta cuenta está abierta. Cerrar una sesión obliga a volver a entrar en ese dispositivo.
+        </p>
+        <p v-if="errorSesiones" class="alert-error">{{ errorSesiones }}</p>
+        <div v-if="cargandoSesiones" class="loading-state">Cargando sesiones…</div>
+        <SesionesLista
+          v-else
+          :sesiones="sesionesUsuario"
+          :politica="politicaSesiones"
+          :procesando="cerrandoSesion"
+          permitir-cerrar-actual
+          @cerrar="cerrarSesionDe"
+        />
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <BaseButton variant="ghost" type="button" @click="usuarioSesiones = null">Cerrar ventana</BaseButton>
+          <BaseButton
+            variant="danger-soft"
+            type="button"
+            :disabled="procesando === usuarioSesiones.id || !sesionesUsuario.length"
+            @click="revocarSesiones(usuarioSesiones)"
+          >
+            Cerrar todas sus sesiones
+          </BaseButton>
+        </div>
+      </div>
     </BaseModal>
 
     <!-- Editar usuario y rol (Fase 3, tarea 2) -->

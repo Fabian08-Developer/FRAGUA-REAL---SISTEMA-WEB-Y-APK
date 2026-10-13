@@ -14,6 +14,17 @@ const NOMBRES: Record<string, string> = {
   antes: 'Antes',
   despues: 'Después',
   sesiones_revocadas: 'Sesiones cerradas',
+  sesiones_cerradas: 'Sesiones cerradas',
+  sesion_id: 'Sesión n.º',
+  dispositivo: 'Dispositivo',
+  ip: 'IP',
+  via: 'Entró con',
+  era_la_actual: 'Era la sesión desde la que se cerró',
+  usuario: 'Nombre de usuario',
+  username: 'Nombre de usuario',
+  email: 'Correo',
+  telefono: 'Teléfono',
+  nombre: 'Nombre',
   otras_sesiones_cerradas: 'Otras sesiones cerradas',
   base_inicial: 'Base inicial',
   diferencia: 'Diferencia',
@@ -30,6 +41,8 @@ const VALORES: Record<string, string> = {
   cuenta_inactiva: 'La cuenta está desactivada',
   token_invalido: 'Enlace de recuperación no válido',
   token_vencido: 'Enlace de recuperación vencido',
+  correo: 'el correo',
+  usuario: 'el nombre de usuario',
 }
 
 export function nombreCampo(clave: string): string {
