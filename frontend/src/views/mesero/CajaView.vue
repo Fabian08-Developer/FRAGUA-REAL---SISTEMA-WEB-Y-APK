@@ -218,7 +218,7 @@ onMounted(cargar)
     <p v-if="error" class="mt-4 alert-error">{{ error }}</p>
     <div v-if="aviso" class="mt-4 flex flex-col gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 sm:flex-row sm:items-center sm:justify-between">
       <p>{{ aviso }}</p>
-      <BotonComprobante v-if="recienPagado" :pedido="recienPagado" size="sm" />
+      <BotonComprobante v-if="recienPagado" :pedido="recienPagado" personal size="sm" />
     </div>
 
     <div v-if="cargando" class="loading-state">Cargando pedidos…</div>

@@ -72,6 +72,13 @@ class PedidoPolicy
         return $user->esAdministrador() || $user->esMesero();
     }
 
+    // Fase 5 (decisión del usuario, 13/10/2026): la historia de comprobantes, con los anulados, es
+    // para revisar o aclarar un reclamo; la ve el Administrador. El Mesero reimprime el vigente.
+    public function verComprobantes(User $user, Pedido $pedido): bool
+    {
+        return $user->esAdministrador();
+    }
+
     public function cancelar(User $user, Pedido $pedido): bool
     {
         if ($user->esAdministrador() || $user->esMesero()) {

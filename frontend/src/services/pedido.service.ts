@@ -1,7 +1,7 @@
 // M02/M07 — espeja StorePedidoRequest y RegistrarPagoEnLineaRequest del backend
 // (routes/api.php: POST /pedidos, GET /pedidos, GET /pedidos/{id}, POST /pedidos/{id}/pagar-en-linea).
 import api from './api'
-import type { Pedido, PromocionAplicada, TipoPedido } from '@/types/models'
+import type { Comprobante, Pedido, PromocionAplicada, TipoPedido } from '@/types/models'
 
 export interface LineaPedidoPayload {
   producto_id?: number
@@ -137,6 +137,14 @@ export const pedidoService = {
   },
   comprobantePorEnlace(token: string) {
     return api.get<Blob>(`/pedidos/seguimiento/${token}/comprobante`, { responseType: 'blob' })
+  },
+  // Reimpresión controlada (13/10/2026), solo Administrador: todos los comprobantes del pedido
+  // (vigente y anulados) y abrir uno en particular (un anulado sale con su sello ANULADO).
+  comprobantes(id: number) {
+    return api.get<{ data: Comprobante[] }>(`/pedidos/${id}/comprobantes`)
+  },
+  comprobanteDelPedido(id: number, comprobanteId: number) {
+    return api.get<Blob>(`/pedidos/${id}/comprobantes/${comprobanteId}`, { responseType: 'blob' })
   },
   // Fase 4, tarea 5 (RF-M07-R-012): la recogida está lista; el backend avisa al cliente por correo.
   marcarListo(id: number) {

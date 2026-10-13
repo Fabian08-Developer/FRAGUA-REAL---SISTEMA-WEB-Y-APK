@@ -102,6 +102,10 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::get('/pedidos/{pedido}', [PedidoController::class, 'show']);
         // Fase 5, tarea 1 (RF-M06-009/010, HU-M02-019): comprobante vigente, ticket o PDF.
         Route::get('/pedidos/{pedido}/comprobante', [ComprobanteController::class, 'show']);
+        // Reimpresión controlada (13/10/2026): todos los comprobantes del pedido, también los
+        // anulados, y abrir uno en particular (solo Administrador, PedidoPolicy::verComprobantes).
+        Route::get('/pedidos/{pedido}/comprobantes', [ComprobanteController::class, 'index']);
+        Route::get('/pedidos/{pedido}/comprobantes/{comprobante}', [ComprobanteController::class, 'mostrar']);
         Route::post('/pedidos/{pedido}/pagar-en-linea', [PagoController::class, 'pagarEnLinea']); // solo Cliente dueño (PagoPolicy)
         // RN-M07-04: el Cliente puede cancelar su propio domicilio mientras esté PENDIENTE
         // (PedidoPolicy::cancelar() filtra esto; Administrador/Mesero cancelan cualquiera).

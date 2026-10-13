@@ -6,6 +6,7 @@ use App\Models\Comprobante;
 use App\Models\Pago;
 use App\Models\Pedido;
 use App\Models\PedidoDetalle;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Barryvdh\DomPDF\PDF as DomPdf;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -73,10 +74,42 @@ class ComprobanteService
         ]);
     }
 
-    /** El PDF (digital, tamaño A5) o el ticket de 80 mm de un comprobante, para ver o imprimir. */
+    /**
+     * El PDF (digital, tamaño A5) o el ticket de 80 mm de un comprobante, tal cual (lo que ve el
+     * cliente en Mis pedidos o con su enlace, y lo que va por correo: nunca dice REIMPRESIÓN).
+     */
     public function documento(Comprobante $comprobante, string $formato): Response
     {
         return $this->pdf($comprobante, $formato)->stream($this->nombreArchivo($comprobante));
+    }
+
+    /**
+     * Decisión del usuario (13/10/2026): el personal puede reimprimir un comprobante cuando quiera,
+     * pero la reimpresión no se confunde con el original. Cada impresión del personal suma una vez
+     * y queda en la auditoría (quién, cuál, qué vez, en qué formato); desde la segunda el documento
+     * dice "REIMPRESIÓN" con la fecha y la hora. Un anulado sale además con su sello ANULADO.
+     */
+    public function imprimir(Comprobante $comprobante, string $formato, User $actor): Response
+    {
+        $vez = DB::transaction(function () use ($comprobante) {
+            $fila = Comprobante::whereKey($comprobante->id)->lockForUpdate()->firstOrFail();
+            $fila->forceFill(['impresiones' => $fila->impresiones + 1])->save();
+
+            return $fila->impresiones;
+        });
+        $comprobante->impresiones = $vez;
+
+        app(AuditoriaService::class)->registrar('imprimir_comprobante', 'Pedido', $comprobante->pedido_id, [
+            'comprobante' => $comprobante->numero,
+            'vez' => $vez,
+            'reimpresion' => $vez > 1,
+            'formato' => $formato,
+            'anulado' => $comprobante->anulado_at !== null,
+        ], $actor);
+
+        $marca = $vez > 1 ? ['vez' => $vez, 'fecha' => now()->toIso8601String()] : null;
+
+        return $this->pdf($comprobante, $formato, $marca)->stream($this->nombreArchivo($comprobante));
     }
 
     /** El PDF ya dibujado, en bytes (para adjuntarlo a un correo). */
@@ -90,16 +123,16 @@ class ComprobanteService
         return "comprobante-{$comprobante->numero}.pdf";
     }
 
-    private function pdf(Comprobante $comprobante, string $formato): DomPdf
+    private function pdf(Comprobante $comprobante, string $formato, ?array $reimpresion = null): DomPdf
     {
-        $datos = ['c' => $comprobante->detalle, 'comprobante' => $comprobante];
+        $datos = ['c' => $comprobante->detalle, 'comprobante' => $comprobante, 'reimpresion' => $reimpresion];
 
         if ($formato === 'ticket') {
             $d = $comprobante->detalle;
             // dompdf no ajusta el alto solo: se calcula con lo que lleva el ticket.
             // Un renglón por línea (dos si el nombre es largo o lleva extras), pagos, descuentos y lo fijo.
             $renglones = collect($d['lineas'] ?? [])->sum(fn ($l) => 1 + (mb_strlen($l['nombre']) > 24 ? 1 : 0) + (empty($l['extras']) ? 0 : 1))
-                + count($d['pagos'] ?? []) + count($d['descuentos'] ?? []) + ($comprobante->anulado_at ? 3 : 0) + 17;
+                + count($d['pagos'] ?? []) + count($d['descuentos'] ?? []) + ($comprobante->anulado_at ? 3 : 0) + ($reimpresion ? 2 : 0) + 17;
 
             return Pdf::loadView('comprobantes.ticket', $datos)->setOption(self::OPCIONES)->setPaper([0, 0, self::ANCHO_TICKET_PUNTOS, 30 + $renglones * 11.5]);
         }

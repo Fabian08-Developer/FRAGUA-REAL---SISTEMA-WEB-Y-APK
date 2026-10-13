@@ -6,6 +6,8 @@
     $n = $c['negocio'] ?? [];
     $p = $c['pedido'] ?? [];
     $anulado = $comprobante->anulado_at !== null;
+    // Reimpresión del personal (desde la segunda vez): ['vez' => n, 'fecha' => ...] o null.
+    $reimpresion = $reimpresion ?? null;
 @endphp
 <!doctype html>
 <html lang="es">
@@ -27,6 +29,7 @@
     .totales td { padding: 2px 0; }
     .total td { font-size: 13px; font-weight: bold; border-top: 1px solid #1f1b16; padding-top: 6px; }
     .sello { position: fixed; top: 38%; left: 0; right: 0; text-align: center; font-size: 64px; color: #c0392b; opacity: 0.18; transform: rotate(-24deg); font-weight: bold; }
+    .reimpresion { margin-top: 4px; display: inline-block; border: 1px solid #1f1b16; padding: 1px 6px; font-weight: bold; font-size: 10px; letter-spacing: 0.5px; }
     .pie { margin-top: 18px; font-size: 9px; color: #6c655c; text-align: center; }
 </style>
 </head>
@@ -46,6 +49,10 @@
             <div style="font-size: 12px; font-weight: bold;">Comprobante de pago</div>
             <div style="font-size: 14px; font-weight: bold;">{{ $c['numero'] }}</div>
             <div class="quieto">{{ $fecha($c['fecha']) }}</div>
+            @if ($reimpresion)
+                <div class="reimpresion">REIMPRESIÓN · copia {{ $reimpresion['vez'] }}</div>
+                <div class="quieto">Impresa el {{ $fecha($reimpresion['fecha']) }}</div>
+            @endif
         </td>
     </tr>
 </table>

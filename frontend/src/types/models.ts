@@ -320,6 +320,8 @@ export interface Comprobante {
   generado_at: string
   anulado_at: string | null
   anulado_motivo: string | null
+  // Veces que lo imprimió el personal; desde la segunda sale marcado "REIMPRESIÓN".
+  impresiones: number
 }
 
 // Fase 4, tarea 5: aviso al cliente de un pedido (hoy, «listo para recoger»), del más reciente al más antiguo.

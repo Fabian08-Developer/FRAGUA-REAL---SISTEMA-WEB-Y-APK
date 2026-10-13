@@ -479,7 +479,7 @@ onMounted(cargar)
           </div>
 
           <!-- Fase 5, tarea 1 (RF-M06-009/010, HU-M02-019): comprobante cuando el pago está completo. -->
-          <BotonComprobante v-if="pedido.comprobante" :pedido="pedido" size="sm" class="mt-3" />
+          <BotonComprobante v-if="pedido.comprobante" :pedido="pedido" personal size="sm" class="mt-3" />
 
           <button
             type="button"

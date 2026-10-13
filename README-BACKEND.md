@@ -766,6 +766,26 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       "Comprobante FR-… (PDF)", abre el documento en otra pestaña) en Pedidos del Mesero y del
       Administrador, en Cobrar (apenas el cobro completa el pago), en Mis pedidos y en el
       seguimiento del invitado.
+37. **Fase 5, tarea 1b (13/10/2026): reimpresión controlada del comprobante.** Decisión del
+    usuario del 13/10/2026: todo lo que el sistema imprime se puede volver a imprimir, pero una
+    reimpresión no se confunde con el original y queda registrada. Migración `2026_10_19_000002`
+    (`comprobantes.impresiones`); 5 pruebas en `ReimpresionComprobanteTest`.
+    - Cuando el Mesero o el Administrador abre un comprobante (`ComprobanteService::imprimir()`),
+      suma una impresión (con bloqueo de fila) y queda en la auditoría (`imprimir_comprobante`:
+      quién, número, qué vez, formato, si estaba anulado). Desde la segunda vez el ticket dice
+      "*** REIMPRESIÓN · COPIA n ***" y el PDF "REIMPRESIÓN · copia n", con la fecha y la hora.
+    - Lo que abre el Cliente desde Mis pedidos o el invitado con su enlace, y el PDF del correo,
+      no cuentan ni se marcan (es su propio comprobante).
+    - Solo Administrador (`PedidoPolicy::verComprobantes`): `GET /pedidos/{pedido}/comprobantes`
+      (todos, el vigente y los anulados, del más nuevo al más viejo, con motivo e impresiones) y
+      `GET /pedidos/{pedido}/comprobantes/{comprobante}` (abre cualquiera; un anulado sale con su
+      sello ANULADO y también cuenta como impresión). El Mesero reimprime solo el vigente.
+    - La misma regla se aplicará a lo que falta imprimir: cierre diario en PDF, reportes guardados y
+      comandas de cocina.
+    - Frontend: `BotonComprobante.vue` con `personal` dice "Reimprimir comprobante FR-…" y "Ya se
+      imprimió n veces: saldrá marcado «REIMPRESIÓN»"; Administrador > Pedidos tiene
+      "Comprobantes" (`ComprobantesPedidoModal.vue`) con la lista y "Abrir"; `utils/documentos.ts`
+      abre los PDF en otra pestaña y lee el mensaje de error que llega como Blob.
 
 ## Qué falta a propósito
 

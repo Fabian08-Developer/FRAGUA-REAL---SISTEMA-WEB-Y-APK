@@ -171,7 +171,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   puntos 31 a 35. La Fase 4 quedó completa el 13/10/2026 salvo el canal SMS, que se aplazó por
   la decisión D3 hasta elegir proveedor.
 - La Fase 5 empezó el 13/10/2026 con la tarea 1 (comprobante de pago): ver `README-BACKEND.md`,
-  punto 36. Trae una dependencia nueva de Composer (`barryvdh/laravel-dompdf`): después de
+  punto 36, y con la reimpresión controlada que pediste el mismo día (punto 37). Trae una dependencia nueva de Composer (`barryvdh/laravel-dompdf`): después de
   actualizar el código hay que correr `composer update barryvdh/laravel-dompdf
   --with-all-dependencies` en `backend` (actualiza `composer.lock`; en el VPS, `composer install`
   con ese lock). Para que el comprobante muestre el NIT, ponerlo en `FRAGUA_REAL_NIT`. Decisiones del 12/10/2026: el sistema corre en un VPS de
@@ -190,7 +190,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4 y 1 de la Fase 5, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4 y 2 de la Fase 5, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -316,6 +316,11 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   Ningún comprobante se borra.
 - El comprobante no es una factura electrónica y lo dice. Una mesa con varios pedidos tiene un
   comprobante por pedido.
+- Reimpresión: el personal puede volver a imprimir un comprobante cuando quiera; desde la segunda
+  vez sale marcado «REIMPRESIÓN · copia n» con la fecha y la hora, y cada impresión queda en
+  Auditoría con quién la hizo. Lo que descarga el cliente no se marca. El Administrador ve en
+  Pedidos > "Comprobantes" todos los del pedido, también los anulados, y abre cualquiera (el anulado
+  sale con su sello).
 
 ## Cambios de comportamiento de la Fase 4 (desde el 12/10/2026)
 

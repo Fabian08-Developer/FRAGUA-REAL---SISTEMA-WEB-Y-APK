@@ -10,7 +10,7 @@
 // Fase 2, tarea 1: aplica o quita un descuento manual con motivo (RF-M04-036, HU-M04-015).
 // Fase 4, tarea 5: marca una recogida «Listo para recoger» y reintenta el aviso si falló (RF-M07-R-012).
 import { computed, onMounted, ref, watch } from 'vue'
-import { ChevronDown, History, Pencil, Percent, RefreshCw, ShoppingBasket } from 'lucide-vue-next'
+import { ChevronDown, History, Pencil, Percent, Receipt, RefreshCw, ShoppingBasket } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -18,6 +18,7 @@ import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import DatosEntregaPedido from '@/components/pedidos/DatosEntregaPedido.vue'
 import DescuentoPedidoModal from '@/components/pedidos/DescuentoPedidoModal.vue'
 import EditarPedidoModal from '@/components/pedidos/EditarPedidoModal.vue'
+import ComprobantesPedidoModal from '@/components/pedidos/ComprobantesPedidoModal.vue'
 import HistorialPedidoModal from '@/components/pedidos/HistorialPedidoModal.vue'
 import ListoParaRecoger from '@/components/pedidos/ListoParaRecoger.vue'
 import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
@@ -166,6 +167,7 @@ const reintentarAviso = (pedido: Pedido, aviso: PedidoAviso) =>
 const editandoId = ref<number | null>(null)
 const pedidoEnEdicion = computed(() => pedidos.value.find((p) => p.id === editandoId.value) ?? null)
 const historialId = ref<number | null>(null)
+const comprobantesId = ref<number | null>(null)
 const descuentoId = ref<number | null>(null)
 const pedidoEnDescuento = computed(() => pedidos.value.find((p) => p.id === descuentoId.value) ?? null)
 
@@ -380,7 +382,7 @@ onMounted(cargar)
             </div>
 
             <!-- Fase 5, tarea 1 (RF-M06-009/010, HU-M02-019): comprobante cuando el pago está completo. -->
-            <BotonComprobante v-if="pedido.comprobante" :pedido="pedido" size="sm" class="mt-3" />
+            <BotonComprobante v-if="pedido.comprobante" :pedido="pedido" personal size="sm" class="mt-3" />
 
             <button
               type="button"
@@ -388,6 +390,15 @@ onMounted(cargar)
               @click="historialId = pedido.id"
             >
               <History :size="15" /> Ver historial
+            </button>
+            <!-- Reimpresión controlada (13/10/2026): comprobantes del pedido, también los anulados. -->
+            <button
+              v-if="pedido.comprobante || pedido.pagos?.length"
+              type="button"
+              class="mt-3 ml-4 inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold text-gray-600 hover:text-ink"
+              @click="comprobantesId = pedido.id"
+            >
+              <Receipt :size="15" /> Comprobantes
             </button>
           </div>
         </li>
@@ -402,6 +413,7 @@ onMounted(cargar)
 
     <EditarPedidoModal :pedido="pedidoEnEdicion" @cerrar="editandoId = null" @actualizado="reemplazarPedido" />
     <HistorialPedidoModal :pedido-id="historialId" @cerrar="historialId = null" />
+    <ComprobantesPedidoModal :pedido-id="comprobantesId" @cerrar="comprobantesId = null" />
     <DescuentoPedidoModal :pedido="pedidoEnDescuento" @cerrar="descuentoId = null" @actualizado="reemplazarPedido" />
 
     <BaseModal :model-value="!!pedidoACancelar" title="Cancelar pedido" @update:model-value="pedidoACancelar = null">

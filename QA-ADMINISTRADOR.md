@@ -233,6 +233,14 @@ Antes de probar: `composer update barryvdh/laravel-dompdf --with-all-dependencie
 - [ ] El Cliente con cuenta lo descarga desde Mis pedidos (detalle del pedido) y el invitado desde
       su enlace de seguimiento. Otro cliente no puede descargarlo.
 - [ ] Con `FRAGUA_REAL_NIT` en el `.env` del servidor, el comprobante muestra el NIT; vacío, no.
+- [ ] Reimpresión: la primera vez el ticket sale normal; el botón cambia a "Reimprimir comprobante"
+      y avisa "Ya se imprimió 1 vez". La segunda vez el ticket dice "*** REIMPRESIÓN · COPIA 2 ***"
+      con la hora. Auditoría muestra las dos impresiones con quién las hizo.
+- [ ] El comprobante que descarga el Cliente desde Mis pedidos (o el invitado con su enlace) nunca
+      dice REIMPRESIÓN y no suma impresiones.
+- [ ] Administrador > Pedidos > "Comprobantes" de un pedido al que se le anuló un pago: lista el
+      vigente y el anulado con su motivo y cuántas veces se imprimió cada uno; "Abrir" en el anulado
+      muestra el sello ANULADO. Con el Mesero no aparece esa lista.
 
 ## 7. Compras y gastos (M03)
 - [ ] Registrar una compra y un gasto; editar uno activo (RF-M03-14).

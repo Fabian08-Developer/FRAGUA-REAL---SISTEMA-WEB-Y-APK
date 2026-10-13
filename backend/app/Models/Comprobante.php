@@ -10,10 +10,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * "impreso" (ticket de 80 mm) para pedidos locales y "digital" (PDF) para domicilio y recogida.
  * `detalle` guarda lo que dice el documento al generarse; nunca se reescribe. Si deja de valer,
  * se anula (anulado_at) y el siguiente sale con otro número. Lo genera ComprobanteService.
+ * `impresiones`: cuántas veces lo imprimió el personal; desde la segunda sale como REIMPRESIÓN.
  */
 class Comprobante extends Model
 {
-    protected $fillable = ['pedido_id', 'consecutivo', 'tipo', 'numero', 'generado_at', 'detalle', 'anulado_at', 'anulado_motivo'];
+    protected $fillable = ['pedido_id', 'consecutivo', 'tipo', 'numero', 'generado_at', 'detalle', 'anulado_at', 'anulado_motivo', 'impresiones'];
 
     // El detalle completo solo se usa para dibujar el documento; en los listados basta el resumen.
     protected $hidden = ['detalle'];
@@ -23,6 +24,7 @@ class Comprobante extends Model
         'anulado_at' => 'datetime',
         'detalle' => 'array',
         'consecutivo' => 'integer',
+        'impresiones' => 'integer',
     ];
 
     public function pedido(): BelongsTo
