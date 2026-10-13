@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import AppSidebar from '@/components/common/AppSidebar.vue'
+import ComandasPendientes from '@/components/pedidos/ComandasPendientes.vue'
 
 const route = useRoute()
 
@@ -23,6 +24,8 @@ const pantallaCompleta = computed(() => !!route.meta.pantallaCompleta)
       <!-- pb-nav-m: deja libre el alto de la barra de pestañas inferior (solo teléfono) para que
            el último elemento de cada lista nunca quede escondido debajo de ella. -->
       <div v-else class="mx-auto w-full max-w-6xl px-4 pb-nav-m pt-5 sm:px-6 sm:pt-7 md:pb-8 lg:px-10 lg:pt-9">
+        <!-- Fase 6, tarea 2 (RNF-M02-011): las comandas por imprimir se ven en todas las pantallas. -->
+        <ComandasPendientes />
         <router-view />
       </div>
     </main>

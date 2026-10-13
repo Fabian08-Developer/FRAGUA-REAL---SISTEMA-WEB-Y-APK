@@ -116,6 +116,12 @@ class Pedido extends Model
         return $this->hasMany(Comprobante::class)->orderBy('id');
     }
 
+    // Fase 6, tarea 2 (RN-PED-06/09): lo que se mandó a la cocina, en orden.
+    public function comandas(): HasMany
+    {
+        return $this->hasMany(Comanda::class)->orderBy('numero');
+    }
+
     public function modificaciones(): HasMany
     {
         return $this->hasMany(PedidoModificacion::class)->orderBy('id');

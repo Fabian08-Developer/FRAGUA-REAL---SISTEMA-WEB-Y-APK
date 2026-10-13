@@ -918,6 +918,57 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
         quedó su reembolso.
     - Configuración en el servidor: llaves `WOMPI_*` en `.env` y la URL de eventos en Wompi >
       Desarrolladores (ver README-ENTREGA).
+42. **Fase 6, tarea 2 (13/10/2026): comandas de cocina impresas desde el navegador (M02, M07).**
+    Decisión D5: en V1 el Mesero imprime el ticket desde el navegador, sin un agente local.
+    RF-M02-L-011, RF-M02-T-004 a 007, RN-PED-06, 09, 17 a 19, RNF-M02-001, 004, 005, 011, 014, 016,
+    HU-M02-016, 017, RF-M07-020, 022. Migración `2026_10_20_000002` (tabla `comandas`); 7 pruebas
+    en `ComandasTest`. Con esta tarea la Fase 6 quedó completa.
+    - `ComandaService` arma cada comanda a partir del pedido y la guarda congelada en
+      `comandas.contenido` (sin precios). Los tipos son:
+      - inicial: al confirmar (RN-PED-06, RF-M07-020). Lleva las líneas, lo que trae cada combo,
+        extras y notas.
+      - actualización: un cambio con el pedido confirmado (RN-PED-09, RF-M07-022). Lleva solo lo
+        que cambió: agregar, quitar o cambiar, con la cantidad anterior.
+      - cancelación: se cancela un pedido que la cocina ya tenía.
+    - Para no sacar hojas de más:
+      - si la cocina todavía no recibió la inicial, un cambio la rehace;
+      - si la última hoja de cambios no se ha impreso, el siguiente cambio se suma a ella;
+      - si se cancela un pedido que nunca llegó a la cocina, su comanda queda "descartada".
+    - Idempotencia (RF-M02-T-007, RNF-M02-004): cada comanda tiene una clave única (`pedido:N:inicial`,
+      `pedido:N:modificacion:M`, `pedido:N:cancelacion`). Confirmar dos veces, un doble clic o dos
+      pantallas a la vez nunca generan dos comandas.
+    - Un fallo nunca deshace el pedido (RN-PED-17, RNF-M02-001/005): si generar la comanda falla, el
+      pedido queda confirmado y el error se reporta. `GET /comandas/pendientes` crea la comanda que
+      falte a todo pedido confirmado en las últimas 24 h (`asegurarIniciales`).
+    - El estado de impresión es independiente del pedido (RN-PED-19, RNF-M02-014):
+      - pendiente → impresa al abrir el ticket (`GET /comandas/{id}/ticket`, PDF de 80 mm);
+      - "No salió" (`POST /comandas/{id}/no-impresa`, auditado `comanda_no_impresa`) la deja
+        "fallida" y la devuelve a pendientes (HU-M02-016);
+      - una impresión que salió no se repite sola (RN-PED-18).
+    - Regla de reimpresión: la primera impresión que sale es el original. Desde la segunda, el ticket
+      dice "REIMPRESIÓN · COPIA n" y cada impresión queda en la auditoría (`imprimir_comanda`, con
+      `RegistroImpresiones`). Una que no salió vuelve a imprimirse como original, porque la cocina
+      nunca la tuvo.
+    - Pantallas:
+      - `GET /comandas/pendientes` alimenta la franja "comandas por imprimir" (RNF-M02-011);
+      - `GET /pedidos/{id}/comandas` da el historial de comandas de un pedido;
+      - el historial del pedido (`historial()`) suma cada comanda enviada e impresa;
+      - los pedidos traen sus comandas (`CON_DETALLES`), sin el contenido;
+      - `confirmar` responde el pedido con sus comandas.
+    - Frontend:
+      - Confirmar en Mesero > Pedidos o Administrador > Pedidos abre la comanda para imprimir (la
+        pestaña se abre en el clic para que el navegador no la bloquee).
+      - Cada pedido tiene "Imprimir comanda" o "Reimprimir comanda" y "¿No salió? Avisar"
+        (`BotonComanda.vue`).
+      - Todas las pantallas del Mesero, y Administrador > Pedidos, muestran la franja
+        `ComandasPendientes.vue`, que se actualiza cada 15 s y al confirmar, editar o cancelar.
+      - "Impresión de comandas en este equipo" (`utils/comandas.ts`, guardado en el navegador):
+        abrir la comanda al confirmar (prendido) y abrir solas las comandas nuevas (para el equipo
+        de la cocina). Con Chrome en modo `--kiosk-printing` salen sin el cuadro de impresión.
+    - Lo que queda a medias, por D5: RF-M02-T-006 (reintento automático). En V1, el equipo de la
+      cocina con "abrir solas" y Chrome en impresión automática se acerca, pero el navegador no puede
+      saber si el papel salió: lo confirma una persona. La impresión 100 % automática necesita un
+      agente local junto a la impresora.
 
 ## Qué falta a propósito
 
@@ -934,6 +985,10 @@ brechas de documentación, solo de implementación técnica):
   cubre Nequi y el botón Bancolombia con un solo contrato. Falta solo lo que no es código: la cuenta
   comercial de producción y sus llaves. Mientras tanto se prueba con las llaves del sandbox, y la
   aprobación manual sigue de respaldo.
+- **Impresión 100 % automática en la impresora POS**: pendiente por decisión (D5, 13/10/2026). Las
+  comandas existen, con su estado de impresión, y se imprimen desde el navegador del Mesero
+  (punto 42). Sin una persona de por medio, hace falta un agente local junto a la impresora,
+  porque un servidor en la nube no ve la impresora del local. Queda para después de V1.
 - **Alta de Administrador/Mesero**: RESUELTO. `UsuarioController` (solo Administrador) lista, crea
   cuentas de Mesero/Administrador, las activa/desactiva y revoca sus sesiones (RF-M01-001).
   `AuthController::register()` solo expone el autorregistro de Cliente (RF-M01-014).

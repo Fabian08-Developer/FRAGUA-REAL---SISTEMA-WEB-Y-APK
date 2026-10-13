@@ -26,10 +26,17 @@ export function guardarArchivo(data: Blob, nombre: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-/** Abre el PDF en otra pestaña. Lanza Error con un mensaje legible si no se pudo. */
-export async function abrirPdf(pedir: () => Promise<{ data: Blob }>, fallback = 'No pudimos abrir el documento. Intenta de nuevo.') {
+/**
+ * Abre el PDF en otra pestaña. Lanza Error con un mensaje legible si no se pudo.
+ * `ventana`: una pestaña ya abierta en el clic (Fase 6: la comanda al confirmar, que se pide después
+ * de esperar la confirmación); si no viene, se abre aquí, antes de pedir el archivo.
+ */
+export async function abrirPdf(
+  pedir: () => Promise<{ data: Blob }>,
+  fallback = 'No pudimos abrir el documento. Intenta de nuevo.',
+  ventana: Window | null = window.open('', '_blank'),
+) {
   // La pestaña se abre antes de pedir el archivo para que el navegador no la bloquee.
-  const ventana = window.open('', '_blank')
   try {
     const { data } = await pedir()
     const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }))

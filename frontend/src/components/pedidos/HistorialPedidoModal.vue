@@ -2,7 +2,7 @@
 // Fase 1, tarea 1 — Historial de un pedido (HU-M02-020, RN-PED-12, RF-M07-028): creación,
 // cambios de estado, productos agregados/cambiados/quitados y pagos, con quién y cuándo.
 import { ref, watch } from 'vue'
-import { CircleDollarSign, Flag, PencilLine } from 'lucide-vue-next'
+import { ChefHat, CircleDollarSign, Flag, PencilLine } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { pedidoService, type EventoHistorialPedido } from '@/services/pedido.service'
 import { mensajeDeError } from '@/services/errors'
@@ -14,7 +14,7 @@ const eventos = ref<EventoHistorialPedido[]>([])
 const cargando = ref(false)
 const error = ref('')
 
-const ICONOS = { estado: Flag, modificacion: PencilLine, pago: CircleDollarSign }
+const ICONOS = { estado: Flag, modificacion: PencilLine, pago: CircleDollarSign, comanda: ChefHat }
 
 watch(
   () => props.pedidoId,
@@ -67,6 +67,7 @@ function formatoFecha(iso: string) {
             'bg-gray-100 text-gray-600': evento.tipo === 'estado',
             'bg-brand-50 text-brand-700': evento.tipo === 'modificacion',
             'bg-emerald-50 text-emerald-700': evento.tipo === 'pago',
+            'bg-amber-50 text-amber-700': evento.tipo === 'comanda',
           }"
         >
           <component :is="ICONOS[evento.tipo]" :size="14" />
@@ -84,7 +85,7 @@ function formatoFecha(iso: string) {
         <span
           v-if="evento.afecta_comanda"
           class="badge mt-1 bg-sky-50 text-sky-700 ring-sky-600/20"
-          title="Cambio hecho con el pedido ya confirmado: va en la comanda de actualización"
+          title="Cambio hecho con el pedido ya confirmado: fue a la cocina en una comanda de cambios"
         >
           Con el pedido confirmado
         </span>

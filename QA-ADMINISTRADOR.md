@@ -425,6 +425,33 @@ Requiere la cola corriendo y un `MAIL_MAILER` que envíe (con `log` el correo qu
 - [ ] Con el Mesero: "Nuevo pedido" → Recogida pide el correo opcional; con un correo mal escrito
       no deja continuar.
 
+### 9c. Comandas de cocina (Fase 6, tarea 2 — RN-PED-06/09/17 a 19, RF-M02-T-004 a 007, HU-M02-016/017)
+Antes de probar: `php artisan migrate`. Permitir las ventanas emergentes del sitio en el navegador.
+- [ ] Con el Mesero, un pedido local con 2 Clásicas "sin cebolla" y un combo: "Confirmar pedido"
+      abre en otra pestaña la comanda de 80 mm (pedido, mesa, hora, líneas, lo que trae el combo,
+      la nota). No lleva precios. Se imprime con Ctrl+P.
+- [ ] El pedido muestra "Reimprimir comanda 12-1"; reimprimirla dice "*** REIMPRESIÓN · COPIA 2 ***".
+      Auditoría muestra las dos impresiones con quién las hizo.
+- [ ] Debajo dice "¿No salió de la impresora? Avisar": al avisar, la franja amarilla de arriba
+      muestra "1 comanda por imprimir · 1 no salió" y al imprimirla de nuevo sale como original.
+- [ ] Apagar "Abrir la comanda al confirmar" (en "Impresión de comandas en este equipo"):
+      confirmar ya no abre nada y la franja dice "1 comanda por imprimir"; "Imprimir" desde la
+      franja la abre y la franja desaparece.
+- [ ] Con el pedido confirmado y su comanda impresa, editar: agregar 2 Papas y cambiar la
+      Clásica a 3. Sale una sola hoja "Cambios al pedido" (hoja 2) con "[AGREGAR] 2 × Papas" y
+      "[CAMBIAR] 3 × Clásica (antes 2)", no las líneas que no cambiaron.
+- [ ] Editar un pedido confirmado cuya comanda todavía no se imprimió: no sale hoja de cambios;
+      la comanda inicial sale ya con el cambio.
+- [ ] Cancelar (con contraseña de Administrador) un pedido cuya comanda ya salió: sale "PEDIDO
+      CANCELADO" con el motivo. Cancelar uno cuya comanda no se imprimió: no sale nada y la franja
+      ya no la muestra.
+- [ ] Un domicilio web confirmado: la comanda dice "DOMICILIO" y el nombre del cliente.
+- [ ] "Ver historial" del pedido muestra "Comanda 12-1 enviada a la cocina" e "impresa" con quién.
+- [ ] Equipo de la cocina: prender "Abrir solas las comandas nuevas" y, desde otro equipo,
+      confirmar un pedido. En menos de 15 s se abre sola la comanda. Con Chrome abierto con
+      `--kiosk-printing` sale sin el cuadro de impresión.
+- [ ] Un Cliente no puede abrir `/api/comandas/pendientes` ni el ticket de una comanda (403).
+
 ## 9b. Invitado (sin cuenta)
 - [ ] Pedir una recogida sin iniciar sesión: el Checkout muestra el enlace de seguimiento.
 - [ ] El enlace muestra el pedido "Recibido"; al confirmarlo el Mesero, en máximo 30 segundos pasa a

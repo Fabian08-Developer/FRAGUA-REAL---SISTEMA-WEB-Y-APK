@@ -84,8 +84,10 @@ Fase 6 (13/10/2026): `2026_10_20_000001` crea `transacciones_pasarela`, un regis
 de pago en Wompi. Se enlaza al pago del pedido o a la reserva cuyo depósito se paga y guarda la
 referencia secreta, el id y el estado en Wompi, la respuesta completa, si hay que revisarlo y el
 reembolso. También agrega a `pagos` cómo se aprobó (`confirmado_via`: pasarela o manual) y quién
-(`confirmado_por`), y a `reservas` el `deposito_confirmado_via` (punto 41). Pruebas automáticas:
-`php artisan test` (282 en `tests/Feature`).
+(`confirmado_por`), y a `reservas` el `deposito_confirmado_via` (punto 41). `2026_10_20_000002` crea
+`comandas`: lo que se manda a la cocina de cada pedido (inicial, cambios o cancelación), con su estado
+de impresión aparte del pedido, sus intentos e impresiones y una clave única para no duplicarla
+(punto 42). Pruebas automáticas: `php artisan test` (289 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

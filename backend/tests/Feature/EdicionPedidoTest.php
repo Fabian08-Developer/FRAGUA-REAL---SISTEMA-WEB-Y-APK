@@ -220,7 +220,8 @@ class EdicionPedidoTest extends TestCase
         $eventos = $this->getJson("/api/pedidos/{$pedido->id}/historial")->assertOk()->json('data');
 
         $this->assertSame(
-            ['Pedido creado (PENDIENTE)', 'Agregó 2 × Gaseosa', 'Retiró 2 × Gaseosa', 'Pedido confirmado'],
+            // Fase 6, tarea 2: confirmar también manda la comanda a la cocina, y queda en la historia.
+            ['Pedido creado (PENDIENTE)', 'Agregó 2 × Gaseosa', 'Retiró 2 × Gaseosa', 'Pedido confirmado', "Comanda {$pedido->id}-1 enviada a la cocina"],
             array_column($eventos, 'descripcion'),
         );
         $this->assertSame('Mesero Uno', $eventos[1]['quien']);

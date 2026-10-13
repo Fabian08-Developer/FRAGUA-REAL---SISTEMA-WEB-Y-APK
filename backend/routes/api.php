@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AuditoriaController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CajaController;
 use App\Http\Controllers\Api\CatalogoController;
+use App\Http\Controllers\Api\ComandaController;
 use App\Http\Controllers\Api\CompraGastoController;
 use App\Http\Controllers\Api\ComprobanteController;
 use App\Http\Controllers\Api\ConfiguracionController;
@@ -150,6 +151,12 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         // cobrar ESTE pedido (siempre el Mesero; el grupo de rutas también deja pasar al
         // Administrador, pero la Policy lo rechaza — autorización fina en profundidad).
         Route::post('/pedidos/{pedido}/cobrar', [PagoController::class, 'cobrar']);
+
+        // Fase 6, tarea 2 (RN-PED-06/09/17 a 19, D5): comandas de cocina impresas desde el navegador.
+        Route::get('/comandas/pendientes', [ComandaController::class, 'pendientes']);
+        Route::get('/pedidos/{pedido}/comandas', [ComandaController::class, 'dePedido']);
+        Route::get('/comandas/{comanda}/ticket', [ComandaController::class, 'ticket']);
+        Route::post('/comandas/{comanda}/no-impresa', [ComandaController::class, 'noImpresa']);
 
         // Confirmar/rechazar manualmente un pago en línea (mismo patrón que el depósito de
         // reserva de abajo). Fase 6, tarea 1: con la pasarela activa el pago se confirma solo y

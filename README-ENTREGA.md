@@ -167,7 +167,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 13/10/2026 van 495 de 579 verificables, 85 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 13/10/2026 van 514 de 579 verificables, 89 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -208,7 +208,9 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   del Mesero en V1 (D5).
 - La Fase 6 empezó el 13/10/2026 con la tarea 1 (pasarela Wompi con confirmación automática):
   ver "Pasarela de pago Wompi" arriba y `README-BACKEND.md`, punto 41. Falta la cuenta comercial
-  de producción; mientras tanto se prueba con las llaves del sandbox.
+  de producción; mientras tanto se prueba con las llaves del sandbox. Con la tarea 2 (comandas de
+  cocina impresas desde el navegador, punto 42) la Fase 6 quedó completa el 13/10/2026. Sigue la
+  prueba de un día completo de operación.
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr
@@ -222,7 +224,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
   del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4, 4 de la Fase 5 y
-  1 de la Fase 6, ninguna borra datos).
+  2 de la Fase 6, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -389,6 +391,19 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   secreto de la reserva.
 - En el servidor: `php artisan migrate`, las variables `PASARELA_*` y `WOMPI_*` del
   `.env.example`, y la URL de eventos en Wompi.
+- Comandas de cocina (D5): al confirmar un pedido, sale su comanda (sin precios) en otra pestaña,
+  lista para imprimir en la impresora de 80 mm. Si después se agrega, cambia o quita algo, sale una
+  hoja de "Cambios al pedido" con solo eso. Si se cancela un pedido que la cocina ya tenía, sale
+  "Pedido cancelado".
+- Arriba de todas las pantallas del Mesero (y en Administrador > Pedidos), una franja amarilla
+  dice cuántas comandas faltan por imprimir. Si una no salió (sin papel, impresora apagada),
+  "¿No salió?" la devuelve a la lista. Un problema de impresión nunca cambia ni cancela el pedido.
+- Volver a imprimir una comanda que ya salió la marca «REIMPRESIÓN · COPIA n» y queda en
+  Auditoría.
+- Para el equipo de la cocina: en "Impresión de comandas en este equipo", prender "Abrir solas las
+  comandas nuevas", permitir las ventanas emergentes del sitio y abrir Chrome con impresión
+  automática (`--kiosk-printing`) con la impresora de 80 mm como predeterminada. Así salen solas.
+  La impresión sin nadie que mire (un agente local junto a la impresora) queda para después de V1.
 
 ## Cambios de comportamiento de la Fase 4 (desde el 12/10/2026)
 

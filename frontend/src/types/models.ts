@@ -214,6 +214,22 @@ export interface Pago {
   transaccion_pasarela?: TransaccionPasarela | null
 }
 
+// Fase 6, tarea 2 (RN-PED-06/09/17 a 19, D5) — espeja app/Models/Comanda.php (sin su contenido,
+// que solo se usa para dibujar el ticket). El estado de impresión no es el estado del pedido.
+export type EstadoImpresionComanda = 'pendiente' | 'impresa' | 'fallida' | 'descartada'
+export interface Comanda {
+  id: number
+  pedido_id: number
+  numero: number
+  tipo: 'inicial' | 'actualizacion' | 'cancelacion'
+  estado_impresion: EstadoImpresionComanda
+  intentos: number
+  impresiones: number
+  impresa_at: string | null
+  ultimo_error: string | null
+  created_at: string
+}
+
 // Fase 6, tarea 1 (D4: Wompi) — espeja app/Models/TransaccionPasarela.php: un intento de pago en la
 // pasarela, del pago de un pedido o del depósito de una reserva. La respuesta cruda no viaja.
 export type EstadoTransaccionPasarela = 'pendiente' | 'aprobado' | 'rechazado' | 'anulado' | 'error' | 'abandonado'
@@ -336,6 +352,8 @@ export interface Pedido {
   avisos?: PedidoAviso[]
   // Fase 5, tarea 1 (RF-M06-009/010): el comprobante vigente; el documento se pide aparte.
   comprobante?: Comprobante | null
+  // Fase 6, tarea 2 (RN-PED-06/09): lo que se mandó a la cocina, en orden.
+  comandas?: Comanda[]
   mesa?: Mesa
   cliente?: Usuario | null
   detalles?: PedidoDetalle[]

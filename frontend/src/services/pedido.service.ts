@@ -73,7 +73,7 @@ export interface DescuentoPayload {
 
 // Fase 1, tarea 1: un evento de GET /pedidos/{id}/historial (PedidoService::historial).
 export interface EventoHistorialPedido {
-  tipo: 'estado' | 'modificacion' | 'pago'
+  tipo: 'estado' | 'modificacion' | 'pago' | 'comanda'
   fecha: string
   quien: string | null
   descripcion: string

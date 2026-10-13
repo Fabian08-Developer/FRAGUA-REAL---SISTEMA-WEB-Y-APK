@@ -7,11 +7,13 @@
 // Fase 1: edita un pedido PENDIENTE o lo no preparado de uno CONFIRMADO (RN-PED-07/08) y
 // muestra su historial (HU-M02-020). Fase 2: descuento manual con motivo (RF-M04-036, HU-M04-015).
 // Fase 4, tarea 5: «Listo para recoger» avisa al cliente por correo (RF-M07-R-012).
+// Fase 6, tarea 2: confirmar abre la comanda para imprimir y cada pedido muestra la suya (D5).
 import { computed, onMounted, ref, watch } from 'vue'
 import { Check, ChevronDown, History, Pencil, Percent, Plus, ShoppingBasket } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import BotonComanda from '@/components/pedidos/BotonComanda.vue'
 import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import DatosEntregaPedido from '@/components/pedidos/DatosEntregaPedido.vue'
 import DescuentoPedidoModal from '@/components/pedidos/DescuentoPedidoModal.vue'
@@ -22,6 +24,9 @@ import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
 import { TIPOS_PEDIDO_UI, faltaParaFinalizar, formatoHoraPedido, saldoPendiente, titularPedido } from '@/utils/pedidoUi'
 import { pedidoService } from '@/services/pedido.service'
 import { mensajeDeError } from '@/services/errors'
+import { comandaService } from '@/services/comanda.service'
+import { abrirPdf } from '@/utils/documentos'
+import { avisarComandas, imprimirAlConfirmar, porImprimir } from '@/utils/comandas'
 import type { Pedido, PedidoAviso } from '@/types/models'
 
 const pedidos = ref<Pedido[]>([])
@@ -116,13 +121,30 @@ function reemplazarPedido(actualizado: Pedido) {
   if (i !== -1) pedidos.value[i] = { ...pedidos.value[i], ...actualizado }
 }
 
+// Fase 6, tarea 2 (RN-PED-06, RF-M02-L-011): confirmar manda la comanda a la cocina. La pestaña se
+// abre en el clic (antes de esperar al servidor) para que el navegador no la bloquee; si la comanda
+// no se puede abrir, el pedido queda confirmado igual y la comanda sigue en «por imprimir» (RN-PED-17).
 async function confirmar(pedido: Pedido) {
   procesando.value = pedido.id
   error.value = ''
+  const ventana = imprimirAlConfirmar.get() ? window.open('', '_blank') : null
   try {
     const { data } = await pedidoService.confirmar(pedido.id)
     reemplazarPedido(data)
+    const comanda = (data.comandas ?? []).find(porImprimir)
+    if (ventana && comanda) {
+      try {
+        await abrirPdf(() => comandaService.ticket(comanda.id), 'El pedido quedó confirmado, pero no pudimos abrir la comanda.', ventana)
+        reemplazarPedido({ ...data, comandas: (data.comandas ?? []).map((c) => (c.id === comanda.id ? { ...c, estado_impresion: 'impresa', impresiones: 1 } : c)) })
+      } catch (e) {
+        error.value = e instanceof Error ? e.message : 'No pudimos abrir la comanda.'
+      }
+    } else {
+      ventana?.close()
+    }
+    avisarComandas()
   } catch (e) {
+    ventana?.close()
     error.value = mensajeDeError(e, 'No pudimos confirmar el pedido.')
   } finally {
     procesando.value = null
@@ -236,6 +258,7 @@ async function confirmarCancelar() {
     reemplazarPedido(data)
     conteoActivos.value = Math.max(0, conteoActivos.value - 1)
     pedidoACancelar.value = null
+    avisarComandas() // Fase 6: si la cocina ya lo tenía, sale la comanda de cancelación
   } catch (e) {
     errorCancelar.value = mensajeDeError(e, 'No pudimos cancelar el pedido.')
   } finally {
@@ -479,6 +502,8 @@ onMounted(cargar)
           </div>
 
           <!-- Fase 5, tarea 1 (RF-M06-009/010, HU-M02-019): comprobante cuando el pago está completo. -->
+          <!-- Fase 6, tarea 2: la comanda de cocina (imprimir, reimprimir o avisar que no salió). -->
+          <BotonComanda v-if="pedido.comandas?.length" :pedido="pedido" class="mt-3 mr-3" />
           <BotonComprobante v-if="pedido.comprobante" :pedido="pedido" personal size="sm" class="mt-3" />
 
           <button
@@ -492,7 +517,11 @@ onMounted(cargar)
       </li>
     </ul>
 
-    <EditarPedidoModal :pedido="pedidoEnEdicion" @cerrar="editandoId = null" @actualizado="reemplazarPedido" />
+    <EditarPedidoModal
+      :pedido="pedidoEnEdicion"
+      @cerrar="editandoId = null"
+      @actualizado="(p: Pedido) => { reemplazarPedido(p); avisarComandas() }"
+    />
     <HistorialPedidoModal :pedido-id="historialId" @cerrar="historialId = null" />
     <DescuentoPedidoModal :pedido="pedidoEnDescuento" @cerrar="descuentoId = null" @actualizado="reemplazarPedido" />
 

@@ -41,7 +41,7 @@ class PedidoController extends Controller
     // Fase 2, tarea 1: 'descuentoManualPor' para mostrar quién aplicó el descuento manual.
     // Fase 4, tarea 5: 'avisos' (correo «listo para recoger» enviado, en cola o fallido).
     // Fase 5, tarea 1: 'comprobante' (el vigente: número y tipo; el documento se pide aparte).
-    public const CON_DETALLES = ['detalles.producto', 'detalles.variante', 'detalles.combo', 'detalles.extras', 'mesa', 'pagos.transaccionPasarela', 'cliente', 'descuentoManualPor:id,nombre', 'avisos', 'comprobante'];
+    public const CON_DETALLES = ['detalles.producto', 'detalles.variante', 'detalles.combo', 'detalles.extras', 'mesa', 'pagos.transaccionPasarela', 'cliente', 'descuentoManualPor:id,nombre', 'avisos', 'comprobante', 'comandas'];
 
     // Panel de pedidos del Administrador (RF-M02-T-017): filtra por tipo/estado.
     public function index(Request $request)
@@ -116,7 +116,8 @@ class PedidoController extends Controller
     {
         $this->authorize('confirmar', $pedido);
 
-        return response()->json($this->pedidoService->confirmar($pedido, $request->user()));
+        // Fase 6, tarea 2: con sus comandas, para que la pantalla abra la comanda recién generada.
+        return response()->json($this->pedidoService->confirmar($pedido, $request->user())->load('comandas'));
     }
 
     public function marcarPreparando(Request $request, Pedido $pedido)

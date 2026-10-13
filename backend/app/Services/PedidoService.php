@@ -321,8 +321,8 @@ class PedidoService
     //
     // Con el pedido PENDIENTE se agregan, cambian y retiran líneas libremente. Con el pedido
     // CONFIRMADO también, pero solo las líneas que la cocina no ha preparado. Cada cambio queda
-    // en `pedido_modificaciones` y en la auditoría. Los cambios hechos ya confirmado quedan
-    // marcados para la comanda de actualización (RN-PED-09), que se imprimirá cuando exista POS.
+    // en `pedido_modificaciones` y en la auditoría. Los cambios hechos ya confirmado van a la
+    // cocina en una comanda de actualización (RN-PED-09, Fase 6: ComandaService).
 
     /** RF-M02-L-003/012: agrega una línea nueva al pedido, con el precio vigente congelado. */
     public function agregarLinea(Pedido $pedido, array $linea, User $actor): Pedido
@@ -447,6 +447,12 @@ class PedidoService
                 'total_nuevo' => $pedido->total,
                 'afecta_comanda' => $pedido->estado === 'confirmado', // RN-PED-09
             ]);
+
+            // Fase 6, tarea 2 (RN-PED-09, RF-M07-022): lo que cambió con el pedido confirmado va a la
+            // cocina en una comanda de actualización. Un fallo ahí no deshace el cambio.
+            if ($modificacion->afecta_comanda) {
+                app(ComandaService::class)->alModificar($pedido, $modificacion);
+            }
 
             // RNF-M02-012: modificar un pedido también queda en la auditoría general.
             app(AuditoriaService::class)->registrar('modificar_pedido', 'Pedido', $pedido->id, [
@@ -725,6 +731,16 @@ class PedidoService
             }
         }
 
+        // Fase 6, tarea 2 (RN-PED-06/09): cada comanda mandada a la cocina y cuándo salió impresa.
+        $tipos = ['inicial' => 'Comanda', 'actualizacion' => 'Comanda de cambios', 'cancelacion' => 'Comanda de cancelación'];
+        foreach ($pedido->comandas()->with('impresaPorUsuario:id,nombre')->get() as $c) {
+            $nombre = ($tipos[$c->tipo] ?? 'Comanda')." {$c->pedido_id}-{$c->numero}";
+            $eventos->push(['tipo' => 'comanda', 'fecha' => $c->created_at, 'quien' => 'Sistema', 'descripcion' => "{$nombre} enviada a la cocina"]);
+            if ($c->impresa_at) {
+                $eventos->push(['tipo' => 'comanda', 'fecha' => $c->impresa_at, 'quien' => $c->impresaPorUsuario?->nombre, 'descripcion' => "{$nombre} impresa"]);
+            }
+        }
+
         foreach ($pedido->pagos as $p) {
             $monto = '$'.number_format((float) $p->monto, 0, ',', '.');
             // Fase 2, tarea 2: el abono del depósito de una reserva se lee como tal.
@@ -769,6 +785,10 @@ class PedidoService
         $pedido->confirmado_por = $actor->id;
         $pedido->confirmado_at = now();
         $pedido->save();
+
+        // Fase 6, tarea 2 (RN-PED-06, RF-M02-L-011, RF-M07-020): confirmar manda la comanda a la
+        // cocina. Si algo falla al generarla, el pedido queda confirmado igual (RN-PED-17).
+        app(ComandaService::class)->alConfirmar($pedido);
 
         return $pedido;
     }
@@ -962,6 +982,8 @@ class PedidoService
         // Fase 2, tarea 2: el abono del depósito de la reserva vuelve a la reserva y pasa a los
         // demás pedidos de la visita.
         app(AbonoDepositoService::class)->liberarDePedidoCancelado($pedido, $actor);
+        // Fase 6, tarea 2: si la cocina ya tenía el pedido, le llega una comanda de cancelación.
+        app(ComandaService::class)->alCancelar($pedido, $motivo);
         // Fase 6, tarea 1: si ya se había pagado por la pasarela, queda marcado para reembolsarlo.
         app(PasarelaPagoService::class)->avisarPedidoCancelado($pedido);
 
