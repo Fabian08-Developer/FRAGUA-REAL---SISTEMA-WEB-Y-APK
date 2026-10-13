@@ -234,6 +234,10 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
 
         // Compras/Gastos/Cierre Diario (M03)
         Route::get('/compras-gastos', [CompraGastoController::class, 'index']);
+        // Fase 2, tarea 4: categorías por tipo y soporte (RF-M03-07, RNF-M03-11).
+        Route::get('/compras-gastos/categorias', [CompraGastoController::class, 'categorias']);
+        Route::post('/compras-gastos/{compraGasto}/soporte', [CompraGastoController::class, 'adjuntarSoporte']);
+        Route::get('/compras-gastos/{compraGasto}/soporte', [CompraGastoController::class, 'verSoporte']);
         Route::post('/compras-gastos', [CompraGastoController::class, 'store']);
         // RF-M03-14: editar un registro activo.
         Route::put('/compras-gastos/{compraGasto}', [CompraGastoController::class, 'update']);

@@ -110,8 +110,11 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 ## Pendientes conocidos al 10/10/2026
 
 - Las cuentas de prueba (`password`) deben desactivarse o cambiarse antes de producción.
+- En el VPS, PHP y Nginx deben aceptar archivos de hasta 8 MB para los soportes de compras
+  (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
+  seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 11/10/2026 van 406 de 579 verificables, 70 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 11/10/2026 van 420 de 579 verificables, 73 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -119,14 +122,14 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   Con las tareas 5 (agotado y búsqueda) y 6 (cancelación y nombres de mesa) la Fase 1 quedó
   completa el 11/10/2026; ver los puntos 20 y 21. La Fase 2 empezó con la tarea 1
   (promociones aplicadas al pedido y descuento manual) y la tarea 2 (el depósito de la reserva
-  se abona a la cuenta de la visita) y la tarea 3 (el mismo catálogo en todos los canales); ver los
-  puntos 22 a 24.
+  se abona a la cuenta de la visita), la tarea 3 (el mismo catálogo en todos los canales) y la
+  tarea 4 (compras y gastos completos); ver los puntos 22 a 25.
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr
   `npm run build` en `frontend` antes de probarlas.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1 y 3 de la Fase 2, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1 y 4 de la Fase 2, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -203,6 +206,12 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   y sus combos en todos los canales.
 - Precios en cero se rechazan, y un nombre de producto o categoría repetido muestra un mensaje
   claro. Cada alta o cambio del catálogo (incluido el precio) queda en la auditoría.
+- En Compras y gastos la categoría es obligatoria y se elige de una lista según el tipo; se
+  pueden anotar cantidad, unidad y observaciones, y adjuntar la foto o el PDF de la factura
+  (antes había que pegar un enlace). El soporte solo lo abre el Administrador con su sesión.
+- El historial de compras y gastos se filtra por fechas, categoría, forma de pago, proveedor y
+  estado, con los totales de lo filtrado, y muestra quién corrigió o anuló cada registro.
+- Una compra no puede registrarse con fecha futura.
 
 ## Artefactos de prueba dejados en la base de datos
 

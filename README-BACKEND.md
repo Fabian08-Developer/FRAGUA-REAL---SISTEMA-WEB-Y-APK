@@ -439,6 +439,38 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       lista de extras dice con qué productos se ofrece cada uno, el combo marca los componentes
       dados de baja y se avisa qué combos se desactivaron.
 
+25. **Fase 2, tarea 4 (12/10/2026): compras y gastos completos (M03).** RF-M03-01, 03, 04, 07,
+    13, 19, 30, RN-M03-02, 03, 14, RNF-M03-04, 06, 11, HU-M03-02, 03. Migración
+    `2026_10_16_000002` (`cantidad`, `unidad`, `observaciones`, `soporte_path/nombre/mime`,
+    `editado_por/at`, `anulado_por/at` en `compras_gastos`); 10 pruebas en
+    `ComprasGastosCompletosTest`.
+    - Categoría obligatoria y de su tipo: Compra → Alimentos, Bebidas, Empaques, Insumos, Otros;
+      Gasto → Transporte, Limpieza, Servicios, Mantenimiento, Papelería, Otros (M03, sección 9).
+      Viven en `config/fragua_real.php` (`categorias_compras_gastos`) para ampliarlas sin tocar
+      código (RNF-M03-12); `GET /compras-gastos/categorias` las entrega. Un registro viejo con
+      otra categoría se puede seguir editando mientras no se cambie.
+    - Cantidad y unidad solo informativas (no hay inventario, RN-M03-02) y observaciones.
+    - La fecha de la compra puede ser anterior al registro, pero no futura (RN-M03-14); la fecha y
+      hora del registro son automáticas (RF-M03-30).
+    - Soporte (RF-M03-07, RNF-M03-06/11): `soporte` en `POST /compras-gastos` (multipart) o en
+      `POST /compras-gastos/{id}/soporte`. Solo JPG, PNG o PDF, revisando el contenido real del
+      archivo, hasta 5 MB (`FRAGUA_REAL_SOPORTE_MAX_KB`). Se guarda en `storage/app/private`
+      (disco `local`), nunca en una carpeta pública; se ve con `GET /compras-gastos/{id}/soporte`
+      y sesión de Administrador. Reemplazarlo no borra el anterior (queda nombrado en la
+      auditoría). El campo suelto `soporte_url` ya no se recibe; los registros viejos lo conservan.
+    - Historial (RF-M03-13): `GET /compras-gastos` filtra por `desde`, `hasta`, `tipo`,
+      `categoria`, `metodo_pago`, `proveedor` (parte del nombre) y `estado`, y trae `totales` de lo
+      filtrado (solo activos).
+    - Trazabilidad (RF-M03-19, RNF-M03-04): cada registro guarda quién y cuándo lo corrigió o anuló,
+      y la auditoría guarda alta, corrección (antes y después), anulación y soporte.
+    - Frontend (Administrador > Compras y gastos): categoría en lista según el tipo, cantidad,
+      unidad, observaciones, archivo de soporte y "Ver soporte"; filtros con sus totales y
+      paginación; quién corrigió o anuló cada registro.
+    - **Para el VPS (Hostinger):** PHP debe aceptar archivos de al menos 6 MB
+      (`upload_max_filesize = 6M` y `post_max_size = 8M` en `php.ini`) y Nginx
+      `client_max_body_size 8m;`. La carpeta `storage/app/private` debe poder escribirla el usuario
+      del servidor web e incluirse en las copias de seguridad.
+
 ## Qué falta a propósito
 
 Cada uno de los puntos abiertos ya está documentado en los documentos oficiales de módulo (no son

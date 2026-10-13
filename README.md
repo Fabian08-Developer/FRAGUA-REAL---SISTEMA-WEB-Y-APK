@@ -49,7 +49,9 @@ quién y cuándo), y a `pedido_detalles` la parte del descuento de cada línea; 
 y su reserva en `pagos`, y en `reservas` el pedido al que se abonó el depósito, cuánto se abonó, la
 hora de llegada y los turnos de caja en que se recibió y se devolvió el depósito; detalle en el
 punto 23. `2026_10_16_000001` crea `producto_extra`, los extras generales que ofrece cada producto
-(punto 24). Pruebas automáticas: `php artisan test` (158 en `tests/Feature`).
+(punto 24). `2026_10_16_000002` completa `compras_gastos`: cantidad, unidad, observaciones, el
+soporte guardado en almacenamiento privado y quién corrigió o anuló cada registro (punto 25).
+Pruebas automáticas: `php artisan test` (168 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

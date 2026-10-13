@@ -1,13 +1,16 @@
 <script setup lang="ts">
 // M03 — Compras, Gastos y Cierre Diario (exclusivo Administrador). Ver CompraGastoController
 // y CierreDiarioService en el backend; RN-M03-01 a 15 en el documento oficial del módulo.
+// Fase 2, tarea 4 (12/10/2026): categoría obligatoria por tipo, cantidad y unidad informativas,
+// observaciones, soporte JPG/PNG/PDF subido como archivo y visible solo con sesión (RF-M03-07,
+// RNF-M03-06/11), filtros del historial con sus totales (RF-M03-13) y quién corrigió o anuló.
 import { computed, onMounted, ref } from 'vue'
-import { Ban, Pencil, Plus, Printer, Receipt, ShoppingCart, Wallet } from 'lucide-vue-next'
+import { Ban, Paperclip, Pencil, Plus, Printer, Receipt, ShoppingCart, SlidersHorizontal, Wallet } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatCard from '@/components/common/StatCard.vue'
-import { compraGastoService, type CompraGastoPayload } from '@/services/compra-gasto.service'
+import { compraGastoService, type CompraGastoPayload, type FiltrosCompraGasto } from '@/services/compra-gasto.service'
 import { reporteService } from '@/services/reporte.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import type { CierreDiario, CompraGasto } from '@/types/models'
@@ -26,6 +29,36 @@ const total = ref(0)
 const cargando = ref(true)
 const error = ref('')
 const filtroTipo = ref<'todos' | 'compra' | 'gasto'>('todos')
+// RF-M03-13 (Fase 2, tarea 4): más filtros, paginación y totales de lo filtrado.
+const filtros = ref<Omit<FiltrosCompraGasto, 'tipo' | 'page'>>({})
+const verFiltros = ref(false)
+const pagina = ref(1)
+const ultimaPagina = ref(1)
+const totalesFiltro = ref<{ total_compras: number; total_gastos: number } | null>(null)
+const categorias = ref<Record<'compra' | 'gasto', string[]>>({ compra: [], gasto: [] })
+const categoriasFiltro = computed(() =>
+  filtroTipo.value === 'todos' ? [...new Set([...categorias.value.compra, ...categorias.value.gasto])] : categorias.value[filtroTipo.value],
+)
+const hayFiltros = computed(() => Object.values(filtros.value).some((v) => v))
+
+async function cargarCategorias() {
+  try {
+    const { data } = await compraGastoService.categorias()
+    categorias.value = data
+  } catch {
+    // Sin la lista, el formulario lo dirá al guardar.
+  }
+}
+
+function aplicarFiltros() {
+  pagina.value = 1
+  cargar()
+}
+
+function limpiarFiltros() {
+  filtros.value = {}
+  aplicarFiltros()
+}
 
 const OPCIONES_TIPO: { v: typeof filtroTipo.value; t: string }[] = [
   { v: 'todos', t: 'Todos' },
@@ -44,11 +77,16 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
+    const limpios = Object.fromEntries(Object.entries(filtros.value).filter(([, v]) => v))
     const { data } = await compraGastoService.index({
+      ...limpios,
       tipo: filtroTipo.value === 'todos' ? undefined : filtroTipo.value,
+      page: pagina.value,
     })
     registros.value = data.data
     total.value = data.total
+    ultimaPagina.value = data.last_page
+    totalesFiltro.value = data.totales ?? null
   } catch (e) {
     error.value = mensajeDeError(e, 'No pudimos cargar las compras y gastos.')
   } finally {
@@ -86,34 +124,50 @@ function formatoFecha(valor: string) {
 // ---- Crear / editar ----
 const modalFormAbierto = ref(false)
 const editando = ref<CompraGasto | null>(null)
-const form = ref<CompraGastoPayload>({
-  tipo: 'compra',
-  categoria: '',
-  descripcion: '',
-  valor: 0,
-  metodo_pago: 'efectivo',
-  proveedor: '',
-  numero_factura: '',
-  soporte_url: '',
-  fecha: hoy(),
-})
+function formVacio(): CompraGastoPayload {
+  return {
+    tipo: 'compra',
+    categoria: '',
+    descripcion: '',
+    cantidad: null,
+    unidad: '',
+    valor: 0,
+    metodo_pago: 'efectivo',
+    proveedor: '',
+    numero_factura: '',
+    observaciones: '',
+    fecha: hoy(),
+  }
+}
+const form = ref<CompraGastoPayload>(formVacio())
+// RF-M03-07: archivo elegido (JPG, PNG o PDF); se valida aquí y otra vez en el servidor.
+const soporte = ref<File | null>(null)
+const UNIDADES = ['unidades', 'kilos', 'gramos', 'litros', 'bolsas', 'paquetes', 'cajas', 'botellas']
+
+function elegirSoporte(evento: Event) {
+  const archivo = (evento.target as HTMLInputElement).files?.[0] ?? null
+  erroresForm.value = { ...erroresForm.value, soporte: '' }
+  if (archivo && !['image/jpeg', 'image/png', 'application/pdf'].includes(archivo.type)) {
+    erroresForm.value = { ...erroresForm.value, soporte: 'El soporte debe ser una imagen JPG o PNG, o un PDF.' }
+    soporte.value = null
+    ;(evento.target as HTMLInputElement).value = ''
+    return
+  }
+  soporte.value = archivo
+}
+
+function cambiarTipo(tipo: CompraGastoPayload['tipo']) {
+  form.value.tipo = tipo
+  if (!categorias.value[tipo].includes(form.value.categoria)) form.value.categoria = ''
+}
 const erroresForm = ref<Record<string, string>>({})
 const errorForm = ref('')
 const guardando = ref(false)
 
 function abrirCrear() {
   editando.value = null
-  form.value = {
-    tipo: 'compra',
-    categoria: '',
-    descripcion: '',
-    valor: 0,
-    metodo_pago: 'efectivo',
-    proveedor: '',
-    numero_factura: '',
-    soporte_url: '',
-    fecha: hoy(),
-  }
+  form.value = formVacio()
+  soporte.value = null
   erroresForm.value = {}
   errorForm.value = ''
   modalFormAbierto.value = true
@@ -125,13 +179,16 @@ function abrirEditar(registro: CompraGasto) {
     tipo: registro.tipo,
     categoria: registro.categoria ?? '',
     descripcion: registro.descripcion,
+    cantidad: registro.cantidad != null ? Number(registro.cantidad) : null,
+    unidad: registro.unidad ?? '',
     valor: Number(registro.valor),
     metodo_pago: registro.metodo_pago,
     proveedor: registro.proveedor ?? '',
     numero_factura: registro.numero_factura ?? '',
-    soporte_url: registro.soporte_url ?? '',
-    fecha: registro.fecha,
+    observaciones: registro.observaciones ?? '',
+    fecha: registro.fecha.slice(0, 10),
   }
+  soporte.value = null
   erroresForm.value = {}
   errorForm.value = ''
   modalFormAbierto.value = true
@@ -144,18 +201,20 @@ async function confirmarGuardar() {
 
   const payload: CompraGastoPayload = {
     ...form.value,
-    categoria: form.value.categoria || undefined,
-    proveedor: form.value.proveedor || undefined,
-    numero_factura: form.value.numero_factura || undefined,
-    soporte_url: form.value.soporte_url || undefined,
+    cantidad: form.value.cantidad ? Number(form.value.cantidad) : null,
+    unidad: form.value.unidad || null,
+    proveedor: form.value.proveedor || null,
+    numero_factura: form.value.numero_factura || null,
+    observaciones: form.value.observaciones || null,
   }
 
   try {
     if (editando.value) {
-      const { data } = await compraGastoService.editar(editando.value.id, payload)
+      let { data } = await compraGastoService.editar(editando.value.id, payload)
+      if (soporte.value) ({ data } = await compraGastoService.adjuntarSoporte(editando.value.id, soporte.value))
       reemplazar(data)
     } else {
-      await compraGastoService.crear(payload)
+      await compraGastoService.crear(payload, soporte.value)
       await cargar()
     }
     await cargarResumenDia()
@@ -170,6 +229,31 @@ async function confirmarGuardar() {
   } finally {
     guardando.value = false
   }
+}
+
+// ---- Ver soporte (RNF-M03-11: se pide con la sesión, no hay enlace público) ----
+const abriendoSoporte = ref<number | null>(null)
+async function verSoporte(registro: CompraGasto) {
+  abriendoSoporte.value = registro.id
+  error.value = ''
+  // La pestaña se abre antes de pedir el archivo para que el navegador no la bloquee.
+  const ventana = window.open('', '_blank')
+  try {
+    const { data } = await compraGastoService.verSoporte(registro.id)
+    const url = URL.createObjectURL(data)
+    if (ventana) ventana.location.href = url
+    else window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  } catch (e) {
+    ventana?.close()
+    error.value = mensajeDeError(e, 'No pudimos abrir el soporte.')
+  } finally {
+    abriendoSoporte.value = null
+  }
+}
+
+function formatoFechaHora(valor?: string | null) {
+  return valor ? new Date(valor).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : ''
 }
 
 // ---- Anular ----
@@ -234,6 +318,7 @@ const contadorTexto = computed(() => (total.value === 1 ? '1 registro' : `${tota
 onMounted(() => {
   cargar()
   cargarResumenDia()
+  cargarCategorias()
 })
 </script>
 
@@ -327,12 +412,57 @@ onMounted(() => {
           type="button"
           class="segmented-item"
           :class="filtroTipo === opcion.v ? 'is-active' : ''"
-          @click="filtroTipo = opcion.v; cargar()"
+          @click="filtroTipo = opcion.v; aplicarFiltros()"
         >
           {{ opcion.t }}
         </button>
       </div>
+      <BaseButton variant="secondary" size="sm" @click="verFiltros = !verFiltros">
+        <SlidersHorizontal :size="15" /> Filtros<template v-if="hayFiltros"> (activos)</template>
+      </BaseButton>
     </div>
+
+    <!-- RF-M03-13, HU-M03-03: filtros por fecha, categoría, forma de pago, proveedor y estado. -->
+    <form v-if="verFiltros" class="card mt-3 grid gap-3 p-4 sm:grid-cols-3 print:hidden" @submit.prevent="aplicarFiltros">
+      <label class="block">
+        <span class="field-label">Desde</span>
+        <input v-model="filtros.desde" type="date" class="field" />
+      </label>
+      <label class="block">
+        <span class="field-label">Hasta</span>
+        <input v-model="filtros.hasta" type="date" class="field" />
+      </label>
+      <label class="block">
+        <span class="field-label">Categoría</span>
+        <select v-model="filtros.categoria" class="field">
+          <option :value="undefined">Todas</option>
+          <option v-for="c in categoriasFiltro" :key="c" :value="c">{{ c }}</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="field-label">Forma de pago</span>
+        <select v-model="filtros.metodo_pago" class="field">
+          <option :value="undefined">Todas</option>
+          <option v-for="(texto, valor) in METODOS_PAGO" :key="valor" :value="valor">{{ texto }}</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="field-label">Proveedor</span>
+        <input v-model="filtros.proveedor" type="search" class="field" placeholder="Nombre o parte" />
+      </label>
+      <label class="block">
+        <span class="field-label">Estado</span>
+        <select v-model="filtros.estado" class="field">
+          <option :value="undefined">Activos y anulados</option>
+          <option value="activo">Solo activos</option>
+          <option value="anulado">Solo anulados</option>
+        </select>
+      </label>
+      <div class="flex gap-2 sm:col-span-3 sm:justify-end">
+        <BaseButton variant="ghost" type="button" @click="limpiarFiltros">Limpiar</BaseButton>
+        <BaseButton type="submit">Aplicar filtros</BaseButton>
+      </div>
+    </form>
 
     <p v-if="error" class="mt-4 alert-error print:hidden">{{ error }}</p>
 
@@ -344,7 +474,12 @@ onMounted(() => {
     </div>
 
     <template v-else>
-      <p class="mt-4 text-xs text-gray-500 print:hidden">{{ contadorTexto }}</p>
+      <p class="mt-4 text-xs text-gray-500 print:hidden">
+        {{ contadorTexto }}
+        <template v-if="totalesFiltro">
+          · activos en este filtro: compras {{ formatoPrecio(totalesFiltro.total_compras) }}, gastos {{ formatoPrecio(totalesFiltro.total_gastos) }}
+        </template>
+      </p>
       <ul class="mt-2 space-y-3 print:hidden">
         <li
           v-for="registro in registros"
@@ -370,11 +505,28 @@ onMounted(() => {
             <p class="mt-1 text-xs text-gray-500">
               {{ formatoFecha(registro.fecha) }} · {{ METODOS_PAGO[registro.metodo_pago] }}
               <template v-if="registro.categoria"> · {{ registro.categoria }}</template>
+              <template v-if="registro.cantidad"> · {{ Number(registro.cantidad) }} {{ registro.unidad ?? '' }}</template>
               <template v-if="registro.proveedor"> · {{ registro.proveedor }}</template>
+              <template v-if="registro.numero_factura"> · factura {{ registro.numero_factura }}</template>
               <template v-if="registro.registrado_por_usuario"> · registrado por {{ registro.registrado_por_usuario.nombre }}</template>
+              <template v-if="registro.editado_at"> · corregido por {{ registro.editado_por_usuario?.nombre ?? '—' }} el {{ formatoFechaHora(registro.editado_at) }}</template>
             </p>
+            <p v-if="registro.observaciones" class="mt-1 text-xs text-gray-500">{{ registro.observaciones }}</p>
+            <button
+              v-if="registro.tiene_soporte"
+              type="button"
+              class="mt-1.5 inline-flex min-h-9 items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline"
+              :disabled="abriendoSoporte === registro.id"
+              @click="verSoporte(registro)"
+            >
+              <Paperclip :size="14" /> {{ abriendoSoporte === registro.id ? 'Abriendo…' : `Ver soporte (${registro.soporte_nombre ?? 'archivo'})` }}
+            </button>
+            <a v-else-if="registro.soporte_url" :href="registro.soporte_url" target="_blank" rel="noopener" class="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline">
+              <Paperclip :size="14" /> Ver enlace del soporte
+            </a>
             <p v-if="registro.estado === 'anulado' && registro.anulado_motivo" class="mt-1 text-xs italic text-red-600">
               Anulado: {{ registro.anulado_motivo }}
+              <template v-if="registro.anulado_at"> ({{ registro.anulado_por_usuario?.nombre ?? '—' }}, {{ formatoFechaHora(registro.anulado_at) }})</template>
             </p>
           </div>
 
@@ -391,6 +543,12 @@ onMounted(() => {
           </div>
         </li>
       </ul>
+
+      <div v-if="ultimaPagina > 1" class="mt-6 flex items-center justify-center gap-3 print:hidden">
+        <BaseButton variant="ghost" :disabled="pagina <= 1 || cargando" @click="pagina--; cargar()">Anterior</BaseButton>
+        <span class="text-xs text-gray-500">{{ pagina }} / {{ ultimaPagina }}</span>
+        <BaseButton variant="ghost" :disabled="pagina >= ultimaPagina || cargando" @click="pagina++; cargar()">Siguiente</BaseButton>
+      </div>
     </template>
 
     <!-- Crear/editar -->
@@ -403,7 +561,7 @@ onMounted(() => {
               type="button"
               class="rounded-xl border px-3 py-3 text-sm font-semibold transition active:scale-[0.98]"
               :class="form.tipo === 'compra' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 hover:border-brand-300'"
-              @click="form.tipo = 'compra'"
+              @click="cambiarTipo('compra')"
             >
               Compra
             </button>
@@ -411,7 +569,7 @@ onMounted(() => {
               type="button"
               class="rounded-xl border px-3 py-3 text-sm font-semibold transition active:scale-[0.98]"
               :class="form.tipo === 'gasto' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 hover:border-brand-300'"
-              @click="form.tipo = 'gasto'"
+              @click="cambiarTipo('gasto')"
             >
               Gasto
             </button>
@@ -439,8 +597,14 @@ onMounted(() => {
 
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="block">
-            <span class="field-label">Categoría (opcional)</span>
-            <input v-model="form.categoria" type="text" class="field" />
+            <span class="field-label">Categoría</span>
+            <select v-model="form.categoria" class="field">
+              <option value="" disabled>Elige una</option>
+              <option v-for="c in categorias[form.tipo]" :key="c" :value="c">{{ c }}</option>
+              <!-- Un registro viejo con otra categoría la conserva mientras no se cambie. -->
+              <option v-if="form.categoria && !categorias[form.tipo].includes(form.categoria)" :value="form.categoria">{{ form.categoria }}</option>
+            </select>
+            <span v-if="erroresForm.categoria" class="mt-1 block text-xs text-red-600">{{ erroresForm.categoria }}</span>
           </label>
           <label class="block">
             <span class="field-label">Forma de pago</span>
@@ -450,6 +614,22 @@ onMounted(() => {
               <option value="tarjeta">Tarjeta</option>
               <option value="otro">Otro</option>
             </select>
+          </label>
+        </div>
+
+        <!-- RF-M03-03/04, RN-M03-02: solo informativas, no llevan inventario. -->
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="block">
+            <span class="field-label">Cantidad (opcional)</span>
+            <input v-model.number="form.cantidad" type="number" min="0" step="any" class="field" />
+            <span v-if="erroresForm.cantidad" class="mt-1 block text-xs text-red-600">{{ erroresForm.cantidad }}</span>
+          </label>
+          <label class="block">
+            <span class="field-label">Unidad (opcional)</span>
+            <input v-model="form.unidad" type="text" list="unidades-compra" maxlength="50" class="field" placeholder="kilos, bolsas, cajas…" />
+            <datalist id="unidades-compra">
+              <option v-for="u in UNIDADES" :key="u" :value="u" />
+            </datalist>
           </label>
         </div>
 
@@ -465,9 +645,19 @@ onMounted(() => {
         </div>
 
         <label class="block">
-          <span class="field-label">URL del soporte (opcional)</span>
-          <input v-model="form.soporte_url" type="text" placeholder="https://…" class="field" />
-          <span class="mt-1 block text-xs text-gray-400">Foto o PDF de la factura/recibo (JPG, PNG o PDF) subido aparte — pega aquí el enlace.</span>
+          <span class="field-label">Observaciones (opcional)</span>
+          <textarea v-model="form.observaciones" rows="2" maxlength="1000" class="field" />
+        </label>
+
+        <!-- RF-M03-07, HU-M03-02: foto o PDF de la factura o el recibo. -->
+        <label class="block">
+          <span class="field-label">Soporte (opcional)</span>
+          <input type="file" accept="image/jpeg,image/png,application/pdf" class="field file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand-700" @change="elegirSoporte" />
+          <span class="mt-1 block text-xs text-gray-400">
+            JPG, PNG o PDF de hasta 5 MB.
+            <template v-if="editando?.tiene_soporte"> Ya tiene uno ({{ editando.soporte_nombre }}); si eliges otro, lo reemplaza y el anterior queda guardado.</template>
+          </span>
+          <span v-if="erroresForm.soporte" class="mt-1 block text-xs text-red-600">{{ erroresForm.soporte }}</span>
         </label>
 
         <p v-if="errorForm" class="alert-error">{{ errorForm }}</p>

@@ -118,6 +118,18 @@ permitía editar los valores, pero no había dónde hacerlo).
 ## 7. Compras y gastos (M03)
 - [ ] Registrar una compra y un gasto; editar uno activo (RF-M03-14).
 - [ ] Anular: nunca se borra y un anulado ya no se puede editar (RN-M03-04).
+- [ ] La categoría se elige de la lista según el tipo (Compra: Alimentos, Bebidas, Empaques,
+      Insumos, Otros; Gasto: Transporte, Limpieza, Servicios, Mantenimiento, Papelería, Otros);
+      sin categoría no deja guardar.
+- [ ] Anotar cantidad y unidad (por ejemplo "5 kilos") y observaciones; se ven en la lista.
+- [ ] Adjuntar una foto JPG, una PNG y un PDF; "Ver soporte" los abre. Un Word o un archivo de
+      más de 5 MB se rechaza con un mensaje claro (RF-M03-07, RNF-M03-06).
+- [ ] Copiar la dirección del soporte y abrirla en una ventana sin sesión: no se ve (RNF-M03-11).
+- [ ] Una fecha de compra futura se rechaza; una anterior a hoy sí se acepta.
+- [ ] Filtros: por fechas, categoría, forma de pago, proveedor y estado; los totales de arriba de
+      la lista cambian con el filtro y no cuentan los anulados (RF-M03-13).
+- [ ] Corregir el valor de un registro: la lista dice quién lo corrigió y la auditoría guarda el
+      valor anterior y el nuevo; anular muestra quién y cuándo (RF-M03-19).
 - [ ] Generar el cierre diario y revisar que los totales coinciden con lo registrado.
 - [ ] El cierre aparece en el historial.
 

@@ -348,6 +348,18 @@ export interface CompraGasto {
   estado: 'activo' | 'anulado'
   anulado_motivo: string | null
   registrado_por_usuario?: Usuario
+  // Fase 2, tarea 4 (RF-M03-03/04/07/19): datos informativos, soporte privado y trazabilidad.
+  cantidad?: number | null
+  unidad?: string | null
+  observaciones?: string | null
+  tiene_soporte?: boolean
+  soporte_nombre?: string | null
+  soporte_mime?: string | null
+  created_at?: string
+  editado_at?: string | null
+  editado_por_usuario?: Pick<Usuario, 'id' | 'nombre'> | null
+  anulado_at?: string | null
+  anulado_por_usuario?: Pick<Usuario, 'id' | 'nombre'> | null
 }
 
 // Espeja app/Models/CierreDiario.php (M03) — la "foto" contable del día (RN-M03-09/10),

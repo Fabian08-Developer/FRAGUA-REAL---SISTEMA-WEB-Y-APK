@@ -31,4 +31,14 @@ return [
     // se crucen. M05 no fija este valor (el plan lo deja para "ventana de reserva configurable",
     // Fase 4); mientras tanto es un supuesto de trabajo de 2 horas.
     'duracion_reserva_minutos' => (int) env('FRAGUA_REAL_DURACION_RESERVA_MINUTOS', 120),
+
+    // Fase 2, tarea 4 — M03, sección 9 ("Tipos y categorías"): categorías V1 de compras y gastos,
+    // simples y con "Otros". Viven aquí para poder ampliarlas sin rediseñar nada (RNF-M03-12).
+    'categorias_compras_gastos' => [
+        'compra' => ['Alimentos', 'Bebidas', 'Empaques', 'Insumos', 'Otros'],
+        'gasto' => ['Transporte', 'Limpieza', 'Servicios', 'Mantenimiento', 'Papelería', 'Otros'],
+    ],
+
+    // RF-M03-07, RNF-M03-06: soporte de una compra o gasto — tamaño máximo en KB.
+    'soporte_max_kb' => (int) env('FRAGUA_REAL_SOPORTE_MAX_KB', 5120),
 ];
