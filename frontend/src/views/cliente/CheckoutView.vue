@@ -1,0 +1,461 @@
+<script setup lang="ts">
+// M02/M07 — Domicilio o Recogida (canal Local se arma desde el QR de mesa, no
+// desde este Checkout web, ver ADR-001 y StorePedidoRequest). El Cliente con sesión
+// y el invitado pueden pagar en línea (Nequi/Bancolombia, RF-M06-005): el Cliente por
+// su sesión y el invitado con el token del pedido. Quien prefiera efectivo o tarjeta
+// paga contra entrega o al recoger — el Mesero lo cobra después (RF-M06-003/004).
+//
+// CORREGIDO (Fase 0, tarea 4, 09/10/2026): el pedido se crea UNA vez. Si el pago en
+// línea falla, el Cliente reintenta solo el pago sobre el mismo pedido (RF-M06-008);
+// antes reintentar volvía a crear el pedido completo.
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { Banknote, Bike, CheckCircle2, MapPin, ShoppingBag, Smartphone } from 'lucide-vue-next'
+import BaseButton from '@/components/common/BaseButton.vue'
+import BaseInput from '@/components/common/BaseInput.vue'
+import { useAuthStore } from '@/stores/auth'
+import { useCarritoStore } from '@/stores/carrito'
+import { useCotizacion } from '@/composables/useCotizacion'
+import { configuracionService } from '@/services/configuracion.service'
+import { pedidoService } from '@/services/pedido.service'
+import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
+import type { Pedido, TipoPedido } from '@/types/models'
+
+const router = useRouter()
+const auth = useAuthStore()
+const carrito = useCarritoStore()
+
+// CORREGIDO (30/09/2026): esta vista usaba "auth.estaAutenticado" (cualquier sesión)
+// para decidir si pedir datos de invitado y habilitar pago en línea — pero el backend
+// (StorePedidoRequest::prepareForValidation, PedidoPolicy::pagarEnLinea) solo trata al
+// usuario como Cliente cuando esCliente() es true. Si un Mesero/Administrador entra a
+// este Checkout con su propia sesión activa (mismo navegador), quedaba "autenticado"
+// pero sin cliente_id ni campos de invitado — el backend rechazaba el pedido con 422 y,
+// como la sección de invitado estaba oculta, ese error nunca tenía dónde mostrarse (el
+// botón "Confirmar pedido" no hacía nada visible). esCliente evita ambos problemas.
+const esCliente = computed(() => auth.rol === 'cliente')
+
+if (carrito.lineas.length === 0) {
+  router.replace({ name: 'menu' })
+}
+
+const tipo = ref<Extract<TipoPedido, 'domicilio' | 'recogida'>>('domicilio')
+const metodoPago = ref<'en_linea' | 'contra_entrega'>('contra_entrega')
+const pasarela = ref<'nequi' | 'bancolombia'>('nequi')
+
+// RN-M07-01, RF-M07-003 a 007 y 010 (Fase 1, tarea 2): nombre, teléfono, dirección, barrio y
+// referencia son obligatorios en un domicilio; el Cliente con cuenta confirma su teléfono para
+// este pedido (viene de su perfil si lo tiene).
+const form = reactive({
+  direccion_entrega: '',
+  barrio: '',
+  referencia: '',
+  observaciones_entrega: '',
+  nombre_invitado: '',
+  telefono_invitado: '',
+  telefono_contacto: auth.usuario?.telefono ?? '',
+})
+
+// Al recargar la página el perfil llega después de montar la vista: se completa al llegar.
+watch(
+  () => auth.usuario?.telefono,
+  (telefono) => {
+    if (telefono && !form.telefono_contacto) form.telefono_contacto = telefono
+  },
+)
+
+const valorDomicilio = ref(2000)
+const enviando = ref(false)
+const errores = ref<Record<string, string>>({})
+const errorGeneral = ref('')
+const pedidoCreado = ref<Pedido | null>(null)
+const pagoRegistrado = ref(false)
+const errorPago = ref('')
+const pagando = ref(false)
+
+onMounted(async () => {
+  try {
+    const { data } = await configuracionService.obtener()
+    valorDomicilio.value = data.valor_domicilio
+  } catch {
+    // Si falla, se queda con el valor por defecto — el backend fija el real de todas formas.
+  }
+})
+
+function formatoPrecio(valor: number) {
+  return Number(valor).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+}
+
+const subtotal = computed(() => carrito.total)
+const enlaceSeguimiento = computed(() =>
+  pedidoCreado.value?.token_publico ? `${window.location.origin}/seguimiento/${pedidoCreado.value.token_publico}` : '',
+)
+const costoDomicilio = computed(() => (tipo.value === 'domicilio' ? valorDomicilio.value : 0))
+// Fase 2, tarea 1 (RF-M04-035): el backend dice cuánto rebajan las promociones vigentes.
+const { cotizacion } = useCotizacion(() => tipo.value, () => carrito.aLineasPedido())
+const promociones = computed(() => cotizacion.value?.promociones ?? [])
+const descuento = computed(() => cotizacion.value?.descuento ?? 0)
+const totalEstimado = computed(() => subtotal.value - descuento.value + costoDomicilio.value)
+
+async function confirmarPedido() {
+  errores.value = {}
+  errorGeneral.value = ''
+  enviando.value = true
+
+  try {
+    const payload = {
+      tipo: tipo.value,
+      origen: 'cliente_web' as const,
+      lineas: carrito.aLineasPedido(),
+      ...(tipo.value === 'domicilio'
+        ? {
+            direccion_entrega: form.direccion_entrega,
+            barrio: form.barrio,
+            referencia: form.referencia,
+          }
+        : {}),
+      observaciones_entrega: form.observaciones_entrega.trim() || undefined,
+      // RF-M07-013/015: el pedido guarda cómo vas a pagar, aunque el pago llegue después.
+      metodo_pago_preferido: metodoPago.value,
+      pasarela_preferida: metodoPago.value === 'en_linea' ? pasarela.value : undefined,
+      ...(!esCliente.value
+        ? {
+            cliente_invitado_nombre: form.nombre_invitado,
+            cliente_invitado_telefono: form.telefono_invitado,
+          }
+        : { telefono_contacto: form.telefono_contacto.trim() || undefined }),
+    }
+
+    const { data: pedido } = await pedidoService.crear(payload)
+
+    // El pedido ya existe: el carrito se vacía aunque el pago en línea falle, para que
+    // un segundo clic no cree otro pedido.
+    carrito.vaciar()
+    pedidoCreado.value = pedido
+
+    if (metodoPago.value === 'en_linea') {
+      await pagarEnLinea()
+    }
+  } catch (error) {
+    const camposInvalidos = erroresDeValidacion(error)
+    if (Object.keys(camposInvalidos).length) {
+      errores.value = camposInvalidos
+    } else {
+      errorGeneral.value = mensajeDeError(error, 'No pudimos confirmar tu pedido. Intenta de nuevo.')
+    }
+  } finally {
+    enviando.value = false
+  }
+}
+
+// RF-M06-005/008: registra el pago en línea del pedido ya creado. Si falla, el pedido sigue
+// pendiente y el botón "Reintentar pago" vuelve a llamar solo a esta función.
+async function pagarEnLinea() {
+  const pedido = pedidoCreado.value
+  if (!pedido) return
+  pagando.value = true
+  errorPago.value = ''
+  try {
+    const datosPago = { pasarela: pasarela.value, monto: Number(pedido.total) }
+    if (esCliente.value) {
+      await pedidoService.pagarEnLinea(pedido.id, datosPago)
+    } else if (pedido.token_publico) {
+      await pedidoService.pagarEnLineaConToken(pedido.token_publico, datosPago)
+    } else {
+      throw new Error('sin token')
+    }
+    pagoRegistrado.value = true
+  } catch (error) {
+    errorPago.value = mensajeDeError(error, 'No pudimos registrar tu pago en línea.')
+  } finally {
+    pagando.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+    <!-- Confirmación -->
+    <div v-if="pedidoCreado" class="mx-auto max-w-lg rounded-2xl border border-[#e2dbcf] bg-white p-8 text-center">
+      <CheckCircle2 :size="48" class="mx-auto text-brand-600" />
+      <h1 class="mt-4 font-display text-2xl text-ink">¡Tu pedido quedó registrado!</h1>
+      <p class="mt-2 text-sm text-[#6c655c]">
+        Pedido #{{ pedidoCreado.id }} · {{ pedidoCreado.tipo === 'domicilio' ? 'Domicilio' : 'Recogida en el local' }}
+        · {{ formatoPrecio(pedidoCreado.total) }}
+      </p>
+      <p class="mt-4 text-sm text-[#6c655c]">
+        <template v-if="metodoPago === 'en_linea' && pagoRegistrado">
+          Ya registramos tu pago. En breve lo verificamos, confirmamos tu pedido y empezamos a prepararlo.
+        </template>
+        <template v-else-if="metodoPago === 'en_linea'">
+          Tu pedido quedó guardado, pero el pago en línea no se pudo registrar. Puedes intentarlo de nuevo
+          o pagar {{ pedidoCreado.tipo === 'domicilio' ? 'contra entrega' : 'al recoger' }} sin hacer nada más.
+        </template>
+        <template v-else>
+          Pagas {{ pedidoCreado.tipo === 'domicilio' ? 'contra entrega' : 'al recoger' }}. Te avisamos cuando esté
+          listo.
+        </template>
+      </p>
+      <!-- Fase 1 (RF-M07-027): el invitado sigue su pedido con este enlace privado. -->
+      <div v-if="!esCliente && pedidoCreado.token_publico" class="mt-5 rounded-xl bg-[#fbfaf7] px-4 py-3 text-left text-sm">
+        <p class="font-medium text-ink">Sigue tu pedido aquí</p>
+        <router-link
+          :to="{ name: 'seguimiento-pedido', params: { token: pedidoCreado.token_publico } }"
+          class="mt-1 block break-all text-brand-700 underline"
+        >
+          {{ enlaceSeguimiento }}
+        </router-link>
+        <p class="mt-1 text-xs text-[#6c655c]">Guárdalo: sin cuenta, es la única forma de ver el estado o cancelarlo mientras esté pendiente.</p>
+      </div>
+      <!-- Reintentar solo el pago, sobre el mismo pedido (RF-M06-008). -->
+      <div v-if="metodoPago === 'en_linea' && !pagoRegistrado" class="mt-6 space-y-3 text-left">
+        <p v-if="errorPago" class="alert-error">{{ errorPago }}</p>
+        <div class="flex justify-center gap-4">
+          <label class="flex items-center gap-2 text-sm text-ink">
+            <input v-model="pasarela" type="radio" value="nequi" />
+            Nequi
+          </label>
+          <label class="flex items-center gap-2 text-sm text-ink">
+            <input v-model="pasarela" type="radio" value="bancolombia" />
+            Bancolombia
+          </label>
+        </div>
+        <div class="flex justify-center">
+          <BaseButton variant="primary" :disabled="pagando" @click="pagarEnLinea">
+            {{ pagando ? 'Registrando pago…' : 'Reintentar pago' }}
+          </BaseButton>
+        </div>
+      </div>
+
+      <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+        <router-link
+          v-if="esCliente"
+          :to="{ name: 'cliente-pedidos' }"
+          class="inline-flex items-center justify-center rounded-xl bg-brand-500 px-6 py-3 text-sm font-medium text-ink shadow-[0_8px_20px_rgba(214,164,58,0.35)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-brand-400"
+        >
+          Ver mis pedidos
+        </router-link>
+        <router-link
+          :to="{ name: 'home' }"
+          class="inline-flex items-center justify-center rounded-xl border border-[#e3ded4] px-6 py-3 text-sm font-medium text-ink transition hover:bg-[#fbfaf7]"
+        >
+          Volver al inicio
+        </router-link>
+      </div>
+    </div>
+
+    <!-- Formulario -->
+    <template v-else>
+      <div class="mb-8 flex items-center gap-3">
+        <span class="h-0.5 w-6 bg-brand-500" aria-hidden="true" />
+        <span class="text-[11px] font-medium tracking-[2px] text-brand-700">ÚLTIMO PASO</span>
+      </div>
+      <h1 class="font-display text-4xl font-medium tracking-tight text-ink">Confirmar pedido</h1>
+
+      <form class="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]" @submit.prevent="confirmarPedido">
+        <div class="space-y-8">
+          <!-- Tipo de entrega -->
+          <section>
+            <h2 class="font-display text-lg text-ink">¿Cómo lo quieres?</h2>
+            <div class="mt-3 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                class="flex flex-col items-center gap-2 rounded-2xl border p-4 text-sm transition"
+                :class="
+                  tipo === 'domicilio'
+                    ? 'border-brand-500 bg-brand-500/10 text-ink'
+                    : 'border-[#e3ded4] text-[#6c655c] hover:border-brand-300'
+                "
+                @click="tipo = 'domicilio'"
+              >
+                <Bike :size="22" />
+                Domicilio
+              </button>
+              <button
+                type="button"
+                class="flex flex-col items-center gap-2 rounded-2xl border p-4 text-sm transition"
+                :class="
+                  tipo === 'recogida'
+                    ? 'border-brand-500 bg-brand-500/10 text-ink'
+                    : 'border-[#e3ded4] text-[#6c655c] hover:border-brand-300'
+                "
+                @click="tipo = 'recogida'"
+              >
+                <ShoppingBag :size="22" />
+                Recogida en el local
+              </button>
+            </div>
+          </section>
+
+          <!-- Dirección (solo domicilio) -->
+          <section v-if="tipo === 'domicilio'" class="space-y-4">
+            <h2 class="font-display text-lg text-ink">Dirección de entrega</h2>
+            <BaseInput
+              v-model="form.direccion_entrega"
+              label="Dirección"
+              placeholder="Calle, carrera, número"
+              :icon="MapPin"
+              :error="errores.direccion_entrega"
+            />
+            <div class="grid gap-4 sm:grid-cols-2">
+              <BaseInput v-model="form.barrio" label="Barrio" placeholder="Tu barrio" :error="errores.barrio" />
+              <BaseInput
+                v-model="form.referencia"
+                label="Punto de referencia"
+                placeholder="Ej. casa azul frente al parque"
+                :error="errores.referencia"
+              />
+            </div>
+          </section>
+
+          <!-- Teléfono del Cliente con cuenta (el invitado lo deja en sus datos de contacto) -->
+          <section v-if="esCliente" class="space-y-4">
+            <h2 class="font-display text-lg text-ink">Teléfono de contacto</h2>
+            <BaseInput
+              v-model="form.telefono_contacto"
+              label="Teléfono"
+              type="tel"
+              placeholder="Para avisarte sobre tu pedido"
+              :error="errores.telefono_contacto"
+            />
+          </section>
+
+          <!-- Datos de contacto (solo invitado) -->
+          <section v-if="!esCliente" class="space-y-4">
+            <h2 class="font-display text-lg text-ink">Tus datos de contacto</h2>
+            <p class="text-xs text-[#6c655c]">
+              Pides como invitado.
+              <router-link :to="{ name: 'login', query: { redirect: '/checkout' } }" class="text-brand-700 underline"
+                >Inicia sesión</router-link
+              >
+              si prefieres guardar tu historial de pedidos.
+            </p>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <BaseInput v-model="form.nombre_invitado" label="Nombre" placeholder="Tu nombre" :error="errores.cliente_invitado_nombre" />
+              <BaseInput
+                v-model="form.telefono_invitado"
+                label="Teléfono"
+                type="tel"
+                placeholder="Tu número de contacto"
+                :error="errores.cliente_invitado_telefono"
+              />
+            </div>
+          </section>
+
+          <!-- RF-M07-010: observaciones para quien entrega o atiende -->
+          <section class="space-y-2">
+            <label for="observaciones-entrega" class="font-display text-lg text-ink">
+              {{ tipo === 'domicilio' ? 'Indicaciones para la entrega' : 'Indicaciones para la recogida' }}
+              <span class="text-xs font-sans text-[#6c655c]">(opcional)</span>
+            </label>
+            <textarea
+              id="observaciones-entrega"
+              v-model="form.observaciones_entrega"
+              rows="2"
+              maxlength="500"
+              class="field"
+              :placeholder="tipo === 'domicilio' ? 'Ej. apartamento 302, timbre dañado, llamar al llegar' : 'Ej. paso a las 7:30 p. m.'"
+            />
+            <p v-if="errores.observaciones_entrega" class="text-xs text-red-600">{{ errores.observaciones_entrega }}</p>
+          </section>
+
+          <!-- Método de pago -->
+          <section class="space-y-3">
+            <h2 class="font-display text-lg text-ink">¿Cómo vas a pagar?</h2>
+
+            <label
+              class="flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition"
+              :class="
+                metodoPago === 'contra_entrega'
+                  ? 'border-brand-500 bg-brand-500/10'
+                  : 'border-[#e3ded4] hover:border-brand-300'
+              "
+            >
+              <input v-model="metodoPago" type="radio" value="contra_entrega" class="mt-1" />
+              <span>
+                <span class="flex items-center gap-2 text-sm font-medium text-ink">
+                  <Banknote :size="16" />
+                  {{ tipo === 'domicilio' ? 'Pago contra entrega' : 'Pago al recoger' }}
+                </span>
+                <span class="mt-0.5 block text-xs text-[#6c655c]">
+                  Efectivo, tarjeta o transferencia — lo recibe quien te {{ tipo === 'domicilio' ? 'entrega' : 'atiende' }}.
+                </span>
+              </span>
+            </label>
+
+            <label
+              class="flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition"
+              :class="[
+                metodoPago === 'en_linea'
+                  ? 'border-brand-500 bg-brand-500/10'
+                  : 'border-[#e3ded4] hover:border-brand-300',
+              ]"
+            >
+              <input
+                v-model="metodoPago"
+                type="radio"
+                value="en_linea"
+                class="mt-1"
+              />
+              <span>
+                <span class="flex items-center gap-2 text-sm font-medium text-ink">
+                  <Smartphone :size="16" />
+                  Pago en línea (Nequi o Bancolombia)
+                </span>
+                <span class="mt-0.5 block text-xs text-[#6c655c]">
+                  Pagas ahora mismo, en línea. Confirmamos tu pedido cuando verifiquemos el pago.
+                </span>
+              </span>
+            </label>
+
+            <div v-if="metodoPago === 'en_linea'" class="flex gap-3 pl-8">
+              <label class="flex items-center gap-2 text-sm text-ink">
+                <input v-model="pasarela" type="radio" value="nequi" />
+                Nequi
+              </label>
+              <label class="flex items-center gap-2 text-sm text-ink">
+                <input v-model="pasarela" type="radio" value="bancolombia" />
+                Bancolombia
+              </label>
+            </div>
+          </section>
+
+          <p v-if="errorGeneral" class="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorGeneral }}</p>
+        </div>
+
+        <!-- Resumen -->
+        <aside class="h-fit rounded-2xl border border-[#e2dbcf] bg-white p-5">
+          <h2 class="font-display text-lg text-ink">Resumen</h2>
+          <ul class="mt-4 space-y-2 text-sm">
+            <li v-for="linea in carrito.lineas" :key="linea.id" class="flex justify-between gap-3 text-[#6c655c]">
+              <span>{{ linea.cantidad }}× {{ linea.producto.nombre }}</span>
+              <span class="shrink-0 text-ink">{{ formatoPrecio(carrito.precioUnitario(linea) * linea.cantidad) }}</span>
+            </li>
+          </ul>
+          <div class="mt-4 space-y-1.5 border-t border-[#e2dbcf] pt-4 text-sm">
+            <div class="flex justify-between text-[#6c655c]">
+              <span>Subtotal</span>
+              <span>{{ formatoPrecio(subtotal) }}</span>
+            </div>
+            <div v-for="(p, i) in promociones" :key="i" class="flex justify-between gap-3 text-emerald-700">
+              <span>{{ p.nombre }}</span>
+              <span class="shrink-0">−{{ formatoPrecio(p.monto) }}</span>
+            </div>
+            <div v-if="tipo === 'domicilio'" class="flex justify-between text-[#6c655c]">
+              <span>Domicilio</span>
+              <span>{{ formatoPrecio(costoDomicilio) }}</span>
+            </div>
+            <div class="flex justify-between pt-1 font-display text-lg text-ink">
+              <span>Total</span>
+              <span>{{ formatoPrecio(totalEstimado) }}</span>
+            </div>
+          </div>
+
+          <BaseButton type="submit" :disabled="enviando" class="mt-5 w-full">
+            {{ enviando ? 'Confirmando…' : 'Confirmar pedido' }}
+          </BaseButton>
+        </aside>
+      </form>
+    </template>
+  </div>
+</template>

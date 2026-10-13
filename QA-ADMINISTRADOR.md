@@ -1,0 +1,182 @@
+# QA del Administrador — lista de pruebas por pantalla
+
+Cierra el hueco que `README-ENTREGA.md` reconoce: las pantallas del Administrador se probaron
+de forma puntual, no en una pasada completa. Marca cada casilla al probarla y anota la fecha.
+Antes de empezar: backend y frontend corriendo, base de datos con `php artisan migrate --seed`
+y sesión iniciada como `admin@fraguareal.com`. Para los puntos que cruzan roles, ten abierta
+otra ventana con el Mesero.
+
+Cada punto cita el requisito oficial en el que se apoya.
+
+## 0. Configuración (RF-M07-030, RF-M05-028)
+
+La pantalla Administrador > Configuración se construyó el 06/10/2026 (antes el backend ya
+permitía editar los valores, pero no había dónde hacerlo).
+
+- [ ] Se abre desde el menú ("Configuración") y muestra $2.000 de domicilio y $20.000 de depósito en una base recién sembrada.
+- [ ] Cambiar el domicilio y guardar: un domicilio nuevo en Checkout cobra el valor nuevo; uno ya creado conserva el anterior.
+- [ ] Cambiar el depósito y guardar: Reservar mesa pide el valor nuevo; una reserva ya creada conserva el anterior.
+- [ ] Valor vacío o con letras: error bajo el campo, sin llamar al servidor.
+- [ ] "Guardar cambios" queda desactivado mientras no haya cambios.
+- [ ] Un Mesero no puede abrir `/admin/configuracion` ni llamar `PUT /configuraciones` (403).
+
+## 1. Dashboard
+- [ ] Muestra ventas del día, pedidos activos por canal y mesas ocupadas.
+- [ ] Con un pedido finalizado hoy, las ventas coinciden con Reportes > Ventas totales del mismo día (RNF-M08-002).
+- [ ] Con la base vacía no falla (ceros, no errores).
+
+## 2. Usuarios (M01)
+- [ ] Listar con búsqueda por nombre/correo y filtro por rol.
+- [ ] Crear Mesero y Administrador (RF-M01-001); correo repetido → mensaje claro.
+- [ ] Desactivar una cuenta: esa persona ya no puede iniciar sesión.
+- [ ] Activar de nuevo: vuelve a entrar.
+- [ ] Revocar sesiones: el token abierto en otra ventana deja de funcionar (RF-M01-010/023).
+- [ ] Un Mesero no puede abrir `/admin` ni llamar `/usuarios` (403).
+
+## 3. Catálogo (M04)
+- [ ] Crear, editar y desactivar categoría y producto.
+- [ ] Variantes: crear con precio propio; el Cliente la ve en el menú.
+- [ ] Extras: uno general y uno específico de producto (RN-M04-05).
+- [ ] Un extra general sin productos elegidos aparece en el Menú, el QR y "Nuevo pedido" del
+      Mesero con cualquier producto; al marcarlo en "Extras generales que ofrece" de un producto,
+      solo aparece con ese producto (RF-M04-010/011).
+- [ ] Dar de baja un producto que está en un combo: aparece el aviso del combo desactivado y el
+      combo ya no se ofrece; activarlo de nuevo con ese producto se rechaza; reemplazándolo, sí (RN-M04-12).
+- [ ] Desactivar una categoría: sus productos y los combos que los usan desaparecen del Menú y del
+      QR; al reactivarla vuelven (RF-M04-003).
+- [ ] Precio en cero o un nombre de producto o categoría repetido: mensaje claro bajo el campo.
+- [ ] Cambiar el precio de un producto queda en la auditoría con el valor anterior y el nuevo (RF-M04-022).
+- [ ] Combos: crear con vigencia; se oculta si un componente está agotado (RN-M04-11).
+- [ ] Promociones: crear, editar y desactivar; cada cambio queda en la auditoría (RF-M04-039/040).
+- [ ] Promoción automática de un producto con 20 %: el menú la marca "−20 %" con el precio tachado,
+      y un pedido nuevo de ese producto sale con el descuento (RF-M04-035).
+- [ ] Una promoción de almuerzo (12:00 a 15:00) no se aplica a las 9:00 a. m. y sí a la 1:00 p. m.
+      (hora de Colombia); una de "jueves" solo los jueves.
+- [ ] Dos promociones vigentes a la vez (una de producto y una al total) se suman en el mismo
+      pedido; el domicilio no se rebaja (RF-M04-038, RN-M04-20).
+- [ ] Una promoción de tipo "Manual" no se aplica sola: aparece en el botón "Descuento" del pedido.
+- [ ] Alternar agotado/disponible y verlo reflejado de inmediato en el menú del Cliente (RF-M04-016/017).
+- [ ] Tipo de venta Bebida/Alimento/Otro queda guardado y aparece en Reportes.
+- [ ] Catálogo > "Agotados y disponibilidad": buscar por nombre, filtrar por categoría y "Solo
+      agotados"; agotar un tamaño (variante): el Cliente ya no lo ve y un pedido con él se rechaza
+      (RF-M04-016/018/025). Volver a disponible lo devuelve al menú (RF-M04-017).
+- [ ] Con el Mesero: la pestaña Menú hace lo mismo; cada cambio aparece en la auditoría.
+
+## 4. Mesas (M05)
+- [ ] Crear mesa: queda Libre con su QR; nombre repetido → error (CA-M05-001).
+- [ ] "Cambiar nombre": el QR sigue siendo el mismo; un nombre de otra mesa se rechaza (RF-M05-002).
+- [ ] Desactivar (con historial no se borra) y reactivar; todo queda en la auditoría (RF-M05-021).
+- [ ] Regenerar QR: el anterior deja de funcionar (CA-M05-004).
+- [ ] Liberar mesa con pedidos activos: bloqueado.
+- [ ] Liberación forzada: exige motivo y deja registro en auditoría (RF-M05-011). Probar también con el Mesero, que tiene el botón "Forzar liberación…" en Mesero > Mesas (decidido el 06/10).
+
+## 5. Reservas (M05)
+- [ ] Listado con filtro por estado.
+- [ ] Reserva web nueva queda en pendiente de pago hasta confirmar el depósito (RN-M05-15).
+- [ ] Confirmar y rechazar un depósito en línea; el rechazo permite reintentar.
+- [ ] Registrar depósito manual en una reserva por teléfono (RN-M05-16).
+- [ ] Cancelar antes de la hora: el depósito queda reembolsado (RN-M05-17).
+- [ ] Marcar no-show: el depósito se retiene y aparece en "depósitos retenidos" (RN-M05-18, HU-M05-015).
+- [ ] Confirmar llegada (cliente llegó): la mesa pasa a Ocupada; al tomar el primer pedido, la
+      cuenta de la mesa ya descuenta el depósito ("Incluye $20.000 del depósito de la reserva")
+      y Reservas dice "abonado $20.000 a la cuenta" (RF-M05-034, RN-M05-19).
+- [ ] Sin pulsar "Confirmar llegada": el primer pedido en la mesa reservada completa la reserva y
+      abona el depósito.
+- [ ] Un pedido de $10.000 con un depósito de $20.000: se abonan $10.000 y Reservas dice que
+      quedan $10.000; el pedido siguiente de esa mesa recibe el resto.
+- [ ] Bajar la cantidad de un pedido cubierto por el depósito: el abono baja solo y el historial
+      del pedido muestra el ajuste; cancelar ese pedido pasa su abono a otro pedido de la mesa.
+- [ ] Registrar un depósito presencial con la caja cerrada: rechazado con un mensaje claro.
+- [ ] "Nueva reserva": al elegir fecha y hora, el selector solo muestra mesas libres a esa hora;
+      la reserva queda "Registrada por" tu nombre y se abre el depósito manual (RF-M05-013).
+- [ ] Otra reserva de la misma mesa una hora después: rechazada; dos horas y media después: aceptada.
+- [ ] El depósito manual solo ofrece efectivo, tarjeta y transferencia (RN-M05-16).
+- [ ] Con el Mesero: la pestaña Reservas hace lo mismo, sin el botón "Depósitos retenidos" (RF-M05-035).
+
+## 6. Caja (M06)
+- [ ] Abrir turno (un solo turno por día, RN-M06-03); intentar abrir otro → rechazado.
+- [ ] Sin turno abierto, la pantalla dice "sin turno" y el Mesero no puede cobrar (bug del 01/10).
+- [ ] Un depósito de reserva en efectivo sube el efectivo esperado del día; el detalle del turno
+      lo lista en "Depósitos de reserva". Cancelar esa reserva (devolver el depósito) lo resta.
+- [ ] El día de la visita, el abono del depósito no vuelve a sumar al esperado: solo suma lo que
+      el Mesero cobra encima (RN-M06-08).
+- [ ] Con turno abierto, el Mesero cobra efectivo, tarjeta, transferencia y pago mixto.
+- [ ] El Administrador **no** puede registrar un cobro (RF-M06-003/004).
+- [ ] Anular un pago con motivo; el pedido recupera su saldo (RF-M06-017).
+- [ ] Registrar un reembolso (no anulación) y ver la marca "Reembolsado" (RF-M06-017).
+- [ ] Registrar un gasto en efectivo: el efectivo esperado del turno baja en ese valor (RF-M06-013).
+- [ ] Cerrar turno: cifras de efectivo y ventas por método cuadran con los cobros hechos.
+- [ ] Con el turno ya cerrado, anular un pago pide tu contraseña y aparece en "Ajustes
+      extraordinarios"; el esperado y la diferencia del turno no cambian (RF-M06-019).
+- [ ] Un pago en línea del día aparece en "Pagos en línea del día" del detalle del turno y se puede anular.
+- [ ] Con el Mesero: dos pedidos en la misma mesa; Mesas muestra la suma y "Ver cuenta" lista ambos
+      (RF-M02-L-019/020). En Cobrar, "Cobrar mesa" con una parte en efectivo y el resto con tarjeta
+      deja tres pagos y la mesa libre; el turno suma el efectivo correcto.
+- [ ] La cuenta de una mesa liberada y vuelta a ocupar no trae los pedidos del cliente anterior.
+- [ ] Historial de turnos incluye el turno cerrado.
+
+## 7. Compras y gastos (M03)
+- [ ] Registrar una compra y un gasto; editar uno activo (RF-M03-14).
+- [ ] Anular: nunca se borra y un anulado ya no se puede editar (RN-M03-04).
+- [ ] Generar el cierre diario y revisar que los totales coinciden con lo registrado.
+- [ ] El cierre aparece en el historial.
+
+## 8. Reportes (M08)
+- [ ] Los 6 reportes cargan con la semana actual por defecto (RN-M08-03).
+- [ ] Cambiar a mes y a rango personalizado.
+- [ ] Comparación contra el periodo anterior equivalente (RF-M08-010).
+- [ ] Periodo en curso aparece marcado como parcial (RN-M08-05).
+- [ ] Resultado operativo = ventas − compras − gastos (RN-M08-06), con y sin cierre diario del día.
+- [ ] Exportar a Excel (CSV) y PDF; la exportación queda en auditoría (RF-M08-011/012/014).
+- [ ] Un Mesero no puede abrir Reportes (403).
+
+## 9. Pedidos (supervisión)
+- [ ] Filtros por estado y canal; paginación con más de 20 pedidos.
+- [ ] Confirmar, marcar preparando y cancelar con motivo (el Administrador cancela también lo confirmado).
+- [ ] Con el Mesero: cancelar un pedido confirmado pide la contraseña de un Administrador; con una
+      clave equivocada no se cancela (RN-M07-05).
+- [ ] No hay botón de cobrar.
+- [ ] El Administrador no ve "Confirmar entrega", "Confirmar recogida" ni "Finalizar pedido"
+      (son del Mesero, RF-M07-025, RF-M02-T-016).
+- [ ] Editar un pedido PENDIENTE: agregar un producto, cambiar una cantidad y quitar una línea;
+      el total se recalcula en cada paso (RN-PED-07, RF-M02-L-004/005).
+- [ ] Editar un pedido CONFIRMADO con una línea marcada como preparada: esa línea no se puede
+      cambiar ni quitar; las demás sí (RN-PED-08, RN-PED-10).
+- [ ] Un pedido en PREPARANDO, FINALIZADO o CANCELADO no muestra "Editar pedido".
+- [ ] Quitar la única línea de un pedido: el sistema pide cancelarlo con motivo.
+- [ ] Bajar la cantidad de un pedido ya pagado por debajo de lo pagado: rechazado con un mensaje claro.
+- [ ] "Ver historial" muestra creación, confirmación, cada cambio con quién y la hora, y los pagos (HU-M02-020).
+- [ ] Un domicilio muestra nombre, teléfono, dirección, barrio, referencia e indicaciones; una
+      recogida, nombre y teléfono (RF-M07-003 a 007, RF-M07-010).
+- [ ] Un pedido web pagado en línea muestra "Paga: En línea (Nequi)" o "(Bancolombia)"; uno
+      contra entrega o por teléfono, "Contra entrega" o "Al recoger" (RF-M07-013/015).
+- [ ] Con el Mesero: "Nuevo pedido" → Domicilio, sin barrio o sin referencia no deja continuar;
+      con los datos completos crea el pedido con el valor de domicilio vigente (RF-M07-001).
+- [ ] Con el Mesero: "Nuevo pedido" → Recogida crea el pedido sin costo de domicilio (RF-M07-R-001).
+- [ ] "Descuento" en un pedido activo: 10 % con motivo; el total baja y aparece "Descuento manual
+      10 %" con el motivo y quién lo aplicó (RF-M04-036, HU-M04-015).
+- [ ] Sin motivo, con 0, con un valor negativo o con 120 % no deja aplicar (RN-M04-22/23).
+- [ ] En un pedido con promociones automáticas, el descuento manual las reemplaza (no se suman);
+      "Quitar descuento" las devuelve (RF-M04-037, RN-M04-21).
+- [ ] Un descuento que dejaría el total por debajo de lo ya pagado se rechaza con un mensaje claro.
+- [ ] El descuento aparece en "Ver historial" y en la auditoría con usuario, motivo y monto (RF-M04-039).
+- [ ] Con el Mesero: el mismo botón "Descuento" funciona igual; "Nuevo pedido" muestra las
+      promociones vigentes y el total con descuento antes de crear el pedido.
+- [ ] Reportes > Ventas por producto: un pedido con descuento suma lo cobrado, no el precio lleno.
+- [ ] Reportes > Ventas por tipo y método: el abono de un depósito sale como "Depósito de reserva".
+
+## 9b. Invitado (sin cuenta)
+- [ ] Pedir una recogida sin iniciar sesión: el Checkout muestra el enlace de seguimiento.
+- [ ] El enlace muestra el pedido "Recibido"; al confirmarlo el Mesero, en máximo 30 segundos pasa a
+      "Confirmado" sin recargar (RF-M07-027).
+- [ ] Desde el enlace: pagar en línea queda "en revisión"; cancelar solo aparece mientras esté pendiente.
+- [ ] Un enlace inventado muestra "No encontramos ese pedido".
+- [ ] Con una promoción vigente, el carrito y el Checkout muestran la rebaja y el mismo total que
+      tendrá el pedido; el seguimiento muestra la promoción aplicada.
+
+## 10. Transversal
+- [ ] Cerrar sesión y volver a entrar; el token anterior ya no sirve.
+- [ ] Desactivar un Mesero con sesión abierta: en su siguiente acción la app lo saca (RF-M01-023).
+- [ ] Usuarios: cada desactivación queda registrada en auditoría (se consulta en la Fase 3).
+- [ ] Cada pantalla en teléfono (ancho ~390 px): sin scroll horizontal ni botones cortados.
+- [ ] Errores del servidor (422/500) muestran un mensaje legible, no una pantalla en blanco.

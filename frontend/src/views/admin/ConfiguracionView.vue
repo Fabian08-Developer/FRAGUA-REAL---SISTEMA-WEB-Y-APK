@@ -1,0 +1,175 @@
+<script setup lang="ts">
+// M05/M07 — Administrador > Configuración: valor fijo de domicilio (RF-M07-030, RN-M07-02) y
+// valor fijo del depósito de reserva (RF-M05-028, RN-M05-14). El Administrador puede cambiarlos
+// "en cualquier momento"; el nuevo valor aplica a los pedidos/reservas creados después del
+// cambio y el histórico no se altera (precio congelado, ADR-002).
+// Lee con GET /configuracion (incluye el valor de respaldo si la tabla aún no tiene la fila) y
+// guarda con PUT /configuraciones.
+import { computed, onMounted, ref } from 'vue'
+import { Bike, CalendarClock } from 'lucide-vue-next'
+import BaseButton from '@/components/common/BaseButton.vue'
+import BaseInput from '@/components/common/BaseInput.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
+import { configuracionService } from '@/services/configuracion.service'
+import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
+
+const domicilio = ref('')
+const deposito = ref('')
+// Valores guardados, para saber si hay cambios sin guardar.
+const guardados = ref({ domicilio: '', deposito: '' })
+
+const cargando = ref(true)
+const guardando = ref(false)
+const error = ref('')
+const exito = ref('')
+const errores = ref<Record<string, string>>({})
+
+function formatoPrecio(valor: number) {
+  return Number(valor).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+}
+
+function aNumero(texto: string): number {
+  // Acepta "2000", "2.000" y "2 000"; descarta cualquier otro carácter.
+  return Number(texto.replace(/[^\d]/g, ''))
+}
+
+const hayCambios = computed(
+  () => domicilio.value !== guardados.value.domicilio || deposito.value !== guardados.value.deposito,
+)
+
+async function cargar() {
+  cargando.value = true
+  error.value = ''
+  try {
+    const { data } = await configuracionService.obtener()
+    domicilio.value = String(Math.round(Number(data.valor_domicilio)))
+    deposito.value = String(Math.round(Number(data.deposito_reserva)))
+    guardados.value = { domicilio: domicilio.value, deposito: deposito.value }
+  } catch (e) {
+    error.value = mensajeDeError(e, 'No pudimos cargar la configuración.')
+  } finally {
+    cargando.value = false
+  }
+}
+
+function validar(): boolean {
+  errores.value = {}
+  for (const [campo, texto] of [
+    ['valor_domicilio', domicilio.value],
+    ['deposito_reserva', deposito.value],
+  ] as const) {
+    if (!texto.trim() || !/^\d[\d.\s]*$/.test(texto.trim())) {
+      errores.value[campo] = 'Escribe un valor en pesos (solo números, 0 o más).'
+    }
+  }
+  return Object.keys(errores.value).length === 0
+}
+
+async function guardar() {
+  exito.value = ''
+  error.value = ''
+  if (!validar()) return
+  guardando.value = true
+  try {
+    await configuracionService.actualizar({
+      valor_domicilio: aNumero(domicilio.value),
+      deposito_reserva: aNumero(deposito.value),
+    })
+    domicilio.value = String(aNumero(domicilio.value))
+    deposito.value = String(aNumero(deposito.value))
+    guardados.value = { domicilio: domicilio.value, deposito: deposito.value }
+    exito.value = 'Configuración guardada. Se aplica a los pedidos y reservas nuevos.'
+  } catch (e) {
+    errores.value = erroresDeValidacion(e)
+    // Si el servidor señaló campos concretos, el mensaje va bajo cada campo; el general solo
+    // aparece para otros errores (red, sesión vencida, 403…).
+    if (Object.keys(errores.value).length === 0) error.value = mensajeDeError(e, 'No pudimos guardar la configuración.')
+  } finally {
+    guardando.value = false
+  }
+}
+
+onMounted(cargar)
+</script>
+
+<template>
+  <div>
+    <PageHeader
+      eyebrow="SISTEMA"
+      titulo="Configuración"
+      descripcion="Valores fijos que el negocio puede cambiar en cualquier momento."
+    />
+
+    <div v-if="cargando" class="loading-state">Cargando configuración…</div>
+
+    <form v-else class="mt-6 max-w-2xl space-y-4" novalidate @submit.prevent="guardar">
+      <div class="card p-4 sm:p-5">
+        <div class="flex items-start gap-3">
+          <span class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
+            <Bike :size="21" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <h2 class="text-[15px] font-semibold text-ink">Valor del domicilio</h2>
+            <p class="mt-0.5 text-xs text-gray-500">
+              Valor fijo igual para toda la ciudad, sin zonas ni tarifas por barrio (RN-M07-02). La recogida en el
+              local no tiene costo.
+            </p>
+            <div class="mt-3">
+              <BaseInput
+                v-model="domicilio"
+                label="Valor en pesos (COP)"
+                type="text"
+                placeholder="2000"
+                :error="errores.valor_domicilio"
+              />
+              <p v-if="errores.valor_domicilio" class="mt-1 text-xs text-red-600">{{ errores.valor_domicilio }}</p>
+              <p v-else-if="domicilio && !Number.isNaN(aNumero(domicilio))" class="mt-1 text-xs text-gray-500">
+                Se cobrará {{ formatoPrecio(aNumero(domicilio)) }} por cada domicilio.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4 sm:p-5">
+        <div class="flex items-start gap-3">
+          <span class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700">
+            <CalendarClock :size="21" />
+          </span>
+          <div class="min-w-0 flex-1">
+            <h2 class="text-[15px] font-semibold text-ink">Depósito de reserva</h2>
+            <p class="mt-0.5 text-xs text-gray-500">
+              Valor fijo obligatorio para toda reserva, sin importar el número de personas (RN-M05-14). Se reembolsa
+              si se cancela a tiempo, se retiene si hay no-show y se abona al pedido si el cliente llega.
+            </p>
+            <div class="mt-3">
+              <BaseInput
+                v-model="deposito"
+                label="Valor en pesos (COP)"
+                type="text"
+                placeholder="20000"
+                :error="errores.deposito_reserva"
+              />
+              <p v-if="errores.deposito_reserva" class="mt-1 text-xs text-red-600">{{ errores.deposito_reserva }}</p>
+              <p v-else-if="deposito && !Number.isNaN(aNumero(deposito))" class="mt-1 text-xs text-gray-500">
+                Cada reserva exigirá {{ formatoPrecio(aNumero(deposito)) }} de depósito.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p v-if="error" class="alert-error">{{ error }}</p>
+      <p v-if="exito" class="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ exito }}</p>
+
+      <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-xs text-gray-500">
+          Los pedidos y reservas ya creados conservan el valor con que se hicieron.
+        </p>
+        <BaseButton type="submit" variant="primary" :disabled="guardando || !hayCambios">
+          {{ guardando ? 'Guardando…' : 'Guardar cambios' }}
+        </BaseButton>
+      </div>
+    </form>
+  </div>
+</template>

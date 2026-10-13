@@ -1,0 +1,38 @@
+import './assets/main.css'
+
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+
+import App from './App.vue'
+import router from './router'
+import { useAuthStore } from './stores/auth'
+import { EVENTO_SESION_INVALIDA } from './services/api'
+
+const app = createApp(App)
+
+app.use(createPinia())
+app.use(router)
+
+// CORREGIDO (29/09/2026): antes esto esperaba cargarUsuarioActual() antes de montar,
+// pensado para "proteger" el primer guard de rutas — pero Vue Router dispara su
+// navegación inicial (y el primer beforeEach) desde app.use(router) de arriba, NO
+// desde app.mount(), así que ese gate nunca protegía nada. Ahora el propio guard
+// (router/index.ts) espera auth.listo, que es donde debe estar esa espera — mount()
+// puede llamarse de inmediato, <router-view> simplemente no resuelve nada hasta que
+// el guard (ya esperando lo que haga falta) lo deje pasar.
+const auth = useAuthStore()
+
+// El interceptor 401 (services/api.ts) no puede importar este store directo — sería
+// un ciclo de imports (api.ts -> stores/auth.ts -> services/auth.service.ts -> api.ts)
+// que rompe la inicialización de módulos de ESM: se probó, y con el import directo
+// cargarUsuarioActual() dejaba de poblar "usuario" sin ningún error visible. Por eso
+// avisa con un evento del navegador en su lugar, y este listener (que sí puede
+// importar el store sin ciclo, porque main.ts está fuera de esa cadena) limpia el
+// estado reactivo — sin esto, auth.estaAutenticado seguía dando true tras un 401 y
+// el guard de rutas dejaba pasar la siguiente navegación como si la sesión siguiera activa.
+window.addEventListener(EVENTO_SESION_INVALIDA, () => {
+  auth.token = null
+  auth.usuario = null
+})
+
+app.mount('#app')

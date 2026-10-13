@@ -1,0 +1,76 @@
+// M05 — espeja ReservaController.php. crear()/registrarDepositoEnLinea() son públicas
+// (Cliente web); el resto es de gestión (Administrador/Mesero) — ver routes/api.php.
+// index()/depositosRetenidos() son exclusivas de la vista de Administrador (RF-M05-035,
+// HU-M05-015): el filtro por estado se resuelve en el backend, no en el frontend, para
+// no traer más páginas de las necesarias.
+import api from './api'
+import type { EstadoReserva, Mesa, Reserva } from '@/types/models'
+
+export interface CrearReservaPayload {
+  mesa_id: number
+  cliente_nombre: string
+  cliente_telefono: string
+  cliente_correo: string
+  fecha_hora: string
+}
+
+export interface DepositoEnLineaPayload {
+  pasarela: 'nequi' | 'bancolombia'
+}
+
+export interface PaginadoReservas {
+  data: Reserva[]
+  total: number
+  current_page: number
+  last_page: number
+}
+
+export interface DepositosRetenidos {
+  total_retenido: number
+  reservas: Reserva[]
+}
+
+export const reservaService = {
+  // proximas: true → pendientes y confirmadas de hoy en adelante, de la más cercana a la más lejana.
+  index(params?: { estado?: EstadoReserva; mesa_id?: number; page?: number; proximas?: boolean }) {
+    return api.get<PaginadoReservas>('/reservas', { params })
+  },
+  // "Mis pedidos y reservas" (Cliente): sus propias reservas, identificadas por correo de
+  // contacto (ver ReservaController::misReservas() — Reserva no tiene cliente_id, RN-M05-12).
+  misReservas(params?: { page?: number }) {
+    return api.get<PaginadoReservas>('/mis-reservas', { params })
+  },
+  depositosRetenidos() {
+    return api.get<DepositosRetenidos>('/reservas/depositos-retenidos')
+  },
+  // Con sesión de Mesero o Administrador queda como reserva manual a su nombre (RF-M05-013).
+  crear(payload: CrearReservaPayload) {
+    return api.post<Reserva>('/reservas', payload)
+  },
+  // Fase 1, tarea 4: mesas activas sin otra reserva que se cruce con esa fecha y hora (pública).
+  mesasDisponibles(fecha_hora: string) {
+    return api.get<Mesa[]>('/mesas/disponibles', { params: { fecha_hora } })
+  },
+  registrarDepositoEnLinea(id: number, payload: DepositoEnLineaPayload) {
+    return api.post<Reserva>(`/reservas/${id}/deposito/en-linea`, payload)
+  },
+  confirmarDepositoEnLinea(id: number) {
+    return api.post<Reserva>(`/reservas/${id}/deposito/en-linea/confirmar`)
+  },
+  rechazarDepositoEnLinea(id: number) {
+    return api.post<Reserva>(`/reservas/${id}/deposito/en-linea/rechazar`)
+  },
+  // RN-M05-16: presencial (efectivo, tarjeta o transferencia).
+  registrarDepositoManual(id: number, metodo: 'efectivo' | 'tarjeta' | 'transferencia') {
+    return api.post<Reserva>(`/reservas/${id}/deposito/manual`, { metodo })
+  },
+  marcarNoShow(id: number) {
+    return api.post<Reserva>(`/reservas/${id}/no-show`)
+  },
+  completar(id: number) {
+    return api.post<Reserva>(`/reservas/${id}/completar`)
+  },
+  cancelar(id: number) {
+    return api.post<Reserva>(`/reservas/${id}/cancelar`)
+  },
+}

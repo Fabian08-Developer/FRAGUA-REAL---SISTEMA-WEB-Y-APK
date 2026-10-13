@@ -1,0 +1,225 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\Pedido\ActualizarLineaRequest;
+use App\Http\Requests\Api\Pedido\AgregarLineaRequest;
+use App\Http\Requests\Api\Pedido\AplicarDescuentoRequest;
+use App\Http\Requests\Api\Pedido\CancelarPedidoRequest;
+use App\Http\Requests\Api\Pedido\CotizarPedidoRequest;
+use App\Http\Requests\Api\Pedido\StorePedidoRequest;
+use App\Models\Configuracion;
+use App\Models\Pedido;
+use App\Models\PedidoDetalle;
+use App\Services\PedidoService;
+use Illuminate\Http\Request;
+
+class PedidoController extends Controller
+{
+    public function __construct(private readonly PedidoService $pedidoService)
+    {
+    }
+
+    // Relaciones que necesita el frontend para mostrar cada línea sin pedir el detalle
+    // aparte (nombre de producto/variante/combo, extras). CORREGIDO (28/09/2026): index()
+    // y show() cargaban 'detalles.extras' pero no 'detalles.producto'/'variante'/'combo' —
+    // Eloquent no serializa una relación que no fue cargada, así que el frontend recibía
+    // detalle.producto === undefined y no podía mostrar el nombre del producto.
+    // 'pagos' se agrega también en index() (no solo en show()) porque la vista Mesero >
+    // Cobrar necesita saber cuánto lleva pagado cada pedido de la lista (pago mixto,
+    // RF-M06-011) sin pedir el detalle de cada uno por separado.
+    // CORREGIDO (29/09/2026): faltaba 'cliente' — sin esto, el Mesero no tenía forma de ver
+    // el nombre de un Cliente CON SESIÓN en Domicilio/Recogida (pedido.cliente_id sin null,
+    // pero pedido.cliente_invitado_nombre si null porque no aplica) — la vista solo mostraba
+    // el nombre para invitados. Ver PedidosView.vue/CajaView.vue del Mesero (fallback a
+    // pedido.cliente?.nombre).
+    // Fase 2, tarea 1: 'descuentoManualPor' para mostrar quién aplicó el descuento manual.
+    public const CON_DETALLES = ['detalles.producto', 'detalles.variante', 'detalles.combo', 'detalles.extras', 'mesa', 'pagos', 'cliente', 'descuentoManualPor:id,nombre'];
+
+    // Panel de pedidos del Administrador (RF-M02-T-017): filtra por tipo/estado.
+    public function index(Request $request)
+    {
+        $pedidos = Pedido::with(self::CON_DETALLES)
+            ->when($request->tipo, fn ($q) => $q->where('tipo', $request->tipo))
+            ->when($request->estado, fn ($q) => $q->where('estado', $request->estado))
+            // Fase 1, tarea 3: pedidos de una mesa (RF-M02-L-020).
+            ->when($request->mesa_id, fn ($q) => $q->where('mesa_id', (int) $request->mesa_id))
+            // ?activos=1 → pendiente/confirmado/preparando (lo que el Mesero atiende y cobra);
+            // sin esto, un listado paginado de 20 podía dejar pedidos activos fuera de la lista.
+            ->when($request->boolean('activos'), fn ($q) => $q->whereIn('estado', ['pendiente', 'confirmado', 'preparando']))
+            ->when($request->user()->esCliente(), fn ($q) => $q->where('cliente_id', $request->user()->id))
+            ->latest()
+            ->paginate(min(max((int) $request->input('per_page', 20), 1), 100));
+
+        return response()->json($pedidos);
+    }
+
+    public function show(Request $request, Pedido $pedido)
+    {
+        $this->authorize('view', $pedido);
+
+        return response()->json($pedido->load(self::CON_DETALLES));
+    }
+
+    // Crear pedido: mesero (QR/local), o cliente_web (domicilio/recogida, con o sin cuenta).
+    public function store(StorePedidoRequest $request)
+    {
+        $data = $request->validated();
+        if ($request->user() && $request->user()->esCliente()) {
+            $data['cliente_id'] = $request->user()->id;
+        }
+        if ($data['tipo'] === 'domicilio') {
+            // Valor vigente fijado por el servidor (tabla `configuraciones`), nunca por el Cliente.
+            $data['valor_domicilio'] = Configuracion::obtenerNumerico(
+                'valor_domicilio',
+                (float) config('fragua_real.valor_domicilio_default')
+            );
+        }
+
+        $pedido = $this->pedidoService->crear($data);
+
+        // RF-M06-005: única vez que se entrega el token del pedido (ver Pedido::$hidden).
+        return response()->json($pedido->makeVisible('token_publico'), 201);
+    }
+
+    // RF-M04-035 (Fase 2, tarea 1): lo que costaría el carrito, con las promociones de este
+    // momento, antes de crear el pedido. No guarda nada.
+    public function cotizar(CotizarPedidoRequest $request)
+    {
+        $data = $request->validated();
+        $valorDomicilio = $data['tipo'] === 'domicilio'
+            ? Configuracion::obtenerNumerico('valor_domicilio', (float) config('fragua_real.valor_domicilio_default'))
+            : 0.0;
+
+        // Un producto agotado o un combo fuera de horario responde 422 con el mensaje (bootstrap/app.php).
+        return response()->json($this->pedidoService->cotizar($data['lineas'], (float) $valorDomicilio));
+    }
+
+    // RF-M06-005, HU-M07-002/011 (Fase 0, tarea 4): el invitado consulta su pedido con el
+    // token que recibió al crearlo. Sin token válido, 404 (no revela qué pedidos existen).
+    public function seguimiento(string $token)
+    {
+        $pedido = Pedido::where('token_publico', $token)->firstOrFail();
+
+        return response()->json($pedido->load(['detalles.producto', 'detalles.variante', 'detalles.combo', 'detalles.extras', 'pagos']));
+    }
+
+    public function confirmar(Request $request, Pedido $pedido)
+    {
+        $this->authorize('confirmar', $pedido);
+
+        return response()->json($this->pedidoService->confirmar($pedido, $request->user()));
+    }
+
+    public function marcarPreparando(Request $request, Pedido $pedido)
+    {
+        $this->authorize('marcarPreparando', $pedido);
+
+        return response()->json($this->pedidoService->marcarPreparando($pedido));
+    }
+
+    // RF-M02-T-017: el panel de cocina marca cada línea como preparada.
+    public function marcarLineaPreparada(Request $request, Pedido $pedido, PedidoDetalle $detalle)
+    {
+        $this->authorize('marcarPreparando', $pedido);
+        abort_if($detalle->pedido_id !== $pedido->id, 404);
+
+        return response()->json($this->pedidoService->marcarLineaPreparada($detalle));
+    }
+
+    // RF-M02-T-016: el Mesero finaliza a mano un pedido que ya cumple todo (por ejemplo, un
+    // local pagado antes de pasar a preparación). 422 con lo que falta si no cumple.
+    public function finalizar(Request $request, Pedido $pedido)
+    {
+        $this->authorize('finalizar', $pedido);
+
+        return response()->json($this->pedidoService->finalizar($pedido, $request->user())->load(self::CON_DETALLES));
+    }
+
+    // RF-M07-025: el Mesero confirma la entrega de un domicilio.
+    public function confirmarEntrega(Request $request, Pedido $pedido)
+    {
+        $this->authorize('confirmarEntrega', $pedido);
+
+        return response()->json($this->pedidoService->confirmarEntrega($pedido, $request->user())->load(self::CON_DETALLES));
+    }
+
+    // RF-M07-R-013: el Mesero confirma que el Cliente recogió su pedido.
+    public function confirmarRecogida(Request $request, Pedido $pedido)
+    {
+        $this->authorize('confirmarRecogida', $pedido);
+
+        return response()->json($this->pedidoService->confirmarRecogida($pedido, $request->user())->load(self::CON_DETALLES));
+    }
+
+    // ---- Edición (Fase 1, tarea 1): RN-PED-07/08/10/12, RF-M02-L-004/005/012/014/017 ----
+    public function agregarLinea(AgregarLineaRequest $request, Pedido $pedido)
+    {
+        $this->authorize('modificar', $pedido);
+
+        return response()->json($this->pedidoService->agregarLinea($pedido, $request->validated(), $request->user()));
+    }
+
+    public function actualizarLinea(ActualizarLineaRequest $request, Pedido $pedido, PedidoDetalle $detalle)
+    {
+        $this->authorize('modificar', $pedido);
+        abort_if($detalle->pedido_id !== $pedido->id, 404);
+
+        return response()->json($this->pedidoService->actualizarLinea($pedido, $detalle, $request->validated(), $request->user()));
+    }
+
+    public function retirarLinea(Request $request, Pedido $pedido, PedidoDetalle $detalle)
+    {
+        $this->authorize('modificar', $pedido);
+        abort_if($detalle->pedido_id !== $pedido->id, 404);
+
+        return response()->json($this->pedidoService->retirarLinea($pedido, $detalle, $request->user()));
+    }
+
+    // HU-M02-020: historia del pedido (estados, cambios y pagos), con actor y fecha/hora.
+    public function historial(Request $request, Pedido $pedido)
+    {
+        $this->authorize('verHistorial', $pedido);
+
+        return response()->json(['data' => $this->pedidoService->historial($pedido)]);
+    }
+
+    // ---- Descuento manual (Fase 2, tarea 1): RF-M04-036/037/039/041, HU-M04-015 ----
+    public function aplicarDescuento(AplicarDescuentoRequest $request, Pedido $pedido)
+    {
+        $this->authorize('aplicarDescuento', $pedido);
+
+        return response()->json($this->pedidoService->aplicarDescuentoManual($pedido, $request->validated(), $request->user()));
+    }
+
+    public function quitarDescuento(Request $request, Pedido $pedido)
+    {
+        $this->authorize('aplicarDescuento', $pedido);
+
+        return response()->json($this->pedidoService->quitarDescuentoManual($pedido, $request->user()));
+    }
+
+    public function cancelar(CancelarPedidoRequest $request, Pedido $pedido)
+    {
+        $this->authorize('cancelar', $pedido);
+
+        return response()->json($this->pedidoService->cancelar(
+            $pedido,
+            $request->user(),
+            $request->motivo,
+            $request->input('password_administrador'),
+        )->load(self::CON_DETALLES));
+    }
+
+    // RF-M07-016, RF-M07-R-009 (Fase 1, tarea 6): el invitado cancela su domicilio o su recogida
+    // con el enlace de su pedido, mientras esté PENDIENTE. Sin token válido, 404.
+    public function cancelarConToken(CancelarPedidoRequest $request, string $token)
+    {
+        $pedido = Pedido::where('token_publico', $token)->firstOrFail();
+        abort_if(! in_array($pedido->tipo, ['domicilio', 'recogida'], true), 404);
+        abort_if($pedido->estado !== 'pendiente', 422, 'El pedido ya fue confirmado por el restaurante; para cancelarlo comunícate con el local.');
+
+        return response()->json($this->pedidoService->cancelar($pedido, null, $request->motivo));
+    }
+}

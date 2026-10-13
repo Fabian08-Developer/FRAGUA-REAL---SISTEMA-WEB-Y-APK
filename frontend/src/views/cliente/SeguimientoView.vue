@@ -1,0 +1,244 @@
+<script setup lang="ts">
+// Fase 1, tarea 6 — Seguimiento del pedido para el invitado (RF-M07-027, RF-M07-R-015, HU-M07-002/
+// 011). El invitado no tiene cuenta: entra con el enlace privado que recibió al crear su pedido
+// (/seguimiento/<token>). Ve el estado, los productos, el total y lo pagado; mientras el pedido
+// está PENDIENTE puede pagarlo en línea o reintentar el pago (RF-M06-005/008) y cancelarlo
+// (RF-M07-016, RF-M07-R-009). La página se actualiza sola cada 30 segundos.
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { Bike, CheckCircle2, ShoppingBag, XCircle } from 'lucide-vue-next'
+import BaseButton from '@/components/common/BaseButton.vue'
+import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
+import { pedidoService } from '@/services/pedido.service'
+import { mensajeDeError } from '@/services/errors'
+import type { Pedido } from '@/types/models'
+
+const route = useRoute()
+const token = String(route.params.token ?? '')
+
+const pedido = ref<Pedido | null>(null)
+const cargando = ref(true)
+const noEncontrado = ref(false)
+const error = ref('')
+
+async function cargar(silencioso = false) {
+  if (!silencioso) cargando.value = true
+  try {
+    const { data } = await pedidoService.seguimiento(token)
+    pedido.value = data
+    noEncontrado.value = false
+  } catch (e) {
+    if ((e as { response?: { status?: number } }).response?.status === 404) noEncontrado.value = true
+    else if (!silencioso) error.value = mensajeDeError(e, 'No pudimos cargar tu pedido.')
+  } finally {
+    cargando.value = false
+  }
+}
+
+let temporizador: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  cargar()
+  temporizador = setInterval(() => {
+    if (pedido.value && !['finalizado', 'cancelado'].includes(pedido.value.estado)) cargar(true)
+  }, 30000)
+})
+onBeforeUnmount(() => clearInterval(temporizador))
+
+function formatoPrecio(valor: number) {
+  return Number(valor).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+}
+
+// Pasos que ve el cliente; el último depende del canal.
+const pasos = computed(() => {
+  const p = pedido.value
+  if (!p) return []
+  return [
+    { clave: 'pendiente', texto: 'Recibido' },
+    { clave: 'confirmado', texto: 'Confirmado' },
+    { clave: 'preparando', texto: 'En preparación' },
+    { clave: 'finalizado', texto: p.tipo === 'domicilio' ? 'Entregado' : 'Recogido' },
+  ]
+})
+const indiceActual = computed(() => pasos.value.findIndex((s) => s.clave === pedido.value?.estado))
+
+const mensajeEstado = computed(() => {
+  const p = pedido.value
+  if (!p) return ''
+  switch (p.estado) {
+    case 'pendiente':
+      return 'Recibimos tu pedido. En cuanto lo revisemos lo confirmamos y empezamos a prepararlo.'
+    case 'confirmado':
+      return 'Tu pedido está confirmado y entra a cocina.'
+    case 'preparando':
+      if (p.tipo === 'domicilio') return p.entregado_at ? 'Tu pedido fue entregado.' : 'Estamos preparando tu pedido; te lo llevamos pronto.'
+      return p.recogido_at ? 'Ya recogiste tu pedido.' : 'Estamos preparando tu pedido. Te esperamos en el local.'
+    case 'finalizado':
+      return '¡Gracias! Tu pedido está completo.'
+    default:
+      return `Este pedido fue cancelado${p.cancelado_motivo ? `: ${p.cancelado_motivo}` : ''}.`
+  }
+})
+
+const pagado = computed(() =>
+  (pedido.value?.pagos ?? []).filter((x) => x.estado === 'aprobado' && !x.anulado).reduce((a, x) => a + Number(x.monto), 0),
+)
+const pagoEnRevision = computed(() =>
+  (pedido.value?.pagos ?? []).some((x) => x.metodo === 'en_linea' && x.estado === 'pendiente' && !x.anulado),
+)
+const puedePagar = computed(
+  () => pedido.value?.estado === 'pendiente' && !pagoEnRevision.value && Number(pedido.value.total) - pagado.value > 0,
+)
+
+// ---- Pago en línea (RF-M06-005/008) ----
+const pasarela = ref<'nequi' | 'bancolombia'>('nequi')
+const pagando = ref(false)
+const errorPago = ref('')
+
+async function pagar() {
+  if (!pedido.value) return
+  pagando.value = true
+  errorPago.value = ''
+  try {
+    await pedidoService.pagarEnLineaConToken(token, { pasarela: pasarela.value, monto: Number(pedido.value.total) - pagado.value })
+    await cargar(true)
+  } catch (e) {
+    errorPago.value = mensajeDeError(e, 'No pudimos registrar tu pago.')
+  } finally {
+    pagando.value = false
+  }
+}
+
+// ---- Cancelar mientras esté pendiente (RF-M07-016, RF-M07-R-009) ----
+const cancelarAbierto = ref(false)
+const motivo = ref('')
+const cancelando = ref(false)
+const errorCancelar = ref('')
+
+async function cancelar() {
+  if (!motivo.value.trim()) {
+    errorCancelar.value = 'Cuéntanos por qué cancelas.'
+    return
+  }
+  cancelando.value = true
+  errorCancelar.value = ''
+  try {
+    const { data } = await pedidoService.cancelarConToken(token, motivo.value.trim())
+    pedido.value = { ...pedido.value!, ...data }
+    cancelarAbierto.value = false
+  } catch (e) {
+    errorCancelar.value = mensajeDeError(e, 'No pudimos cancelar el pedido.')
+  } finally {
+    cancelando.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+    <p v-if="cargando" class="text-sm text-[#6c655c]">Cargando tu pedido…</p>
+
+    <div v-else-if="noEncontrado" class="rounded-2xl border border-[#e2dbcf] bg-white p-8 text-center">
+      <XCircle :size="40" class="mx-auto text-[#c8c1b2]" />
+      <h1 class="mt-4 font-display text-2xl text-ink">No encontramos ese pedido</h1>
+      <p class="mt-2 text-sm text-[#6c655c]">Revisa que el enlace esté completo, o comunícate con el local.</p>
+    </div>
+
+    <p v-else-if="error" class="alert-error">{{ error }}</p>
+
+    <template v-else-if="pedido">
+      <div class="flex items-center gap-3">
+        <span class="flex size-11 items-center justify-center rounded-xl bg-brand-500/10 text-brand-700">
+          <Bike v-if="pedido.tipo === 'domicilio'" :size="20" />
+          <ShoppingBag v-else :size="20" />
+        </span>
+        <div>
+          <p class="text-[11px] font-medium tracking-[2px] text-brand-700">
+            {{ pedido.tipo === 'domicilio' ? 'DOMICILIO' : 'RECOGIDA EN EL LOCAL' }}
+          </p>
+          <h1 class="font-display text-3xl font-medium tracking-tight text-ink">Pedido #{{ pedido.id }}</h1>
+        </div>
+      </div>
+
+      <!-- Estado -->
+      <section class="mt-6 rounded-2xl border border-[#e2dbcf] bg-white p-5">
+        <ol v-if="pedido.estado !== 'cancelado'" class="grid grid-cols-4 gap-2" aria-label="Avance del pedido">
+          <li v-for="(paso, i) in pasos" :key="paso.clave" class="text-center">
+            <span
+              class="mx-auto flex size-8 items-center justify-center rounded-full border-2 text-xs font-semibold"
+              :class="i <= indiceActual ? 'border-brand-500 bg-brand-500 text-ink' : 'border-[#e3ded4] text-[#a59d90]'"
+            >
+              <CheckCircle2 v-if="i < indiceActual" :size="16" />
+              <template v-else>{{ i + 1 }}</template>
+            </span>
+            <span class="mt-1.5 block text-[11px] leading-tight" :class="i <= indiceActual ? 'text-ink' : 'text-[#a59d90]'">
+              {{ paso.texto }}
+            </span>
+          </li>
+        </ol>
+        <p class="text-sm text-ink" :class="{ 'mt-4': pedido.estado !== 'cancelado' }" role="status">{{ mensajeEstado }}</p>
+      </section>
+
+      <!-- Productos y total -->
+      <section class="mt-4 rounded-2xl border border-[#e2dbcf] bg-white p-5">
+        <ul class="space-y-2 text-sm">
+          <li v-for="d in pedido.detalles" :key="d.id" class="flex justify-between gap-3">
+            <span class="text-ink">
+              {{ d.cantidad }}× {{ d.combo ? `Combo ${d.combo.nombre}` : d.producto?.nombre }}
+              <span v-if="d.variante" class="text-xs text-[#6c655c]">({{ d.variante.nombre }})</span>
+            </span>
+          </li>
+        </ul>
+        <!-- Fase 2, tarea 1: promociones o descuento aplicados al pedido. -->
+        <TotalesPedido class="mt-4 border-t border-[#e2dbcf] pt-3" :pedido="pedido" tono="cliente" />
+        <dl class="mt-1 space-y-1 text-sm">
+          <div v-if="pagado > 0" class="flex justify-between text-[#6c655c]">
+            <dt>Pagado</dt>
+            <dd>{{ formatoPrecio(pagado) }}</dd>
+          </div>
+        </dl>
+        <p v-if="pagoEnRevision" class="mt-3 text-xs text-[#6c655c]">Tu pago en línea está en revisión.</p>
+        <p v-if="pedido.direccion_entrega" class="mt-3 text-xs text-[#6c655c]">
+          Entrega en {{ pedido.direccion_entrega }}<template v-if="pedido.barrio">, {{ pedido.barrio }}</template>
+        </p>
+      </section>
+
+      <!-- Pagar en línea -->
+      <section v-if="puedePagar" class="mt-4 rounded-2xl border border-[#e2dbcf] bg-white p-5">
+        <h2 class="font-display text-lg text-ink">Pagar en línea</h2>
+        <p class="mt-1 text-xs text-[#6c655c]">
+          También puedes pagar {{ pedido.tipo === 'domicilio' ? 'contra entrega' : 'al recoger' }}.
+        </p>
+        <div class="mt-3 flex gap-4">
+          <label class="flex items-center gap-2 text-sm text-ink"><input v-model="pasarela" type="radio" value="nequi" /> Nequi</label>
+          <label class="flex items-center gap-2 text-sm text-ink"><input v-model="pasarela" type="radio" value="bancolombia" /> Bancolombia</label>
+        </div>
+        <p v-if="errorPago" class="mt-3 alert-error">{{ errorPago }}</p>
+        <BaseButton class="mt-4" :disabled="pagando" @click="pagar">
+          {{ pagando ? 'Registrando…' : `Pagar ${formatoPrecio(Number(pedido.total) - pagado)}` }}
+        </BaseButton>
+      </section>
+
+      <!-- Cancelar -->
+      <section v-if="pedido.estado === 'pendiente'" class="mt-4">
+        <button v-if="!cancelarAbierto" type="button" class="text-sm font-medium text-red-700 underline-offset-2 hover:underline" @click="cancelarAbierto = true">
+          Cancelar mi pedido
+        </button>
+        <div v-else class="rounded-2xl border border-red-200 bg-red-50/60 p-5">
+          <label class="block">
+            <span class="text-sm font-medium text-ink">¿Por qué cancelas?</span>
+            <textarea v-model="motivo" rows="2" maxlength="255" class="field mt-2" />
+          </label>
+          <p v-if="errorCancelar" class="mt-2 text-xs text-red-600">{{ errorCancelar }}</p>
+          <div class="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <BaseButton variant="ghost" @click="cancelarAbierto = false">Volver</BaseButton>
+            <BaseButton variant="danger" :disabled="cancelando" @click="cancelar">
+              {{ cancelando ? 'Cancelando…' : 'Cancelar pedido' }}
+            </BaseButton>
+          </div>
+        </div>
+      </section>
+
+      <p class="mt-8 text-xs text-[#a59d90]">Guarda este enlace: es la única forma de ver tu pedido sin cuenta.</p>
+    </template>
+  </div>
+</template>
