@@ -4,7 +4,7 @@
 // HU-M05-015): el filtro por estado se resuelve en el backend, no en el frontend, para
 // no traer más páginas de las necesarias.
 import api from './api'
-import type { EstadoReserva, Mesa, Reserva, ReservaPublica } from '@/types/models'
+import type { CheckoutPasarela, EstadoReserva, Mesa, Reserva, ReservaPublica } from '@/types/models'
 
 export interface CrearReservaPayload {
   mesa_id: number
@@ -16,6 +16,8 @@ export interface CrearReservaPayload {
 
 export interface DepositoEnLineaPayload {
   pasarela: 'nequi' | 'bancolombia'
+  // Fase 6, tarea 1: el enlace secreto que devolvió crear() (sin él, 404).
+  token: string
 }
 
 export interface PaginadoReservas {
@@ -51,8 +53,9 @@ export const reservaService = {
   mesasDisponibles(fecha_hora: string) {
     return api.get<Mesa[]>('/mesas/disponibles', { params: { fecha_hora } })
   },
+  // Fase 6, tarea 1 (RF-M05-030): con la pasarela activa trae `checkout` con el enlace de Wompi.
   registrarDepositoEnLinea(id: number, payload: DepositoEnLineaPayload) {
-    return api.post<Reserva>(`/reservas/${id}/deposito/en-linea`, payload)
+    return api.post<Reserva & { checkout: CheckoutPasarela | null }>(`/reservas/${id}/deposito/en-linea`, payload)
   },
   confirmarDepositoEnLinea(id: number) {
     return api.post<Reserva>(`/reservas/${id}/deposito/en-linea/confirmar`)
@@ -77,6 +80,10 @@ export const reservaService = {
   },
   cancelarPorEnlace(token: string) {
     return api.post<ReservaPublica>(`/reservas/enlace/${encodeURIComponent(token)}/cancelar`)
+  },
+  // Fase 6, tarea 1 (RF-M05-030): pagar o reintentar el depósito con el enlace de la reserva.
+  pagarDepositoPorEnlace(token: string, pasarela: 'nequi' | 'bancolombia') {
+    return api.post<ReservaPublica & { checkout: CheckoutPasarela | null }>(`/reservas/enlace/${encodeURIComponent(token)}/deposito`, { pasarela })
   },
   completar(id: number) {
     return api.post<Reserva>(`/reservas/${id}/completar`)

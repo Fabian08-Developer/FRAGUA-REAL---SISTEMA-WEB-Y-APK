@@ -38,3 +38,13 @@ Artisan::command('reservas:procesar', function (\App\Services\ReservaAutomaticaS
 })->purpose('Aplica el no-show automático, la ventana de mesa Reservada y los recordatorios');
 
 \Illuminate\Support\Facades\Schedule::command('reservas:procesar')->everyMinute()->withoutOverlapping(5);
+
+// Fase 6, tarea 1 (RF-M06-006, D4): por si un evento de la pasarela se pierde, cada 5 minutos se
+// pregunta por los pagos en línea que siguen pendientes y se cierran los que vencieron sin pagarse.
+// No hace nada mientras la pasarela esté en modo manual.
+Artisan::command('pasarela:conciliar', function (\App\Services\PasarelaPagoService $pasarela) {
+    $r = $pasarela->conciliar();
+    $this->info("Revisadas: {$r['revisadas']} · cerradas: {$r['cerradas']} · abandonadas: {$r['abandonadas']} · sin respuesta: {$r['sin_respuesta']}");
+})->purpose('Concilia con la pasarela los pagos en línea pendientes');
+
+\Illuminate\Support\Facades\Schedule::command('pasarela:conciliar')->everyFiveMinutes()->withoutOverlapping(10);

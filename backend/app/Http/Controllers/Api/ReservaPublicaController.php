@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Reserva;
 use App\Services\ReservaService;
 use App\Support\Reservas\PoliticaReservas;
+use Illuminate\Http\Request;
 use RuntimeException;
 
 /**
@@ -39,6 +40,30 @@ class ReservaPublicaController extends Controller
         $this->reservas->cancelar($reserva, null, true);
 
         return response()->json($this->presentar($reserva->fresh('mesa')));
+    }
+
+    // Fase 6, tarea 1 (RF-M05-030, RF-M06-008): pagar (o volver a intentar) el depósito desde el
+    // enlace, por ejemplo después de un rechazo en la pasarela. Mismo camino que la reserva web.
+    public function pagarDeposito(Request $request, string $token)
+    {
+        $datos = $request->validate(['pasarela' => ['required', 'in:nequi,bancolombia']]);
+        $reserva = $this->buscar($token);
+        if (! $this->puedePagar($reserva)) {
+            throw new RuntimeException('Esta reserva ya no espera el pago del depósito.');
+        }
+
+        [$reserva, $checkout] = $this->reservas->iniciarDepositoEnLinea($reserva, $datos['pasarela']);
+
+        return response()->json($this->presentar($reserva->fresh('mesa')) + ['checkout' => $checkout]);
+    }
+
+    private function puedePagar(Reserva $reserva): bool
+    {
+        // En modo manual, un depósito ya registrado espera la aprobación del personal: no se repite.
+        $esperandoAprobacion = $reserva->deposito_estado === 'pendiente' && ! app(\App\Services\PasarelaPagoService::class)->activa();
+
+        return $reserva->estado === 'pendiente_pago' && $reserva->creado_por === 'cliente_web'
+            && now()->lt($reserva->fecha_hora) && ! $esperandoAprobacion;
     }
 
     private function buscar(string $token): Reserva
@@ -75,6 +100,9 @@ class ReservaPublicaController extends Controller
             'tolerancia_minutos' => PoliticaReservas::toleranciaMinutos(),
             'puede_cancelar' => $motivo === null,
             'motivo_no_cancela' => $motivo,
+            // Fase 6, tarea 1: pagar el depósito desde aquí, y en qué va el último intento.
+            'puede_pagar' => $this->puedePagar($reserva),
+            'deposito_estado' => $reserva->deposito_estado,
         ];
     }
 }

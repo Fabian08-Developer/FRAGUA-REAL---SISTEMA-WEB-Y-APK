@@ -18,6 +18,7 @@ import CuentaMesaModal from '@/components/pedidos/CuentaMesaModal.vue'
 import { pedidoService } from '@/services/pedido.service'
 import { pagoService } from '@/services/pago.service'
 import { mensajeDeError } from '@/services/errors'
+import { metodoPasarela } from '@/utils/pasarela'
 import { TIPOS_PEDIDO_UI, faltaParaFinalizar, formatoHoraPedido, saldoPendiente, titularPedido, totalPagado } from '@/utils/pedidoUi'
 import type { Pago, Pedido } from '@/types/models'
 
@@ -236,7 +237,8 @@ onMounted(cargar)
           <span class="badge bg-sky-50 text-sky-700 ring-sky-600/20">{{ pagosEnLineaPendientes.length }}</span>
         </h2>
         <p class="mt-1.5 text-xs text-gray-500">
-          El Cliente ya pagó por Nequi o Bancolombia — apruébalo si el pago llegó, o recházalo si no.
+          Los que pasan por la pasarela (Wompi) se confirman solos al llegar el pago. Apruébalo o recházalo a mano solo
+          como respaldo, si ves el dinero en la cuenta o el Cliente te muestra el comprobante.
         </p>
 
         <p v-if="errorPago" class="mt-3 alert-error">{{ errorPago }}</p>
@@ -254,13 +256,22 @@ onMounted(cargar)
                 {{ pago.pasarela === 'nequi' ? 'Nequi' : 'Bancolombia' }}
               </p>
               <p class="mt-1.5 font-display text-xl font-medium text-ink">{{ formatoPrecio(pago.monto) }}</p>
+              <!-- Fase 6, tarea 1: el intento en la pasarela, si lo hubo. -->
+              <p v-if="pago.transaccion_pasarela" class="mt-1 text-xs text-sky-700">
+                En proceso en Wompi<template v-if="pago.transaccion_pasarela.metodo_pago"> · {{ metodoPasarela(pago.transaccion_pasarela.metodo_pago) }}</template>
+                · se confirma solo
+              </p>
             </div>
             <div class="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
               <BaseButton variant="ghost" :disabled="procesandoPagoId === pago.id" @click="rechazarPago(pago)">
-                Rechazar
+                {{ pago.transaccion_pasarela ? 'Rechazar a mano' : 'Rechazar' }}
               </BaseButton>
-              <BaseButton variant="primary" :disabled="procesandoPagoId === pago.id" @click="aprobarPago(pago)">
-                {{ procesandoPagoId === pago.id ? 'Procesando…' : 'Aprobar pago' }}
+              <BaseButton
+                :variant="pago.transaccion_pasarela ? 'secondary' : 'primary'"
+                :disabled="procesandoPagoId === pago.id"
+                @click="aprobarPago(pago)"
+              >
+                {{ procesandoPagoId === pago.id ? 'Procesando…' : pago.transaccion_pasarela ? 'Aprobar a mano' : 'Aprobar pago' }}
               </BaseButton>
             </div>
           </li>

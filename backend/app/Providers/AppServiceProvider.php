@@ -14,7 +14,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Fase 6, tarea 1 (decisión D4): la pasarela de pago es Wompi. Para cambiar de proveedor
+        // se escribe otro adaptador de App\Support\Pasarela\PasarelaPago y se cambia aquí.
+        $this->app->bind(\App\Support\Pasarela\PasarelaPago::class, \App\Support\Pasarela\WompiPasarela::class);
     }
 
     /**

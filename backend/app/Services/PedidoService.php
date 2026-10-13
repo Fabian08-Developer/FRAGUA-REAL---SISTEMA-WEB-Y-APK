@@ -962,6 +962,8 @@ class PedidoService
         // Fase 2, tarea 2: el abono del depósito de la reserva vuelve a la reserva y pasa a los
         // demás pedidos de la visita.
         app(AbonoDepositoService::class)->liberarDePedidoCancelado($pedido, $actor);
+        // Fase 6, tarea 1: si ya se había pagado por la pasarela, queda marcado para reembolsarlo.
+        app(PasarelaPagoService::class)->avisarPedidoCancelado($pedido);
 
         // RNF-M02-003/012: cancelar un pedido queda auditado.
         app(AuditoriaService::class)->registrar('cancelar_pedido', 'Pedido', $pedido->id, [

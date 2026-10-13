@@ -242,6 +242,49 @@ Antes de probar: `composer update barryvdh/laravel-dompdf --with-all-dependencie
       vigente y el anulado con su motivo y cuántas veces se imprimió cada uno; "Abrir" en el anulado
       muestra el sello ANULADO. Con el Mesero no aparece esa lista.
 
+### 6c. Pago en línea con Wompi (Fase 6, tarea 1 — RF-M06-006/007/008/017, RN-M06-05, RF-M05-030)
+Antes de probar: `php artisan migrate`. Poner en el `.env` del backend las llaves del sandbox de
+Wompi (`WOMPI_*`), `PASARELA_PROVEEDOR=wompi` y `FRONTEND_URL`, y correr `php artisan config:clear`.
+Para que lleguen los eventos al equipo de desarrollo hace falta una URL pública (por ejemplo un
+túnel); sin ella, la página de retorno y `php artisan pasarela:conciliar` igual confirman el pago.
+- [ ] Sin llaves (o con `PASARELA_PROVEEDOR=manual`): Caja > "Pagos en línea" dice "Aprobación
+      manual" y el pago en línea queda en revisión como antes; el Mesero lo aprueba en Cobrar y
+      Auditoría dice "a mano" con su nombre.
+- [ ] Con las llaves: Caja > "Pagos en línea" dice "Wompi activo (pruebas)" y muestra la URL de
+      eventos, que es la que se pone en Wompi > Desarrolladores.
+- [ ] Como invitado, una recogida pagada en línea con Nequi: el Checkout lleva a la página de pago
+      de Wompi con el monto del pedido y los datos del invitado ya puestos.
+- [ ] Pagar con el Nequi de prueba que Wompi aprueba: se vuelve a "Pago aprobado", con la
+      referencia FRP-…. El pedido queda con el pago aprobado sin que nadie lo apruebe, ya se
+      puede confirmar y tiene su comprobante en PDF.
+- [ ] En Caja, ese pago dice "Confirmado por Wompi · Nequi · ref. FRP-…". En Auditoría aparece
+      "Pago en línea aprobado" sin usuario.
+- [ ] Pagar con el Nequi de prueba que Wompi rechaza: "El pago no se completó" con "Intentar de
+      nuevo". Desde el seguimiento se paga otra vez sobre el mismo pedido (no se crea otro).
+- [ ] Abrir el pago y cerrar la página de Wompi sin pagar: en el seguimiento sale "¿No terminaste
+      el pago? Puedes intentarlo de nuevo" y el reintento abre otro pago. El anterior queda "Sin
+      pagar (vencido)".
+- [ ] Mientras Nequi espera la aprobación, la página "Tu pago está en proceso" se actualiza sola.
+      En Cobrar el pago dice "En proceso en Wompi · se confirma solo", con "Aprobar a mano" de
+      respaldo.
+- [ ] Reserva web: después de crearla, "Pagar depósito" lleva a Wompi; al aprobarse, la reserva
+      queda confirmada y llega el correo. En Reservas dice "Wompi: Aprobado · ref. FRR-…".
+- [ ] Depósito rechazado: la página de retorno ofrece volver a la reserva y "Mi reserva" (el
+      enlace) tiene "Pagar el depósito" para reintentar.
+- [ ] Reembolsar en Caja un pago aprobado con tarjeta de prueba: queda "Reembolso solicitado a la
+      pasarela" y en Wompi aparece anulado. Con Nequi: "Devolverlo desde el panel de la pasarela"
+      y aparece en "Pagos en línea por revisar". Hacerlo en Wompi y "Marcar como revisado" con la
+      nota de lo que se hizo.
+- [ ] Cancelar una reserva con depósito pagado por Wompi: se pide la devolución (con Nequi queda
+      por revisar).
+- [ ] Cancelar un pedido ya pagado por Wompi: aparece en "Pagos en línea por revisar" con
+      "reembólsalo desde Caja".
+- [ ] Rechazar a mano en Cobrar un pago que luego Wompi aprueba: queda por revisar ("ya estaba
+      rechazado").
+- [ ] Enviar al webhook un evento con la firma cambiada (por ejemplo con Postman): responde 401 y
+      no cambia nada.
+- [ ] Un Mesero no puede abrir `GET /pasarela/estado` ni `/pasarela/transacciones` (403).
+
 ## 7. Compras y gastos (M03)
 - [ ] Registrar una compra y un gasto; editar uno activo (RF-M03-14).
 - [ ] Anular: nunca se borra y un anulado ya no se puede editar (RN-M03-04).
@@ -311,6 +354,17 @@ Antes de probar: `composer update phpoffice/phpspreadsheet --with-all-dependenci
       periodo, "con comparación", "parcial", quién y cuándo). "Descargar" baja el mismo archivo
       aunque después haya ventas nuevas: no se regenera (RNF-M08-006). Auditoría muestra
       "Descarga de un reporte ya exportado".
+
+### 8c. Uso de mesas con pedidos locales (Fase 5, tarea 4 — RF-M08-009, HU-M08-007)
+- [ ] Atender una mesa sin reserva con dos pedidos (el segundo con la mesa todavía ocupada),
+      cobrar, finalizar y liberarla; más tarde, otro pedido en la misma mesa. En Reportes >
+      "Ocupación por mesa" esa mesa dice "2 visitas", las ventas y los minutos promedio.
+- [ ] Una mesa con una reserva completada suma "1 reserva"; una mesa que no se usó dice "Sin uso
+      en el periodo".
+- [ ] Un pedido cancelado no cuenta como visita. Las cifras de reservas (creadas, canceladas,
+      no-show) no cambian.
+- [ ] Exportar "Uso de mesas" a Excel: la hoja "Ocupación por mesa" trae Mesa, Visitas, Pedidos,
+      Ventas, Minutos promedio por visita y Reservas completadas.
 - [ ] Un Mesero no puede abrir Reportes (403).
 
 ## 9. Pedidos (supervisión)

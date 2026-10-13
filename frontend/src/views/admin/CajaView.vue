@@ -9,9 +9,11 @@ import { Banknote, CreditCard, Landmark, Smartphone, Wallet } from 'lucide-vue-n
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import PagosPasarelaPorRevisar from '@/components/caja/PagosPasarelaPorRevisar.vue'
 import { cajaService } from '@/services/caja.service'
 import { pagoService } from '@/services/pago.service'
 import { mensajeDeError } from '@/services/errors'
+import { ESTADO_REEMBOLSO, ESTADO_TRANSACCION, metodoPasarela } from '@/utils/pasarela'
 import type { CajaTurno, Pago } from '@/types/models'
 
 function formatoPrecio(valor: number | null) {
@@ -262,6 +264,9 @@ onMounted(() => {
       descripcion="Historial de turnos, detalle de pagos y anulación de pagos."
     />
 
+    <!-- Fase 6, tarea 1 (D4): estado de la pasarela y pagos en línea por revisar. -->
+    <PagosPasarelaPorRevisar />
+
     <!-- Turno de hoy: abrir si no hay uno, cerrar si está abierto (RN-M06-01/03) -->
     <section
       class="mt-7 overflow-hidden rounded-2xl p-5 sm:p-6"
@@ -505,6 +510,20 @@ onMounted(() => {
                 <p class="mt-0.5 text-xs text-gray-500">
                   {{ pago.pasarela === 'nequi' ? 'Nequi' : 'Bancolombia' }} · {{ formatoPrecio(pago.monto) }}
                   <template v-if="pago.anulado && pago.anulado_motivo">· "{{ pago.anulado_motivo }}"</template>
+                </p>
+                <!-- Fase 6, tarea 1: cómo se aprobó y qué dijo la pasarela. -->
+                <p v-if="pago.transaccion_pasarela || pago.confirmado_via" class="mt-0.5 text-xs text-gray-500">
+                  <template v-if="pago.confirmado_via === 'pasarela'">Confirmado por Wompi</template>
+                  <template v-else-if="pago.confirmado_via === 'manual'">
+                    {{ pago.estado === 'rechazado' ? 'Rechazado' : 'Aprobado' }} a mano<template v-if="pago.confirmado_por_usuario"> por {{ pago.confirmado_por_usuario.nombre }}</template>
+                  </template>
+                  <template v-if="pago.transaccion_pasarela">
+                    · {{ metodoPasarela(pago.transaccion_pasarela.metodo_pago) || ESTADO_TRANSACCION[pago.transaccion_pasarela.estado] }}
+                    · ref. <span class="font-mono">{{ pago.transaccion_pasarela.referencia }}</span>
+                  </template>
+                </p>
+                <p v-if="pago.transaccion_pasarela?.reembolso_estado" class="mt-0.5 text-xs" :class="pago.transaccion_pasarela.reembolso_estado === 'fallido' ? 'text-red-700' : 'text-amber-700'">
+                  {{ ESTADO_REEMBOLSO[pago.transaccion_pasarela.reembolso_estado] }}<template v-if="pago.transaccion_pasarela.reembolso_mensaje">: {{ pago.transaccion_pasarela.reembolso_mensaje }}</template>
                 </p>
               </div>
               <BaseButton

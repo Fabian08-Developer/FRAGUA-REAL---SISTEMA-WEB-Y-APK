@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Auditoria;
 use App\Models\CierreDiario;
 use App\Models\CompraGasto;
+use App\Models\Mesa;
 use App\Models\Pago;
 use App\Models\Pedido;
 use App\Models\PedidoDetalle;
@@ -241,8 +242,19 @@ class ReporteService
         ];
     }
 
-    // RF-M08-009: reservas creadas, canceladas y liberadas por no-show, y ocupación de
-    // cada mesa, tomando los datos de M05 (fecha_hora de la reserva, no su creación).
+    /**
+     * RF-M08-009, HU-M08-007: uso de mesas del periodo. Reservas creadas, canceladas y liberadas por
+     * no-show (por la hora de la reserva, M05) y la ocupación de cada mesa.
+     *
+     * CORREGIDO (Fase 5, tarea 4, 13/10/2026): la ocupación solo contaba reservas completadas, así que
+     * una mesa llena de clientes sin reserva aparecía "sin uso". Ahora también cuenta los pedidos
+     * locales de la mesa (M02), agrupados en visitas: un pedido abre una visita nueva cuando todos
+     * los pedidos anteriores de esa mesa ya se habían finalizado o cancelado (la mesa se había
+     * liberado); los que llegan mientras la mesa sigue ocupada son de la misma visita. Por mesa:
+     * visitas, pedidos, ventas (pedidos finalizados), minutos promedio por visita (del primer pedido
+     * al cierre del último, solo visitas ya cerradas) y reservas completadas. Se listan todas las
+     * mesas activas, también las que no tuvieron uso.
+     */
     public function usoDeMesas(CarbonImmutable $desde, CarbonImmutable $hasta): array
     {
         $porEstado = Reserva::whereBetween('fecha_hora', [$desde, $hasta])
@@ -250,13 +262,57 @@ class ReporteService
             ->groupBy('estado')
             ->get();
 
-        $ocupacionPorMesa = Reserva::join('mesas', 'mesas.id', '=', 'reservas.mesa_id')
-            ->whereBetween('reservas.fecha_hora', [$desde, $hasta])
-            ->where('reservas.estado', 'completada')
-            ->select('mesas.id', 'mesas.nombre', DB::raw('COUNT(*) as reservas_completadas'))
-            ->groupBy('mesas.id', 'mesas.nombre')
-            ->orderByDesc('reservas_completadas')
-            ->get();
+        $reservasCompletadas = Reserva::whereBetween('fecha_hora', [$desde, $hasta])
+            ->where('estado', 'completada')
+            ->select('mesa_id', DB::raw('COUNT(*) as cantidad'))
+            ->groupBy('mesa_id')
+            ->pluck('cantidad', 'mesa_id');
+
+        $pedidos = Pedido::where('tipo', 'local')->whereNotNull('mesa_id')
+            ->where('estado', '!=', 'cancelado')
+            ->whereBetween('created_at', [$desde, $hasta])
+            ->orderBy('mesa_id')->orderBy('created_at')->orderBy('id')
+            ->get(['id', 'mesa_id', 'estado', 'total', 'created_at', 'finalizado_at', 'cancelado_at']);
+
+        $usoPorMesa = $pedidos->groupBy('mesa_id')->map(function ($deLaMesa) {
+            $visitas = [];
+            foreach ($deLaMesa as $pedido) {
+                $cierre = $pedido->finalizado_at ?? $pedido->cancelado_at; // null: sigue activo
+                $actual = array_key_last($visitas);
+                $sigueAbierta = $actual !== null
+                    && ($visitas[$actual]['fin'] === null || $pedido->created_at->lte($visitas[$actual]['fin']));
+                if ($sigueAbierta) {
+                    $fin = $visitas[$actual]['fin'];
+                    $visitas[$actual]['fin'] = ($fin === null || $cierre === null) ? null : $fin->max($cierre);
+                } else {
+                    $visitas[] = ['inicio' => $pedido->created_at, 'fin' => $cierre];
+                }
+            }
+            $cerradas = array_filter($visitas, fn ($v) => $v['fin'] !== null);
+
+            return [
+                'visitas' => count($visitas),
+                'pedidos_locales' => $deLaMesa->count(),
+                'ventas' => (float) $deLaMesa->where('estado', 'finalizado')->sum('total'),
+                'minutos_promedio' => $cerradas
+                    ? (int) round(array_sum(array_map(fn ($v) => $v['inicio']->diffInMinutes($v['fin']), $cerradas)) / count($cerradas))
+                    : null,
+            ];
+        });
+
+        $mesasUsadas = $usoPorMesa->keys()->merge($reservasCompletadas->keys())->unique();
+        $ocupacionPorMesa = Mesa::where('activa', true)->orWhereIn('id', $mesasUsadas)->orderBy('nombre')->get(['id', 'nombre'])
+            ->map(fn (Mesa $mesa) => [
+                'id' => $mesa->id,
+                'nombre' => $mesa->nombre,
+                'visitas' => $usoPorMesa[$mesa->id]['visitas'] ?? 0,
+                'pedidos_locales' => $usoPorMesa[$mesa->id]['pedidos_locales'] ?? 0,
+                'ventas' => $usoPorMesa[$mesa->id]['ventas'] ?? 0.0,
+                'minutos_promedio' => $usoPorMesa[$mesa->id]['minutos_promedio'] ?? null,
+                'reservas_completadas' => (int) ($reservasCompletadas[$mesa->id] ?? 0),
+            ])
+            ->sortByDesc(fn ($m) => [$m['visitas'], $m['reservas_completadas'], $m['ventas']])
+            ->values();
 
         $cuenta = fn (string $estado) => (int) ($porEstado->firstWhere('estado', $estado)->cantidad ?? 0);
 
@@ -265,7 +321,9 @@ class ReporteService
                 'reservas_creadas' => (int) $porEstado->sum('cantidad'),
                 'reservas_canceladas' => $cuenta('cancelada'),
                 'reservas_no_show' => $cuenta('no_show'),
-                'mesas_con_uso' => $ocupacionPorMesa->count(),
+                'visitas' => (int) $ocupacionPorMesa->sum('visitas'),
+                'pedidos_locales' => (int) $ocupacionPorMesa->sum('pedidos_locales'),
+                'mesas_con_uso' => $ocupacionPorMesa->filter(fn ($m) => $m['visitas'] > 0 || $m['reservas_completadas'] > 0)->count(),
             ],
             'detalle' => [
                 'por_estado' => $porEstado,

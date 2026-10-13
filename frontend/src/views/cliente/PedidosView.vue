@@ -11,6 +11,7 @@ import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
 import { pedidoService } from '@/services/pedido.service'
 import { reservaService } from '@/services/reserva.service'
 import { mensajeDeError } from '@/services/errors'
+import { irAlCheckout } from '@/utils/pasarela'
 import type { EstadoReserva, Pedido, Reserva } from '@/types/models'
 
 const tab = ref<'pedidos' | 'reservas'>('pedidos')
@@ -60,11 +61,14 @@ function puedeCancelarPedido(pedido: Pedido) {
 // pendiente, el Cliente puede reintentarlo aquí sobre el mismo pedido.
 function puedeReintentarPago(pedido: Pedido) {
   const enLinea = (pedido.pagos ?? []).filter((p) => p.metodo === 'en_linea' && !p.anulado)
+  // Fase 6, tarea 1: también si el último quedó a medias en la pasarela (el servidor pregunta por
+  // él antes de abrir otro; si sigue en curso, lo dice).
+  const aMedias = enLinea.some((p) => p.estado === 'pendiente' && p.transaccion_pasarela)
   return (
     pedido.estado === 'pendiente' &&
     pedido.tipo !== 'local' &&
     enLinea.length > 0 &&
-    enLinea.every((p) => p.estado === 'rechazado')
+    (aMedias || enLinea.every((p) => p.estado === 'rechazado'))
   )
 }
 
@@ -75,7 +79,8 @@ async function reintentarPago(pedido: Pedido, pasarela: 'nequi' | 'bancolombia')
   reintentando.value = pedido.id
   errorReintento.value = ''
   try {
-    await pedidoService.pagarEnLinea(pedido.id, { pasarela, monto: Number(pedido.total) })
+    const { data } = await pedidoService.pagarEnLinea(pedido.id, { pasarela, monto: Number(pedido.total) })
+    if (irAlCheckout(data.checkout)) return // Fase 6: se paga en la pasarela y se vuelve por /pago/retorno
     await cargarPedidos()
   } catch (e) {
     errorReintento.value = mensajeDeError(e, 'No pudimos registrar el pago.')
@@ -333,7 +338,13 @@ onMounted(cargarPedidos)
             </template>
 
             <div v-if="puedeReintentarPago(pedido)" class="mt-4 border-t border-[#e2dbcf] pt-4">
-              <p class="text-xs text-[#6c655c]">Tu pago en línea fue rechazado. Puedes intentarlo de nuevo:</p>
+              <p class="text-xs text-[#6c655c]">
+                {{
+                  (pedido.pagos ?? []).some((p) => p.estado === 'pendiente' && p.transaccion_pasarela)
+                    ? 'Tu pago en línea quedó en proceso. Si no lo terminaste, puedes intentarlo de nuevo:'
+                    : 'Tu pago en línea fue rechazado. Puedes intentarlo de nuevo:'
+                }}
+              </p>
               <p v-if="errorReintento" class="mt-2 alert-error">{{ errorReintento }}</p>
               <div class="mt-2 flex gap-2">
                 <button

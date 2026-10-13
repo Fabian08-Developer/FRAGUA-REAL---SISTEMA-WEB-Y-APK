@@ -44,7 +44,7 @@ class CajaController extends Controller
         // del día del turno, junto con lo que restan las compras y gastos en efectivo
         // (RF-M06-013), para que el Administrador vea de dónde sale el efectivo esperado.
         [$desde, $hasta] = $this->cajaService->rangoDelTurno($turno);
-        $pagosEnLinea = Pago::with(['pedido', 'anuladoPorUsuario'])
+        $pagosEnLinea = Pago::with(['pedido', 'anuladoPorUsuario', 'transaccionPasarela', 'confirmadoPorUsuario:id,nombre'])
             ->where('metodo', 'en_linea')
             ->where('tipo', 'cobro') // el abono de un depósito no es un cobro del día (Fase 2, tarea 2)
             ->whereBetween('created_at', [$desde, $hasta])

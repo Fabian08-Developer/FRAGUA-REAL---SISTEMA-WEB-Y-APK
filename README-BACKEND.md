@@ -832,6 +832,92 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       generó, y cada descarga queda registrada.
     - Frontend: Reportes exporta con la comparación de la pantalla y muestra "Exportaciones
       guardadas" con "Descargar"; `utils/documentos.ts` gana `guardarArchivo()`.
+40. **Fase 5, tarea 4 (13/10/2026): uso de mesas con pedidos locales (M08).** RF-M08-009,
+    HU-M08-007, CA-M08-007. Sin migración; 3 pruebas en `UsoDeMesasTest`. Con esta tarea la Fase 5
+    quedó completa.
+    - CORREGIDO: la ocupación de cada mesa solo contaba reservas completadas, así que una mesa llena
+      de clientes sin reserva salía "sin uso".
+    - `ReporteService::usoDeMesas()` cuenta ahora los pedidos locales no cancelados del periodo,
+      agrupados en visitas: un pedido abre una visita nueva cuando todos los anteriores de esa mesa
+      ya estaban finalizados o cancelados (la mesa se había liberado); los que llegan con la mesa
+      ocupada son de la misma visita. Por mesa: visitas, pedidos, ventas (lo finalizado), minutos
+      promedio por visita (del primer pedido al cierre del último, solo visitas cerradas) y reservas
+      completadas. Lista todas las mesas activas, también las que no se usaron, de la más usada a la
+      menos usada. El resumen suma `visitas` y `pedidos_locales`, y `mesas_con_uso` cuenta las
+      mesas con visitas o reservas completadas. Las cifras de reservas no cambian (CA-M08-007).
+    - La exportación (punto 39) trae la tabla "Ocupación por mesa" con esas columnas.
+    - Frontend: Reportes > "Ocupación por mesa" muestra visitas, ventas, minutos promedio y reservas
+      de cada mesa, y "Sin uso en el periodo" en las que no se usaron.
+
+41. **Fase 6, tarea 1 (13/10/2026): pasarela Wompi con confirmación automática (M06, M07, M05).**
+    Decisión D4: Wompi, desarrollado contra su sandbox, con la aprobación manual de respaldo.
+    RF-M06-006, 007, 008, 017, RN-M06-05, RF-M07-013 a 015, RF-M05-029, 030. Migración
+    `2026_10_20_000001` (tabla `transacciones_pasarela`; `pagos.confirmado_via` y `confirmado_por`;
+    `reservas.deposito_confirmado_via`); 15 pruebas en `PasarelaWompiTest`, con eventos firmados y
+    la API de Wompi simulada (`Http::fake`).
+    - Interfaz `App\Support\Pasarela\PasarelaPago` y su adaptador `WompiPasarela` (enlazado en
+      `AppServiceProvider`). Cambiar de proveedor es escribir otro adaptador.
+    - Cobro: el Cliente elige pagar en línea y `PagoService::iniciarPagoEnLinea()` (o
+      `ReservaService::iniciarDepositoEnLinea()` para el depósito) deja el pago "pendiente" como
+      antes y crea el intento en `transacciones_pasarela`. Ese intento lleva una referencia secreta
+      (`FRP-…` o `FRR-…` y 20 caracteres al azar) y vence a los 30 minutos. La respuesta trae
+      `checkout.url`: el Web Checkout de Wompi con la firma de integridad (sha256 de referencia +
+      monto en centavos + moneda + vencimiento + secreto). Con la pasarela se cobra exactamente lo
+      que falta, no lo que mande el navegador.
+    - Confirmación: `POST /api/pasarela/wompi/eventos` (público, sin sesión). Solo aplica un evento
+      `transaction.updated` cuya firma cuadre: sha256 de los valores de `signature.properties` +
+      `timestamp` + el secreto de eventos, y además el encabezado `X-Event-Checksum` si viene.
+      Firma mala: 401 y nada cambia. `PasarelaPagoService::aplicar()` es idempotente (un evento
+      repetido no hace nada la segunda vez) y aprueba o rechaza el pago o el depósito
+      (`confirmado_via = pasarela`, auditado como `confirmar_pago_en_linea` /
+      `rechazar_pago_en_linea` / `confirmar_deposito_reserva` con `via`). RN-M06-05 y RF-M06-007
+      siguen igual: `PedidoService::confirmar()` no confirma con un pago sin aprobar.
+    - Página de retorno: Wompi devuelve al Cliente a `/pago/retorno/{referencia}?id=…`. El frontend
+      llama `GET /api/pasarela/transacciones/{referencia}` (público, con límite de intentos), que
+      consulta la transacción en Wompi. Un `id` de otra referencia se ignora. La respuesta no trae
+      la respuesta cruda de Wompi.
+    - RF-M06-008: al reintentar, se pregunta antes por el intento abierto. Si nunca llegó a Wompi
+      queda "abandonado" y el pago rechazado; si sigue en proceso (Nequi esperando aprobación) se
+      avisa en vez de cobrar dos veces; si ya se aprobó, se dice.
+    - Conciliación: `php artisan pasarela:conciliar`, cada 5 minutos con el programador. Pregunta
+      por los intentos pendientes de más de 2 minutos, por si un evento se perdió, y cierra como
+      abandonados los que vencieron sin pagarse.
+    - El sistema no decide solo con el dinero: marca "por revisar" (`requiere_revision`, auditado
+      `pago_pasarela_por_revisar`) estos casos:
+      - un monto distinto;
+      - un aprobado por Wompi que ya estaba rechazado a mano, anulado o abandonado;
+      - un rechazo de Wompi a un pago aprobado a mano;
+      - un pedido cancelado que ya estaba pagado;
+      - un depósito aprobado cuya reserva ya no se puede confirmar (mesa tomada);
+      - un reembolso que Wompi no hizo.
+      El Administrador los ve en Caja > "Pagos en línea" (`GET /pasarela/estado`,
+      `GET /pasarela/transacciones?revision=1`) y los cierra con una nota
+      (`POST /pasarela/transacciones/{id}/revisada`, auditado `revisar_pago_pasarela`).
+    - Reembolso (RF-M06-017, RN-M05-17): reembolsar un pago en línea en Caja, o cancelar una reserva
+      con depósito pagado en línea, se lo pide también a Wompi (`reembolso_pasarela` en la
+      auditoría). Wompi solo anula por API los pagos con tarjeta (`POST /transactions/{id}/void`).
+      Los de Nequi, botón Bancolombia y PSE quedan "no_soportado", con la indicación de devolverlos
+      desde el panel de Wompi. Si la llamada falla, la anulación o la cancelación siguen en pie y
+      se reintenta con `POST /pasarela/transacciones/{id}/reembolsar`.
+    - Respaldo (D4): sin `PASARELA_PROVEEDOR=wompi` o sin alguna de las cuatro llaves, todo sigue
+      como antes: el pago queda en revisión y lo aprueba el Mesero o el Administrador, ahora con
+      quién lo hizo en la auditoría. Con la pasarela activa, esa aprobación manual sigue disponible.
+    - CORREGIDO (seguridad): `POST /reservas/{id}/deposito/en-linea` aceptaba cualquier número de
+      reserva, que es consecutivo. Ahora exige el enlace secreto de la reserva (`token`), que
+      `POST /reservas` devuelve una sola vez a quien la crea desde la web. El depósito también se
+      paga o se reintenta desde el enlace del correo (`POST /reservas/enlace/{token}/deposito`).
+    - Frontend:
+      - Checkout, Seguimiento, Mis pedidos, Reservar y Mi reserva mandan al checkout de Wompi
+        (`utils/pasarela.ts`).
+      - Nueva página `PagoRetornoView.vue`. Se actualiza sola mientras Nequi espera la aprobación y
+        lleva al pedido o a la reserva, o a reintentar.
+      - Cobrar (Mesero) y Reservas (Administrador) dicen "En proceso en Wompi · se confirma solo" y
+        dejan "Aprobar a mano" de respaldo.
+      - Caja (Administrador) muestra el estado de la pasarela, la URL de eventos, los pagos por
+        revisar (`PagosPasarelaPorRevisar.vue`) y, en cada pago en línea, cómo se aprobó y cómo
+        quedó su reembolso.
+    - Configuración en el servidor: llaves `WOMPI_*` en `.env` y la URL de eventos en Wompi >
+      Desarrolladores (ver README-ENTREGA).
 
 ## Qué falta a propósito
 
@@ -844,13 +930,10 @@ brechas de documentación, solo de implementación técnica):
   `GET /configuracion` (público) los lee de ahí. `config/fragua_real.php` quedó solo como valor de
   respaldo. El valor inicial del depósito de reserva es $20.000 COP
   (confirmado el 06/10/2026 y documentado en RN-M05-14).
-- **Pasarela de pago real (Nequi/Bancolombia)**: documentado como pendiente en
-  `M06_Gestion_de_Caja_y_Ventas_Fragua_Real.docx` sección 16 ("Integrar técnicamente las
-  pasarelas de Nequi Negocios y Bancolombia") y en `M01...docx` sección 17 ("Proveedor de
-  pago en línea"). `PagoService::registrarPagoEnLinea()` (M06) y
-  `ReservaService::registrarDepositoEnLinea()` (M05, RN-M05-15) crean el pago/depósito en
-  estado `pendiente`; falta el webhook real que lo confirme — `confirmarPagoEnLinea()` y
-  `confirmarDepositoEnLinea()` ya existen para cuando esa integración llegue.
+- **Pasarela de pago real (Nequi/Bancolombia)**: RESUELTO (13/10/2026, punto 41) con Wompi (D4), que
+  cubre Nequi y el botón Bancolombia con un solo contrato. Falta solo lo que no es código: la cuenta
+  comercial de producción y sus llaves. Mientras tanto se prueba con las llaves del sandbox, y la
+  aprobación manual sigue de respaldo.
 - **Alta de Administrador/Mesero**: RESUELTO. `UsuarioController` (solo Administrador) lista, crea
   cuentas de Mesero/Administrador, las activa/desactiva y revoca sus sesiones (RF-M01-001).
   `AuthController::register()` solo expone el autorregistro de Cliente (RF-M01-014).

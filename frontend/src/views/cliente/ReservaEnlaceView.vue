@@ -9,6 +9,7 @@ import { CalendarClock, CheckCircle2, XCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import { reservaService } from '@/services/reserva.service'
 import { mensajeDeError } from '@/services/errors'
+import { irAlCheckout } from '@/utils/pasarela'
 import type { EstadoReserva, ReservaPublica } from '@/types/models'
 
 const route = useRoute()
@@ -55,6 +56,26 @@ async function cancelar() {
     error.value = mensajeDeError(e, 'No pudimos cancelar tu reserva.')
   } finally {
     cancelando.value = false
+  }
+}
+
+// ---- Fase 6, tarea 1 (RF-M05-030, RF-M06-008): pagar o reintentar el depósito desde aquí ----
+const pasarela = ref<'nequi' | 'bancolombia'>('nequi')
+const pagando = ref(false)
+const depositoEnRevision = ref(false)
+
+async function pagarDeposito() {
+  pagando.value = true
+  error.value = ''
+  try {
+    const { data } = await reservaService.pagarDepositoPorEnlace(token, pasarela.value)
+    if (irAlCheckout(data.checkout)) return // vuelve por /pago/retorno
+    reserva.value = data
+    depositoEnRevision.value = true // modo manual: lo aprueba el personal
+    pagando.value = false
+  } catch (e) {
+    error.value = mensajeDeError(e, 'No pudimos iniciar el pago del depósito.')
+    pagando.value = false
   }
 }
 
@@ -121,6 +142,26 @@ onMounted(cargar)
         Tu reserva quedó cancelada. Te enviamos la confirmación por correo.
       </p>
       <p v-if="error" class="mt-4 alert-error">{{ error }}</p>
+
+      <!-- Fase 6, tarea 1: el depósito se paga (o se reintenta) desde el enlace. -->
+      <section v-if="reserva.puede_pagar && !depositoEnRevision" class="mt-6 rounded-2xl border border-[#e2dbcf] bg-white p-5">
+        <h2 class="font-display text-lg text-ink">Pagar el depósito</h2>
+        <p class="mt-1 text-xs text-[#6c655c]">
+          <template v-if="reserva.deposito_estado === 'rechazado'">El pago anterior no se aprobó. </template>
+          <template v-else-if="reserva.deposito_estado === 'pendiente'">Si no terminaste el pago anterior, puedes intentarlo de nuevo. </template>
+          Tu reserva se confirma en cuanto el pago quede aprobado.
+        </p>
+        <div class="mt-3 flex gap-4">
+          <label class="flex items-center gap-2 text-sm text-ink"><input v-model="pasarela" type="radio" value="nequi" /> Nequi</label>
+          <label class="flex items-center gap-2 text-sm text-ink"><input v-model="pasarela" type="radio" value="bancolombia" /> Bancolombia</label>
+        </div>
+        <BaseButton class="mt-4" :disabled="pagando" @click="pagarDeposito">
+          {{ pagando ? 'Abriendo el pago…' : `Pagar ${formatoPrecio(reserva.deposito_valor)}` }}
+        </BaseButton>
+      </section>
+      <p v-else-if="depositoEnRevision" class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        Registramos tu pago. En cuanto lo verifiquemos, confirmamos tu reserva y te avisamos por correo.
+      </p>
 
       <div v-if="reserva.puede_cancelar" class="mt-6">
         <BaseButton v-if="!confirmando" variant="danger-soft" @click="confirmando = true">Cancelar mi reserva</BaseButton>

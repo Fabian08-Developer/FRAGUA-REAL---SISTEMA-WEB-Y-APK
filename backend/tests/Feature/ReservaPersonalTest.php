@@ -109,11 +109,13 @@ class ReservaPersonalTest extends TestCase
 
     public function test_una_reserva_web_sin_pagar_no_aparta_la_mesa_y_la_primera_que_paga_se_queda_con_ella(): void
     {
-        $primera = $this->postJson('/api/reservas', $this->datos())->assertCreated()->json('id');
-        $segunda = $this->postJson('/api/reservas', $this->datos(['cliente_correo' => 'otro@correo.co']))->assertCreated()->json('id');
+        $r1 = $this->postJson('/api/reservas', $this->datos())->assertCreated();
+        $r2 = $this->postJson('/api/reservas', $this->datos(['cliente_correo' => 'otro@correo.co']))->assertCreated();
+        [$primera, $segunda] = [$r1->json('id'), $r2->json('id')];
 
-        $this->postJson("/api/reservas/{$segunda}/deposito/en-linea", ['pasarela' => 'nequi'])->assertOk();
-        $this->postJson("/api/reservas/{$primera}/deposito/en-linea", ['pasarela' => 'bancolombia'])->assertOk();
+        // Fase 6, tarea 1: el depósito se inicia con el enlace secreto que recibió quien reservó.
+        $this->postJson("/api/reservas/{$segunda}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $r2->json('token_publico')])->assertOk();
+        $this->postJson("/api/reservas/{$primera}/deposito/en-linea", ['pasarela' => 'bancolombia', 'token' => $r1->json('token_publico')])->assertOk();
 
         Sanctum::actingAs($this->admin);
         $this->postJson("/api/reservas/{$segunda}/deposito/en-linea/confirmar")->assertOk();

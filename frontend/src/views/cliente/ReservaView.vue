@@ -15,6 +15,7 @@ import { mesaService } from '@/services/mesa.service'
 import { configuracionService } from '@/services/configuracion.service'
 import { reservaService } from '@/services/reserva.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
+import { irAlCheckout } from '@/utils/pasarela'
 import type { Mesa, Reserva } from '@/types/models'
 
 const auth = useAuthStore()
@@ -43,6 +44,7 @@ const errorGeneral = ref('')
 const reservaCreada = ref<Reserva | null>(null)
 const pagandoDeposito = ref(false)
 const depositoRegistrado = ref(false)
+const redirigiendo = ref(false) // Fase 6: saliendo hacia el checkout de la pasarela
 const errorDeposito = ref('')
 
 // No se puede reservar para "ahora mismo" ni para el pasado — mínimo, dentro de 1 hora.
@@ -122,12 +124,21 @@ async function pagarDeposito() {
   errorDeposito.value = ''
   pagandoDeposito.value = true
   try {
-    await reservaService.registrarDepositoEnLinea(reservaCreada.value.id, { pasarela: pasarela.value })
+    // Fase 6, tarea 1 (RF-M05-030): con el enlace secreto que devolvió la creación de la reserva.
+    const { data } = await reservaService.registrarDepositoEnLinea(reservaCreada.value.id, {
+      pasarela: pasarela.value,
+      token: reservaCreada.value.token_publico ?? '',
+    })
+    // Con la pasarela activa se paga en Wompi y se vuelve por /pago/retorno.
+    if (irAlCheckout(data.checkout)) {
+      redirigiendo.value = true
+      return
+    }
     depositoRegistrado.value = true
   } catch (error) {
     errorDeposito.value = mensajeDeError(error, 'No pudimos registrar el pago del depósito. Intenta de nuevo.')
   } finally {
-    pagandoDeposito.value = false
+    if (!redirigiendo.value) pagandoDeposito.value = false
   }
 }
 </script>
@@ -169,7 +180,7 @@ async function pagarDeposito() {
 
         <BaseButton class="mt-5" :disabled="pagandoDeposito" @click="pagarDeposito">
           <Smartphone :size="16" />
-          {{ pagandoDeposito ? 'Registrando…' : `Pagar depósito con ${pasarela === 'nequi' ? 'Nequi' : 'Bancolombia'}` }}
+          {{ redirigiendo ? 'Abriendo la pasarela…' : pagandoDeposito ? 'Registrando…' : `Pagar depósito con ${pasarela === 'nequi' ? 'Nequi' : 'Bancolombia'}` }}
         </BaseButton>
       </template>
 

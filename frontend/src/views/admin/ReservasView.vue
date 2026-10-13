@@ -20,6 +20,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import { reservaService } from '@/services/reserva.service'
 import { mesaService } from '@/services/mesa.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
+import { ESTADO_REEMBOLSO, ESTADO_TRANSACCION, metodoPasarela } from '@/utils/pasarela'
 import { useAuthStore } from '@/stores/auth'
 import { configuracionService } from '@/services/configuracion.service'
 import type { EstadoReserva, Mesa, Reserva, ReservaAviso } from '@/types/models'
@@ -549,9 +550,21 @@ onBeforeUnmount(() => clearInterval(reloj))
                 <span v-else-if="reserva.estado === 'completada'" class="font-medium text-green-700">· se abona al primer pedido de la mesa</span>
                 <span v-else-if="reserva.deposito_reembolsado" class="font-medium text-gray-700">· reembolsado</span>
               </template>
-              <template v-else-if="reserva.deposito_estado === 'pendiente'"> — pago en línea pendiente de confirmar</template>
+              <template v-else-if="reserva.deposito_estado === 'pendiente'">
+                — {{ reserva.transaccion_deposito ? 'pago en proceso en Wompi (se confirma solo)' : 'pago en línea pendiente de confirmar' }}
+              </template>
               <template v-else-if="reserva.deposito_estado === 'rechazado'"> — pago en línea rechazado</template>
               <template v-else> — sin pagar</template>
+            </p>
+            <!-- Fase 6, tarea 1 (RF-M05-030): el último intento en la pasarela y su reembolso. -->
+            <p v-if="reserva.transaccion_deposito" class="mt-0.5 text-xs text-gray-500">
+              Wompi: {{ ESTADO_TRANSACCION[reserva.transaccion_deposito.estado] }}
+              <template v-if="reserva.transaccion_deposito.metodo_pago"> · {{ metodoPasarela(reserva.transaccion_deposito.metodo_pago) }}</template>
+              · ref. <span class="font-mono">{{ reserva.transaccion_deposito.referencia }}</span>
+              <template v-if="reserva.deposito_confirmado_via === 'manual' && reserva.deposito_pagado"> · aprobado a mano</template>
+              <template v-if="reserva.transaccion_deposito.reembolso_estado">
+                · {{ ESTADO_REEMBOLSO[reserva.transaccion_deposito.reembolso_estado] }}
+              </template>
             </p>
           </div>
 
@@ -561,11 +574,17 @@ onBeforeUnmount(() => clearInterval(reloj))
           >
             <template v-if="reserva.estado === 'pendiente_pago'">
               <template v-if="reserva.deposito_estado === 'pendiente'">
-                <BaseButton size="sm" variant="primary" :disabled="procesando === reserva.id" @click="confirmarDeposito(reserva)">
-                  Confirmar depósito
+                <!-- Con Wompi se confirma solo; los botones quedan de respaldo (D4). -->
+                <BaseButton
+                  size="sm"
+                  :variant="reserva.transaccion_deposito ? 'secondary' : 'primary'"
+                  :disabled="procesando === reserva.id"
+                  @click="confirmarDeposito(reserva)"
+                >
+                  {{ reserva.transaccion_deposito ? 'Confirmar a mano' : 'Confirmar depósito' }}
                 </BaseButton>
                 <BaseButton size="sm" variant="ghost" :disabled="procesando === reserva.id" @click="rechazarDeposito(reserva)">
-                  Rechazar depósito
+                  {{ reserva.transaccion_deposito ? 'Rechazar a mano' : 'Rechazar depósito' }}
                 </BaseButton>
               </template>
               <BaseButton v-else size="sm" variant="primary" :disabled="procesando === reserva.id" @click="abrirDeposito(reserva)">

@@ -207,6 +207,39 @@ export interface Pago {
   pedido?: Pedido
   registrado_por_usuario?: Usuario | null
   anulado_por_usuario?: Usuario | null
+  // Fase 6, tarea 1 (RF-M06-006): cómo se aprobó o rechazó un pago en línea y su intento en la pasarela.
+  confirmado_via?: 'pasarela' | 'manual' | null
+  confirmado_por?: number | null
+  confirmado_por_usuario?: Pick<Usuario, 'id' | 'nombre'> | null
+  transaccion_pasarela?: TransaccionPasarela | null
+}
+
+// Fase 6, tarea 1 (D4: Wompi) — espeja app/Models/TransaccionPasarela.php: un intento de pago en la
+// pasarela, del pago de un pedido o del depósito de una reserva. La respuesta cruda no viaja.
+export type EstadoTransaccionPasarela = 'pendiente' | 'aprobado' | 'rechazado' | 'anulado' | 'error' | 'abandonado'
+export type EstadoReembolsoPasarela = 'solicitado' | 'aprobado' | 'no_soportado' | 'fallido'
+export interface TransaccionPasarela {
+  id: number
+  proveedor: string
+  referencia: string
+  estado: EstadoTransaccionPasarela
+  monto: number | string
+  metodo_pago: string | null
+  transaccion_id: string | null
+  requiere_revision: boolean
+  motivo_revision: string | null
+  revisado_at: string | null
+  reembolso_estado: EstadoReembolsoPasarela | null
+  reembolso_mensaje: string | null
+  created_at: string
+}
+
+// Lo que devuelve el backend al iniciar un pago en línea con la pasarela activa (null en modo manual).
+export interface CheckoutPasarela {
+  proveedor: string
+  referencia: string
+  url: string
+  expira_at: string
 }
 
 // Espeja app/Models/CajaTurno.php (M06) — RN-M06-03: un solo turno de caja por día.
@@ -376,6 +409,11 @@ export interface Reserva {
   recordatorio_enviado_at?: string | null
   // Fase 4, tarea 4 (RF-M05-027): avisos por correo al cliente, del más reciente al más antiguo.
   avisos?: ReservaAviso[]
+  // Fase 6, tarea 1 (RF-M05-030): el último intento de pagar el depósito en la pasarela.
+  deposito_confirmado_via?: 'pasarela' | 'manual' | null
+  transaccion_deposito?: TransaccionPasarela | null
+  // Solo en la respuesta de crearla desde la web: el enlace secreto con el que se paga el depósito.
+  token_publico?: string
   mesa?: Mesa
 }
 
@@ -404,6 +442,9 @@ export interface ReservaPublica {
   tolerancia_minutos: number
   puede_cancelar: boolean
   motivo_no_cancela: string | null
+  // Fase 6, tarea 1 (RF-M05-030): pagar o reintentar el depósito desde el enlace.
+  puede_pagar?: boolean
+  deposito_estado?: EstadoDepositoReserva
 }
 
 // Espeja app/Models/CompraGasto.php (M03). 'estado' en vez de "anulado": el backend lo

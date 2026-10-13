@@ -42,9 +42,7 @@ class PagoController extends Controller
     {
         $this->authorize('pagarEnLinea', $pedido);
 
-        $pago = $this->pagoService->registrarPagoEnLinea($pedido, $request->validated());
-
-        return response()->json($pago, 201);
+        return $this->respuestaPagoEnLinea(...$this->pagoService->iniciarPagoEnLinea($pedido, $request->validated()));
     }
 
     // POST /api/pedidos/seguimiento/{token}/pagar-en-linea — el invitado paga con el token
@@ -53,38 +51,45 @@ class PagoController extends Controller
     {
         $pedido = Pedido::where('token_publico', $token)->firstOrFail();
 
-        $pago = $this->pagoService->registrarPagoEnLinea($pedido, $request->validated());
+        return $this->respuestaPagoEnLinea(...$this->pagoService->iniciarPagoEnLinea($pedido, $request->validated()));
+    }
 
-        return response()->json($pago, 201);
+    // Fase 6, tarea 1 (RF-M06-006): el pago, y en "checkout" el enlace de la pasarela a donde el
+    // navegador manda al Cliente (null en modo manual: el pago queda en revisión, como antes).
+    private function respuestaPagoEnLinea(Pago $pago, ?array $checkout)
+    {
+        return response()->json($pago->toArray() + ['checkout' => $checkout], 201);
     }
 
     public function anular(AnularPagoRequest $request, Pago $pago)
     {
         $this->authorize('anular', $pago);
 
+        // Fase 6: con la transacción de la pasarela, para mostrar cómo quedó el reembolso.
         return response()->json($this->pagoService->anular(
             $pago,
             $request->user(),
             $request->motivo,
             $request->input('tipo') ?? 'anulacion',
             $request->input('password_confirmacion'),
-        ));
+        )->load('transaccionPasarela'));
     }
 
     // POST /api/pagos/{pago}/confirmar-en-linea — Mesero/Administrador aprueban manualmente
-    // un pago en línea (mismo patrón que ReservaController::confirmarDepositoEnLinea, hasta
-    // que exista el webhook real de la pasarela — ver README-BACKEND.md).
+    // un pago en línea (mismo patrón que ReservaController::confirmarDepositoEnLinea). Fase 6,
+    // tarea 1: con la pasarela activa el pago se confirma solo; esto queda como respaldo (D4) y
+    // en la auditoría con quién lo hizo.
     public function confirmarEnLinea(Request $request, Pago $pago)
     {
         $this->authorize('confirmarEnLinea', $pago);
 
-        return response()->json($this->pagoService->confirmarPagoEnLinea($pago));
+        return response()->json($this->pagoService->confirmarPagoEnLinea($pago, $request->user(), 'manual')->load('transaccionPasarela'));
     }
 
     public function rechazarEnLinea(Request $request, Pago $pago)
     {
         $this->authorize('rechazarEnLinea', $pago);
 
-        return response()->json($this->pagoService->rechazarPagoEnLinea($pago));
+        return response()->json($this->pagoService->rechazarPagoEnLinea($pago, $request->user(), 'manual')->load('transaccionPasarela'));
     }
 }

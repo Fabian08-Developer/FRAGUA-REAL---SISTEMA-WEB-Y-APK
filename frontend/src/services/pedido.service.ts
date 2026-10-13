@@ -1,7 +1,7 @@
 // M02/M07 — espeja StorePedidoRequest y RegistrarPagoEnLineaRequest del backend
 // (routes/api.php: POST /pedidos, GET /pedidos, GET /pedidos/{id}, POST /pedidos/{id}/pagar-en-linea).
 import api from './api'
-import type { Comprobante, Pedido, PromocionAplicada, TipoPedido } from '@/types/models'
+import type { CheckoutPasarela, Comprobante, Pago, Pedido, PromocionAplicada, TipoPedido } from '@/types/models'
 
 export interface LineaPedidoPayload {
   producto_id?: number
@@ -35,6 +35,9 @@ export interface CrearPedidoPayload {
   pasarela_preferida?: 'nequi' | 'bancolombia'
   lineas: LineaPedidoPayload[]
 }
+
+// Fase 6, tarea 1 (RF-M06-006): el pago creado y, si la pasarela está activa, el enlace del checkout.
+export type PagoEnLineaRespuesta = Pago & { checkout: CheckoutPasarela | null }
 
 export interface PagoEnLineaPayload {
   pasarela: 'nequi' | 'bancolombia'
@@ -100,13 +103,14 @@ export const pedidoService = {
   show(id: number) {
     return api.get<Pedido>(`/pedidos/${id}`)
   },
+  // Fase 6, tarea 1: con la pasarela activa trae `checkout` con el enlace de Wompi (ver utils/pasarela.ts).
   pagarEnLinea(id: number, payload: PagoEnLineaPayload) {
-    return api.post(`/pedidos/${id}/pagar-en-linea`, payload)
+    return api.post<PagoEnLineaRespuesta>(`/pedidos/${id}/pagar-en-linea`, payload)
   },
   // RF-M06-005 (Fase 0, tarea 4): el invitado paga y consulta su pedido con el token que
   // recibió al crearlo — no tiene sesión.
   pagarEnLineaConToken(token: string, payload: PagoEnLineaPayload) {
-    return api.post(`/pedidos/seguimiento/${token}/pagar-en-linea`, payload)
+    return api.post<PagoEnLineaRespuesta>(`/pedidos/seguimiento/${token}/pagar-en-linea`, payload)
   },
   seguimiento(token: string) {
     return api.get<Pedido>(`/pedidos/seguimiento/${token}`)

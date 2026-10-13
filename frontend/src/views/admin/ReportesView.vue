@@ -288,7 +288,7 @@ const maxPorEstadoReserva = computed(() =>
   Math.max(1, ...(usoDeMesas.value?.detalle.por_estado.map((e) => e.cantidad) ?? [0]))
 )
 const maxOcupacionPorMesa = computed(() =>
-  Math.max(1, ...(usoDeMesas.value?.detalle.ocupacion_por_mesa.map((m) => m.reservas_completadas) ?? [0]))
+  Math.max(1, ...(usoDeMesas.value?.detalle.ocupacion_por_mesa.map((m) => m.visitas + m.reservas_completadas) ?? [0]))
 )
 </script>
 
@@ -715,20 +715,32 @@ const maxOcupacionPorMesa = computed(() =>
 
         <div class="card p-4 sm:p-5">
           <h2 class="section-title">Ocupación por mesa</h2>
-          <p class="text-xs text-gray-400">Reservas completadas en el periodo, por mesa.</p>
+          <!-- Fase 5, tarea 4 (RF-M08-009): visitas con pedidos en el local, además de las reservas. -->
+          <p class="text-xs text-gray-400">
+            {{ usoDeMesas.resumen.visitas }} visitas con {{ usoDeMesas.resumen.pedidos_locales }} pedidos en el local. Una visita
+            empieza con el primer pedido de la mesa libre y termina cuando se cierra el último.
+          </p>
           <p v-if="usoDeMesas.detalle.ocupacion_por_mesa.length === 0" class="mt-3 text-sm text-gray-400">
-            Ninguna mesa tuvo reservas completadas en este periodo.
+            No hay mesas activas.
           </p>
           <ul v-else class="mt-3 space-y-2.5">
             <li v-for="m in usoDeMesas.detalle.ocupacion_por_mesa" :key="m.id">
-              <div class="flex items-baseline justify-between text-sm">
+              <div class="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
                 <span class="font-medium text-ink">{{ m.nombre }}</span>
-                <span class="text-gray-500">{{ m.reservas_completadas }} reservas completadas</span>
+                <span class="text-xs text-gray-500">
+                  <template v-if="m.visitas || m.reservas_completadas">
+                    {{ m.visitas }} {{ m.visitas === 1 ? 'visita' : 'visitas' }} · {{ formatoMoneda(m.ventas) }}
+                    <template v-if="m.minutos_promedio !== null"> · {{ m.minutos_promedio }} min en promedio</template>
+                    <template v-if="m.reservas_completadas"> · {{ m.reservas_completadas }} {{ m.reservas_completadas === 1 ? 'reserva' : 'reservas' }}</template>
+                  </template>
+                  <template v-else>Sin uso en el periodo</template>
+                </span>
               </div>
               <div class="mt-1 h-2 rounded-full bg-gray-100">
                 <div
+                  v-if="m.visitas || m.reservas_completadas"
                   class="h-2 rounded-full bg-brand-500"
-                  :style="{ width: anchoBarra(m.reservas_completadas, maxOcupacionPorMesa) }"
+                  :style="{ width: anchoBarra(m.visitas + m.reservas_completadas, maxOcupacionPorMesa) }"
                 />
               </div>
             </li>

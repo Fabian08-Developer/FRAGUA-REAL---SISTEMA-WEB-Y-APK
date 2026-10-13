@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\ComprobanteController;
 use App\Http\Controllers\Api\ConfiguracionController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\MesaController;
+use App\Http\Controllers\Api\PasarelaController;
 use App\Http\Controllers\Api\PagoController;
 use App\Http\Controllers\Api\PedidoController;
 use App\Http\Controllers\Api\PromocionController;
@@ -69,6 +70,13 @@ Route::middleware('throttle:30,1')->group(function () {
     Route::post('/pedidos/seguimiento/{token}/cancelar', [PedidoController::class, 'cancelarConToken']);
 });
 
+// Fase 6, tarea 1 (RF-M06-006, D4: Wompi): eventos firmados de la pasarela (los manda Wompi, sin
+// sesión; la firma con el secreto de eventos es la autenticación) y la página de retorno del Cliente.
+Route::post('/pasarela/wompi/eventos', [PasarelaController::class, 'evento'])->middleware('throttle:240,1');
+Route::get('/pasarela/transacciones/{referencia}', [PasarelaController::class, 'retorno'])
+    ->where('referencia', 'FR[PR]-[0-9]+-[A-Z0-9]{20}')
+    ->middleware('throttle:60,1');
+
 // Reserva pública (Cliente web) — StoreReservaRequest exige los datos de contacto (RN-M05-12).
 // RN-M05-14: depósito obligatorio; el Cliente lo paga en línea por Nequi/Bancolombia.
 Route::post('/reservas', [ReservaController::class, 'store'])->middleware('throttle:30,1');
@@ -79,6 +87,8 @@ Route::post('/reservas/{reserva}/deposito/en-linea', [ReservaController::class, 
 Route::middleware('throttle:30,1')->group(function () {
     Route::get('/reservas/enlace/{token}', [ReservaPublicaController::class, 'ver']);
     Route::post('/reservas/enlace/{token}/cancelar', [ReservaPublicaController::class, 'cancelar']);
+    // Fase 6, tarea 1 (RF-M05-030): pagar o reintentar el depósito con el mismo enlace.
+    Route::post('/reservas/enlace/{token}/deposito', [ReservaPublicaController::class, 'pagarDeposito']);
 });
 
 // 'activo' (Fase 0, tarea 6): una cuenta desactivada no usa ninguna ruta con sesión.
@@ -142,7 +152,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::post('/pedidos/{pedido}/cobrar', [PagoController::class, 'cobrar']);
 
         // Confirmar/rechazar manualmente un pago en línea (mismo patrón que el depósito de
-        // reserva de abajo) — hasta que exista el webhook real de la pasarela. Sin esto, un
+        // reserva de abajo). Fase 6, tarea 1: con la pasarela activa el pago se confirma solo y
+        // esto queda como respaldo (decisión D4). Historia: sin esto, un
         // Pedido pagado en línea quedaba en "pendiente" para siempre: PedidoService::confirmar()
         // exige que no tenga un pago en línea sin aprobar (RN-M06-05) y no había forma de
         // aprobarlo.
@@ -194,6 +205,12 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
 
     // ---- Exclusivo Administrador ----
     Route::middleware('role:administrador')->group(function () {
+        // Fase 6, tarea 1: estado de la pasarela y los pagos en línea que hay que revisar.
+        Route::get('/pasarela/estado', [PasarelaController::class, 'estado']);
+        Route::get('/pasarela/transacciones', [PasarelaController::class, 'index']);
+        Route::post('/pasarela/transacciones/{transaccion}/revisada', [PasarelaController::class, 'revisada']);
+        Route::post('/pasarela/transacciones/{transaccion}/reembolsar', [PasarelaController::class, 'reembolsar']);
+
         // Dashboard: KPIs resumen del día (ventas, pedidos activos, mesas ocupadas).
         Route::get('/dashboard/resumen', [DashboardController::class, 'resumen']);
 

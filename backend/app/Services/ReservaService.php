@@ -112,6 +112,34 @@ class ReservaService
      * 'pendiente' — la reserva sigue pendiente_pago hasta que se confirme, igual que
      * PagoService::registrarPagoEnLinea() con un pedido.
      */
+    /**
+     * Fase 6, tarea 1 (RF-M05-030): el depósito usa el mismo camino que el pago de un pedido. Con la
+     * pasarela activa, se crea el intento en Wompi y se devuelve el enlace del checkout; el depósito
+     * se confirma solo con el evento firmado. Sin pasarela, queda en revisión como antes.
+     *
+     * @return array{0: Reserva, 1: array|null}
+     */
+    public function iniciarDepositoEnLinea(Reserva $reserva, string $pasarela): array
+    {
+        $servicio = app(PasarelaPagoService::class);
+
+        if ($servicio->activa() && $reserva->deposito_estado === 'pendiente' && ($tx = $reserva->transaccionDeposito) && ! $tx->esFinal()) {
+            $servicio->liberarParaReintento($tx);
+            $reserva->refresh();
+        }
+
+        $reserva = $this->registrarDepositoEnLinea($reserva, $pasarela);
+        if (! $servicio->activa()) {
+            return [$reserva, null];
+        }
+
+        return [$reserva, $servicio->iniciar($reserva, (float) $reserva->deposito_valor, $pasarela, [
+            'correo' => $reserva->cliente_correo,
+            'nombre' => $reserva->cliente_nombre,
+            'telefono' => $reserva->cliente_telefono,
+        ])];
+    }
+
     public function registrarDepositoEnLinea(Reserva $reserva, string $pasarela): Reserva
     {
         if ($reserva->estado !== 'pendiente_pago') {
@@ -127,12 +155,12 @@ class ReservaService
     }
 
     /**
-     * Confirma el depósito en línea (hoy: acción manual de Administrador/Mesero; mañana:
-     * el webhook real de la pasarela — ver README-BACKEND.md, "Pasarela de pago real").
+     * Confirma el depósito en línea. Fase 6, tarea 1: lo hace la pasarela con su evento firmado
+     * ($via = 'pasarela', PasarelaPagoService) o, de respaldo, el Administrador o el Mesero ('manual').
      * La mesa se marca 'reservada' recién aquí, no al crear la reserva — así no se
      * bloquea una mesa por una reserva sin pagar.
      */
-    public function confirmarDepositoEnLinea(Reserva $reserva, ?User $actor = null): Reserva
+    public function confirmarDepositoEnLinea(Reserva $reserva, ?User $actor = null, string $via = 'manual'): Reserva
     {
         if ($reserva->estado !== 'pendiente_pago' || $reserva->deposito_estado !== 'pendiente') {
             throw new RuntimeException('Esta reserva no tiene un depósito en línea pendiente de confirmar.');
@@ -141,6 +169,7 @@ class ReservaService
 
         $reserva->deposito_pagado = true;
         $reserva->deposito_estado = 'aprobado';
+        $reserva->deposito_confirmado_via = $via; // Fase 6: 'pasarela' (evento firmado) o 'manual'
         $reserva->deposito_pagado_at = now();
         $reserva->estado = 'confirmada';
         $reserva->save();
@@ -151,7 +180,7 @@ class ReservaService
 
         // RF-M05-036: cada confirmación, rechazo o registro manual de un depósito queda auditado.
         app(AuditoriaService::class)->registrar('confirmar_deposito_reserva', 'Reserva', $reserva->id, [
-            'monto' => (float) $reserva->deposito_valor, 'pasarela' => $reserva->deposito_pasarela,
+            'monto' => (float) $reserva->deposito_valor, 'pasarela' => $reserva->deposito_pasarela, 'via' => $via,
         ], $actor);
 
         return $reserva;
@@ -159,17 +188,18 @@ class ReservaService
 
     // Rechaza el depósito en línea; la reserva sigue pendiente_pago para que el Cliente
     // pueda reintentar (mismo patrón de M06: confirmar/rechazar/reintentar).
-    public function rechazarDepositoEnLinea(Reserva $reserva, ?User $actor = null): Reserva
+    public function rechazarDepositoEnLinea(Reserva $reserva, ?User $actor = null, string $via = 'manual'): Reserva
     {
         if ($reserva->estado !== 'pendiente_pago' || $reserva->deposito_estado !== 'pendiente') {
             throw new RuntimeException('Esta reserva no tiene un depósito en línea pendiente de rechazar.');
         }
 
         $reserva->deposito_estado = 'rechazado';
+        $reserva->deposito_confirmado_via = $via;
         $reserva->save();
 
         app(AuditoriaService::class)->registrar('rechazar_deposito_reserva', 'Reserva', $reserva->id, [
-            'monto' => (float) $reserva->deposito_valor, 'pasarela' => $reserva->deposito_pasarela,
+            'monto' => (float) $reserva->deposito_valor, 'pasarela' => $reserva->deposito_pasarela, 'via' => $via,
         ], $actor);
 
         return $reserva;
@@ -375,6 +405,15 @@ class ReservaService
             'deposito_reembolsado' => $reserva->deposito_pagado ? (float) $reserva->deposito_valor : null,
         ], fn ($v) => $v !== null), $actor);
         app(AvisoReservaService::class)->programar($reserva, 'cancelacion');
+
+        // Fase 6, tarea 1 (RN-M05-17, RF-M06-017): el depósito pagado por la pasarela se devuelve por
+        // la pasarela (si el medio lo permite; si no, la transacción dice cómo hacerlo).
+        if ($reserva->deposito_pagado && $reserva->deposito_metodo === 'en_linea') {
+            $tx = $reserva->transaccionesDeposito()->where('estado', 'aprobado')->first();
+            if ($tx) {
+                app(PasarelaPagoService::class)->reembolsar($tx, $actor);
+            }
+        }
 
         return $reserva;
     }

@@ -12,6 +12,7 @@ import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
 import { pedidoService } from '@/services/pedido.service'
 import { mensajeDeError } from '@/services/errors'
+import { irAlCheckout } from '@/utils/pasarela'
 import type { Pedido } from '@/types/models'
 
 const route = useRoute()
@@ -90,8 +91,16 @@ const pagado = computed(() =>
 const pagoEnRevision = computed(() =>
   (pedido.value?.pagos ?? []).some((x) => x.metodo === 'en_linea' && x.estado === 'pendiente' && !x.anulado),
 )
+// Fase 6, tarea 1: un pago que se fue a la pasarela y no se terminó se puede volver a intentar
+// (el servidor pregunta antes por el anterior; si sigue en curso, lo dice). En modo manual, no.
+const intentoEnPasarela = computed(() =>
+  (pedido.value?.pagos ?? []).some((x) => x.metodo === 'en_linea' && x.estado === 'pendiente' && !x.anulado && x.transaccion_pasarela),
+)
 const puedePagar = computed(
-  () => pedido.value?.estado === 'pendiente' && !pagoEnRevision.value && Number(pedido.value.total) - pagado.value > 0,
+  () =>
+    pedido.value?.estado === 'pendiente' &&
+    (!pagoEnRevision.value || intentoEnPasarela.value) &&
+    Number(pedido.value.total) - pagado.value > 0,
 )
 
 // ---- Pago en línea (RF-M06-005/008) ----
@@ -104,7 +113,8 @@ async function pagar() {
   pagando.value = true
   errorPago.value = ''
   try {
-    await pedidoService.pagarEnLineaConToken(token, { pasarela: pasarela.value, monto: Number(pedido.value.total) - pagado.value })
+    const { data } = await pedidoService.pagarEnLineaConToken(token, { pasarela: pasarela.value, monto: Number(pedido.value.total) - pagado.value })
+    if (irAlCheckout(data.checkout)) return // vuelve por /pago/retorno
     await cargar(true)
   } catch (e) {
     errorPago.value = mensajeDeError(e, 'No pudimos registrar tu pago.')
@@ -201,7 +211,10 @@ async function cancelar() {
             <dd>{{ formatoPrecio(pagado) }}</dd>
           </div>
         </dl>
-        <p v-if="pagoEnRevision" class="mt-3 text-xs text-[#6c655c]">Tu pago en línea está en revisión.</p>
+        <p v-if="pagoEnRevision && intentoEnPasarela" class="mt-3 text-xs text-[#6c655c]">
+          Tu pago en línea está en proceso en la pasarela. Si pagas con Nequi, apruébalo en la app; en cuanto llegue, confirmamos tu pedido.
+        </p>
+        <p v-else-if="pagoEnRevision" class="mt-3 text-xs text-[#6c655c]">Tu pago en línea está en revisión.</p>
         <p v-if="pedido.direccion_entrega" class="mt-3 text-xs text-[#6c655c]">
           Entrega en {{ pedido.direccion_entrega }}<template v-if="pedido.barrio">, {{ pedido.barrio }}</template>
         </p>
@@ -213,6 +226,7 @@ async function cancelar() {
       <section v-if="puedePagar" class="mt-4 rounded-2xl border border-[#e2dbcf] bg-white p-5">
         <h2 class="font-display text-lg text-ink">Pagar en línea</h2>
         <p class="mt-1 text-xs text-[#6c655c]">
+          <template v-if="intentoEnPasarela">¿No terminaste el pago? Puedes intentarlo de nuevo. </template>
           También puedes pagar {{ pedido.tipo === 'domicilio' ? 'contra entrega' : 'al recoger' }}.
         </p>
         <div class="mt-3 flex gap-4">

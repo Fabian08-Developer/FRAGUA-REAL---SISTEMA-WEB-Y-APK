@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
 class Pago extends Model
 {
@@ -20,7 +21,7 @@ class Pago extends Model
 
     protected $fillable = [
         'pedido_id', 'tipo', 'reserva_id', 'caja_turno_id', 'metodo', 'pasarela', 'monto', 'estado',
-        'registrado_por', 'anulado', 'reverso_tipo', 'anulado_motivo', 'anulado_por', 'anulado_at',
+        'confirmado_via', 'confirmado_por', 'registrado_por', 'anulado', 'reverso_tipo', 'anulado_motivo', 'anulado_por', 'anulado_at',
     ];
 
     protected $casts = [
@@ -62,6 +63,18 @@ class Pago extends Model
     public function reserva(): BelongsTo
     {
         return $this->belongsTo(Reserva::class);
+    }
+
+    // Fase 6, tarea 1 (RF-M06-006): el intento en la pasarela de este pago en línea, si lo hubo
+    // (en modo manual no hay ninguno).
+    public function transaccionPasarela(): MorphOne
+    {
+        return $this->morphOne(TransaccionPasarela::class, 'pagable')->latestOfMany();
+    }
+
+    public function confirmadoPorUsuario(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'confirmado_por');
     }
 
     public function esAbonoDeDeposito(): bool

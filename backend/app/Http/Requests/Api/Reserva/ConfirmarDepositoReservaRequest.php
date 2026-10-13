@@ -18,6 +18,8 @@ class ConfirmarDepositoReservaRequest extends FormRequest
     {
         return [
             'pasarela' => ['required', 'in:nequi,bancolombia'],
+            // Fase 6, tarea 1: el enlace secreto que recibió quien creó la reserva.
+            'token' => ['required', 'string', 'max:64'],
         ];
     }
 }

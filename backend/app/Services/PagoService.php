@@ -63,9 +63,46 @@ class PagoService
 
     /**
      * Pago en línea (Nequi/Bancolombia): autoservicio del Cliente, sin empleado de por medio.
-     * `registrado_por` queda en NULL (ADR-004). Sin una pasarela real integrada todavía,
-     * el estado queda 'pendiente' hasta que algo confirme el pago (webhook u operación manual).
+     * `registrado_por` queda en NULL (ADR-004). El pago nace 'pendiente'.
+     *
+     * Fase 6, tarea 1 (RF-M06-006, D4): con la pasarela activa, además se crea el intento en Wompi
+     * y la respuesta trae el enlace del checkout (PasarelaPagoService::iniciar); el pago se
+     * confirma solo con el evento firmado. Sin pasarela (modo manual, el respaldo), lo aprueba el
+     * Mesero o el Administrador como antes.
+     *
+     * @return array{0: Pago, 1: array|null} el pago y, si hay pasarela, el checkout
      */
+    public function iniciarPagoEnLinea(Pedido $pedido, array $data): array
+    {
+        $pasarela = app(PasarelaPagoService::class);
+
+        // RF-M06-008: si hay un intento anterior en la pasarela que sigue pendiente, se pregunta
+        // por él antes de abrir otro (se cierra si no se pagó; si sigue en curso, se avisa).
+        $anterior = $this->pagoEnLineaPendiente($pedido);
+        if ($anterior && $pasarela->activa() && ($tx = $anterior->transaccionPasarela) && ! $tx->esFinal()) {
+            $pasarela->liberarParaReintento($tx);
+            $pedido->refresh();
+        }
+
+        // Con la pasarela se cobra exactamente lo que falta: el monto no lo decide el navegador.
+        if ($pasarela->activa()) {
+            $data['monto'] = round((float) $pedido->total - $pedido->totalPagado(), 2);
+        }
+
+        $pago = $this->registrarPagoEnLinea($pedido, $data);
+        if (! $pasarela->activa()) {
+            return [$pago, null];
+        }
+
+        $checkout = $pasarela->iniciar($pago, (float) $pago->monto, $pago->pasarela, [
+            'correo' => $pedido->correoDeContacto(),
+            'nombre' => $pedido->cliente?->nombre ?? $pedido->cliente_invitado_nombre,
+            'telefono' => $pedido->telefono_contacto ?? $pedido->cliente_invitado_telefono,
+        ]);
+
+        return [$pago, $checkout];
+    }
+
     public function registrarPagoEnLinea(Pedido $pedido, array $data): Pago
     {
         // CORREGIDO (Fase 0, tarea 4, 09/10/2026): RF-M06-005/008. El pago en línea es para
@@ -78,12 +115,7 @@ class PagoService
         if ($pedido->estado !== 'pendiente') {
             throw new RuntimeException('Este pedido ya no está pendiente; no admite un pago en línea nuevo.');
         }
-        $hayPendiente = $pedido->pagos()
-            ->where('metodo', 'en_linea')
-            ->where('estado', 'pendiente')
-            ->where('anulado', false)
-            ->exists();
-        if ($hayPendiente) {
+        if ($this->pagoEnLineaPendiente($pedido)) {
             throw new RuntimeException('Ya hay un pago en línea en revisión para este pedido. Espera su aprobación o rechazo.');
         }
 
@@ -100,18 +132,25 @@ class PagoService
         ]);
     }
 
+    private function pagoEnLineaPendiente(Pedido $pedido): ?Pago
+    {
+        return $pedido->pagos()
+            ->where('metodo', 'en_linea')
+            ->where('estado', 'pendiente')
+            ->where('anulado', false)
+            ->latest('id')
+            ->first();
+    }
+
     /**
-     * Confirma un pago en línea que estaba pendiente (ej. tras validar el webhook de la pasarela).
+     * Confirma un pago en línea que estaba pendiente: lo hace la pasarela (Fase 6, $via =
+     * 'pasarela', sin persona) o, como respaldo, el Mesero o el Administrador ($via = 'manual').
      *
-     * CORREGIDO (29/09/2026): este método ya existía pero nada lo invocaba — a diferencia de
-     * ReservaService::confirmarDepositoEnLinea() (mismo patrón, sí expuesto por
-     * ReservaController), no había ruta/Controller que lo llamara. Un Pedido pagado en línea
-     * quedaba en 'pendiente' para siempre: PedidoService::confirmar() rechaza confirmar un
-     * pedido de domicilio/recogida con un pago en línea sin aprobar (RN-M06-05), y sin este
-     * método enganchado a una ruta no había ninguna forma de aprobarlo. Ver PagoController::
-     * confirmarEnLinea()/rechazarEnLinea() y routes/api.php.
+     * CORREGIDO (29/09/2026): este método ya existía pero nada lo invocaba; ver
+     * PagoController::confirmarEnLinea()/rechazarEnLinea() y routes/api.php.
+     * Fase 6, tarea 1: queda en la auditoría quién o qué lo aprobó.
      */
-    public function confirmarPagoEnLinea(Pago $pago): Pago
+    public function confirmarPagoEnLinea(Pago $pago, ?User $actor = null, string $via = 'manual'): Pago
     {
         if ($pago->metodo !== 'en_linea') {
             throw new RuntimeException('Solo un pago en_linea se confirma con este método.');
@@ -120,10 +159,13 @@ class PagoService
             throw new RuntimeException('Este pago no está pendiente de confirmar.');
         }
 
-        return DB::transaction(function () use ($pago) {
+        return DB::transaction(function () use ($pago, $actor, $via) {
             $pago->estado = 'aprobado';
+            $pago->confirmado_via = $via;
+            $pago->confirmado_por = $actor?->id;
             $pago->save();
 
+            $this->auditarEnLinea('confirmar_pago_en_linea', $pago, $actor, $via);
             $this->finalizarSiQuedoCompleto($pago->pedido, null);
 
             return $pago;
@@ -132,9 +174,8 @@ class PagoService
 
     // Mismo patrón que ReservaService::rechazarDepositoEnLinea(): el pedido no se cancela
     // solo, sigue 'pendiente' sin un pago válido — el Cliente puede reintentar el pago en
-    // línea (RegistrarPagoEnLineaRequest no bloquea un segundo intento) o el Mesero puede
-    // cobrarlo presencial en su lugar.
-    public function rechazarPagoEnLinea(Pago $pago): Pago
+    // línea (RF-M06-008) o el Mesero puede cobrarlo presencial en su lugar.
+    public function rechazarPagoEnLinea(Pago $pago, ?User $actor = null, string $via = 'manual', ?string $motivo = null): Pago
     {
         if ($pago->metodo !== 'en_linea') {
             throw new RuntimeException('Solo un pago en_linea se rechaza con este método.');
@@ -144,9 +185,27 @@ class PagoService
         }
 
         $pago->estado = 'rechazado';
+        $pago->confirmado_via = $via;
+        $pago->confirmado_por = $actor?->id;
         $pago->save();
 
+        $this->auditarEnLinea('rechazar_pago_en_linea', $pago, $actor, $via, $motivo);
+
         return $pago;
+    }
+
+    private function auditarEnLinea(string $accion, Pago $pago, ?User $actor, string $via, ?string $motivo = null): void
+    {
+        $tx = $pago->transaccionPasarela()->first();
+        app(AuditoriaService::class)->registrar($accion, 'Pago', $pago->id, array_filter([
+            'pedido_id' => $pago->pedido_id,
+            'monto' => (float) $pago->monto,
+            'pasarela' => $pago->pasarela,
+            'via' => $via,
+            'referencia' => $tx?->referencia,
+            'metodo_pasarela' => $tx?->metodo_pago,
+            'motivo' => $motivo,
+        ], fn ($v) => $v !== null), $via === 'pasarela' ? null : $actor);
     }
 
     /**
@@ -268,7 +327,7 @@ class PagoService
             }
         }
 
-        return DB::transaction(function () use ($pago, $actor, $motivo, $tipo, $turno, $cajaCerrada, $esAbono) {
+        $pago = DB::transaction(function () use ($pago, $actor, $motivo, $tipo, $turno, $cajaCerrada, $esAbono) {
             $pago->anulado = true;
             $pago->reverso_tipo = $tipo;
             $pago->anulado_motivo = $motivo;
@@ -312,5 +371,18 @@ class PagoService
 
             return $pago;
         });
+
+        // Fase 6, tarea 1 (RF-M06-017): el reembolso de un pago en línea aprobado por la pasarela se
+        // pide también a la pasarela, después de guardar la anulación (si la pasarela falla o no lo
+        // permite para ese medio, el pago igual queda reembolsado en el sistema y la transacción
+        // dice qué hacer). La anulación (un error de registro) no mueve dinero y no la toca.
+        if ($tipo === 'reembolso' && $pago->metodo === 'en_linea' && ! $esAbono) {
+            $tx = $pago->transaccionPasarela()->first();
+            if ($tx && $tx->estado === 'aprobado') {
+                app(PasarelaPagoService::class)->reembolsar($tx, $actor);
+            }
+        }
+
+        return $pago;
     }
 }

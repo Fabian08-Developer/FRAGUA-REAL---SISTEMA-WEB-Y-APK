@@ -69,4 +69,16 @@ return [
         'inactividad_minutos' => (int) env('FRAGUA_REAL_SESION_INACTIVIDAD_MINUTOS', 60 * 24 * 7),
         'duracion_maxima_minutos' => (int) env('FRAGUA_REAL_SESION_DURACION_MAXIMA_MINUTOS', 60 * 24 * 30),
     ],
+
+    // Fase 6, tarea 1 (RF-M06-006, decisión D4 del 13/10/2026): pasarela de pago en línea.
+    // 'wompi' manda al Cliente al checkout de Wompi (Nequi, botón Bancolombia y lo demás que Wompi
+    // ofrezca) y el pago se confirma solo con el evento firmado. 'manual' es el respaldo: el pago
+    // queda "en revisión" y lo aprueba el Mesero o el Administrador, como antes. Si se pide 'wompi'
+    // pero faltan llaves en config/services.php, el sistema sigue en manual (no se rompe el cobro).
+    'pasarela' => [
+        'proveedor' => env('PASARELA_PROVEEDOR', 'manual'),
+        // Cuánto vale el enlace del checkout. Pasado este tiempo, un pago que nunca llegó a la
+        // pasarela se da por abandonado y el Cliente puede intentar de nuevo.
+        'minutos_checkout' => (int) env('PASARELA_MINUTOS_CHECKOUT', 30),
+    ],
 ];

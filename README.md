@@ -77,8 +77,15 @@ documento en `detalle`, anulación con motivo; un pedido puede tener varios en s
 comprobante de pago (punto 36). `2026_10_19_000002` agrega `comprobantes.impresiones` para marcar
 las reimpresiones (punto 37). `2026_10_19_000003` agrega `cierres_diarios.impresiones` para el
 cierre en PDF (punto 38). `2026_10_19_000004` crea `reporte_exportaciones`, el archivo de los
-reportes exportados en PDF y Excel para volver a descargarlos sin regenerarlos (punto 39). Pruebas
-automáticas: `php artisan test` (264 en `tests/Feature`).
+reportes exportados en PDF y Excel para volver a descargarlos sin regenerarlos (punto 39). La tarea 4
+de la Fase 5 (uso de mesas con pedidos locales, punto 40) no necesita migración.
+
+Fase 6 (13/10/2026): `2026_10_20_000001` crea `transacciones_pasarela`, un registro por cada intento
+de pago en Wompi. Se enlaza al pago del pedido o a la reserva cuyo depósito se paga y guarda la
+referencia secreta, el id y el estado en Wompi, la respuesta completa, si hay que revisarlo y el
+reembolso. También agrega a `pagos` cómo se aprobó (`confirmado_via`: pasarela o manual) y quién
+(`confirmado_por`), y a `reservas` el `deposito_confirmado_via` (punto 41). Pruebas automáticas:
+`php artisan test` (282 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

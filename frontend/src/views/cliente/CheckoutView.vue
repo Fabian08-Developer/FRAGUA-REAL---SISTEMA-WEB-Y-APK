@@ -19,6 +19,7 @@ import { useCotizacion } from '@/composables/useCotizacion'
 import { configuracionService } from '@/services/configuracion.service'
 import { pedidoService } from '@/services/pedido.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
+import { irAlCheckout } from '@/utils/pasarela'
 import type { Pedido, TipoPedido } from '@/types/models'
 
 const router = useRouter()
@@ -74,6 +75,7 @@ const pedidoCreado = ref<Pedido | null>(null)
 const pagoRegistrado = ref(false)
 const errorPago = ref('')
 const pagando = ref(false)
+const redirigiendo = ref(false) // Fase 6: saliendo hacia el checkout de la pasarela
 
 onMounted(async () => {
   try {
@@ -160,18 +162,25 @@ async function pagarEnLinea() {
   errorPago.value = ''
   try {
     const datosPago = { pasarela: pasarela.value, monto: Number(pedido.total) }
+    let respuesta
     if (esCliente.value) {
-      await pedidoService.pagarEnLinea(pedido.id, datosPago)
+      respuesta = await pedidoService.pagarEnLinea(pedido.id, datosPago)
     } else if (pedido.token_publico) {
-      await pedidoService.pagarEnLineaConToken(pedido.token_publico, datosPago)
+      respuesta = await pedidoService.pagarEnLineaConToken(pedido.token_publico, datosPago)
     } else {
       throw new Error('sin token')
+    }
+    // Fase 6, tarea 1 (RF-M06-006): con la pasarela activa, se paga en Wompi y se vuelve a
+    // /pago/retorno; el botón queda deshabilitado mientras el navegador sale.
+    if (irAlCheckout(respuesta.data.checkout)) {
+      redirigiendo.value = true
+      return
     }
     pagoRegistrado.value = true
   } catch (error) {
     errorPago.value = mensajeDeError(error, 'No pudimos registrar tu pago en línea.')
   } finally {
-    pagando.value = false
+    if (!redirigiendo.value) pagando.value = false
   }
 }
 </script>
@@ -187,7 +196,11 @@ async function pagarEnLinea() {
         · {{ formatoPrecio(pedidoCreado.total) }}
       </p>
       <p class="mt-4 text-sm text-[#6c655c]">
-        <template v-if="metodoPago === 'en_linea' && pagoRegistrado">
+        <template v-if="metodoPago === 'en_linea' && redirigiendo">
+          Te estamos llevando a la pasarela de pago (Wompi) para que pagues con {{ pasarela === 'nequi' ? 'Nequi' : 'Bancolombia' }}.
+          Al terminar vuelves aquí y confirmamos tu pedido solos.
+        </template>
+        <template v-else-if="metodoPago === 'en_linea' && pagoRegistrado">
           Ya registramos tu pago. En breve lo verificamos, confirmamos tu pedido y empezamos a prepararlo.
         </template>
         <template v-else-if="metodoPago === 'en_linea'">
@@ -211,7 +224,7 @@ async function pagarEnLinea() {
         <p class="mt-1 text-xs text-[#6c655c]">Guárdalo: sin cuenta, es la única forma de ver el estado o cancelarlo mientras esté pendiente.</p>
       </div>
       <!-- Reintentar solo el pago, sobre el mismo pedido (RF-M06-008). -->
-      <div v-if="metodoPago === 'en_linea' && !pagoRegistrado" class="mt-6 space-y-3 text-left">
+      <div v-if="metodoPago === 'en_linea' && !pagoRegistrado && !redirigiendo" class="mt-6 space-y-3 text-left">
         <p v-if="errorPago" class="alert-error">{{ errorPago }}</p>
         <div class="flex justify-center gap-4">
           <label class="flex items-center gap-2 text-sm text-ink">
@@ -225,7 +238,7 @@ async function pagarEnLinea() {
         </div>
         <div class="flex justify-center">
           <BaseButton variant="primary" :disabled="pagando" @click="pagarEnLinea">
-            {{ pagando ? 'Registrando pago…' : 'Reintentar pago' }}
+            {{ redirigiendo ? 'Abriendo la pasarela…' : pagando ? 'Registrando pago…' : 'Reintentar pago' }}
           </BaseButton>
         </div>
       </div>

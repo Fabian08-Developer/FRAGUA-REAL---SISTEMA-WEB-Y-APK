@@ -63,6 +63,12 @@ const router = createRouter({
           name: 'reserva-enlace',
           component: () => import('@/views/cliente/ReservaEnlaceView.vue'),
         },
+        // Fase 6, tarea 1 (RF-M06-006): a donde vuelve el Cliente desde la pasarela (Wompi agrega ?id=).
+        {
+          path: 'pago/retorno/:referencia',
+          name: 'pago-retorno',
+          component: () => import('@/views/cliente/PagoRetornoView.vue'),
+        },
         {
           path: 'pedidos',
           name: 'cliente-pedidos',

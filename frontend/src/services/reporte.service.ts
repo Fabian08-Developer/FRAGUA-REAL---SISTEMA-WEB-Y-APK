@@ -141,9 +141,15 @@ export interface UsoDeMesasPorEstado {
   cantidad: number
 }
 
+// Fase 5, tarea 4 (RF-M08-009): la ocupación cuenta también los pedidos locales, agrupados en
+// visitas (un pedido abre una visita nueva cuando la mesa ya se había liberado).
 export interface OcupacionPorMesa {
   id: number
   nombre: string
+  visitas: number
+  pedidos_locales: number
+  ventas: number
+  minutos_promedio: number | null
   reservas_completadas: number
 }
 
@@ -154,6 +160,8 @@ export interface UsoDeMesasReporte {
       reservas_creadas: number
       reservas_canceladas: number
       reservas_no_show: number
+      visitas: number
+      pedidos_locales: number
       mesas_con_uso: number
     }
     detalle: {

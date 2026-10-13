@@ -63,7 +63,9 @@ class ReporteExportService
         'reservas_creadas' => ['Reservas del periodo', 'numero'],
         'reservas_canceladas' => ['Reservas canceladas', 'numero'],
         'reservas_no_show' => ['Reservas no-show', 'numero'],
-        'mesas_con_uso' => ['Mesas con reservas completadas', 'numero'],
+        'visitas' => ['Visitas a las mesas', 'numero'],
+        'pedidos_locales' => ['Pedidos en el local', 'numero'],
+        'mesas_con_uso' => ['Mesas con uso', 'numero'],
     ];
 
     private const TIPOS_VENTA = ['alimento' => 'Alimentos', 'bebida' => 'Bebidas', 'otro' => 'Otros'];
@@ -240,8 +242,11 @@ class ReporteExportService
                 ],
                 [
                     'titulo' => 'Ocupación por mesa',
-                    'columnas' => [$col('Mesa'), $col('Reservas completadas', 'numero')],
-                    'filas' => collect($d['ocupacion_por_mesa'] ?? [])->map(fn ($m) => [(string) $valor($m, 'nombre'), (int) $valor($m, 'reservas_completadas')])->all(),
+                    'columnas' => [$col('Mesa'), $col('Visitas', 'numero'), $col('Pedidos', 'numero'), $col('Ventas', 'moneda'), $col('Minutos promedio por visita'), $col('Reservas completadas', 'numero')],
+                    'filas' => collect($d['ocupacion_por_mesa'] ?? [])->map(fn ($m) => [
+                        (string) $valor($m, 'nombre'), (int) $valor($m, 'visitas'), (int) $valor($m, 'pedidos_locales'), (float) $valor($m, 'ventas'),
+                        $valor($m, 'minutos_promedio') === null ? '—' : (int) $valor($m, 'minutos_promedio'), (int) $valor($m, 'reservas_completadas'),
+                    ])->all(),
                 ],
             ],
             default => [],

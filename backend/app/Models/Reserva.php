@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Str;
 
 class Reserva extends Model
@@ -12,7 +14,7 @@ class Reserva extends Model
     protected $fillable = [
         'mesa_id', 'cliente_nombre', 'cliente_telefono', 'cliente_correo', 'fecha_hora',
         'estado', 'deposito_valor', 'deposito_pagado', 'deposito_metodo',
-        'deposito_pasarela', 'deposito_estado', 'deposito_pagado_at',
+        'deposito_pasarela', 'deposito_estado', 'deposito_confirmado_via', 'deposito_pagado_at',
         'deposito_reembolsado', 'deposito_aplicado_abono', 'deposito_registrado_por',
         'creado_por', 'registrada_por',
         'pedido_id', 'deposito_abonado', 'llegada_at', 'deposito_caja_turno_id', 'deposito_reembolso_caja_turno_id',
@@ -54,6 +56,18 @@ class Reserva extends Model
     public function avisos(): HasMany
     {
         return $this->hasMany(ReservaAviso::class)->latest('id');
+    }
+
+    // Fase 6, tarea 1 (RF-M05-030): intentos de pagar el depósito en la pasarela; el último es el
+    // que cuenta para confirmar o devolver.
+    public function transaccionesDeposito(): MorphMany
+    {
+        return $this->morphMany(TransaccionPasarela::class, 'pagable')->latest('id');
+    }
+
+    public function transaccionDeposito(): MorphOne
+    {
+        return $this->morphOne(TransaccionPasarela::class, 'pagable')->latestOfMany();
     }
 
     // Enlace público para ver y cancelar la reserva sin cuenta (RF-M05-018, RN-M05-09).

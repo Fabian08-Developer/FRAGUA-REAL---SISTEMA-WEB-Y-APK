@@ -88,6 +88,27 @@ la cola están activos (cada uno deja un latido cada minuto), los trabajos pendi
 y si el correo sale de verdad. En el equipo de desarrollo se puede probar con
 `php artisan schedule:work` y `php artisan queue:work` en dos terminales.
 
+## Pasarela de pago Wompi (Fase 6)
+
+Decisión D4 del 13/10/2026: los pagos en línea (pedidos y depósitos de reserva) van por Wompi y se
+confirman solos. Mientras no estén las llaves, el sistema sigue en **aprobación manual**: el pago
+queda en revisión y lo aprueba el Mesero o el Administrador, como antes.
+
+1. En Wompi > Desarrolladores, copiar las cuatro llaves del ambiente (sandbox para probar,
+   producción cuando la cuenta comercial esté aprobada) al `.env` del servidor:
+   `WOMPI_LLAVE_PUBLICA` (pub_…), `WOMPI_LLAVE_PRIVADA` (prv_…), `WOMPI_SECRETO_EVENTOS`
+   (…events…), `WOMPI_SECRETO_INTEGRIDAD` (…integrity…), y `WOMPI_AMBIENTE=sandbox` o `produccion`.
+2. Poner `PASARELA_PROVEEDOR=wompi` y `FRONTEND_URL` con la dirección pública del sitio (Wompi
+   devuelve al cliente a `FRONTEND_URL/pago/retorno/...`).
+3. En Wompi > Desarrolladores > **URL de eventos**, poner `https://<dominio>/api/pasarela/wompi/eventos`
+   (la misma que muestra Administrador > Caja > "Pagos en línea").
+4. `php artisan config:cache`. El cron ya corre `pasarela:conciliar` cada 5 minutos por si un aviso
+   de Wompi se pierde.
+
+Comprobación: Administrador > Caja > "Pagos en línea" dice "Wompi activo (pruebas)". En sandbox se
+paga con los datos de prueba de Wompi (Nequi de prueba aprobado o rechazado); el pedido o la reserva
+debe confirmarse solo y aparecer en Caja como "Confirmado por Wompi".
+
 ## QA final — estado por rol
 
 Verificado en vivo contra los servidores de desarrollo del usuario
@@ -146,7 +167,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 13/10/2026 van 484 de 579 verificables, 84 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 13/10/2026 van 495 de 579 verificables, 85 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -175,13 +196,19 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   punto 36, con la reimpresión controlada que pediste el mismo día (punto 37) y con la tarea 2
   (cierre diario impreso y en PDF, punto 38) y la tarea 3 (exportación real de reportes, punto 39),
   que trae otra dependencia de Composer: `composer update phpoffice/phpspreadsheet
-  --with-all-dependencies`. Trae una dependencia nueva de Composer (`barryvdh/laravel-dompdf`): después de
+  --with-all-dependencies`. Con la tarea 4 (uso de mesas con pedidos locales, punto 40) la Fase 5
+  quedó completa el 13/10/2026. Trae una dependencia nueva de Composer (`barryvdh/laravel-dompdf`): después de
   actualizar el código hay que correr `composer update barryvdh/laravel-dompdf
   --with-all-dependencies` en `backend` (actualiza `composer.lock`; en el VPS, `composer install`
   con ese lock). Para que el comprobante muestre el NIT, ponerlo en `FRAGUA_REAL_NIT`. Decisiones del 12/10/2026: el sistema corre en un VPS de
   Hostinger (D2); los avisos al cliente van por correo en V1 y el SMS queda para después (D3);
   reservas con no-show a los 15 min, recordatorio 2 h antes y mesa Reservada 1 h antes,
-  editables en Configuración (D6).
+  editables en Configuración (D6). Decisiones del 13/10/2026: pasarela Wompi, desarrollada contra
+  el sandbox y con la aprobación manual de respaldo (D4), y comandas impresas desde el navegador
+  del Mesero en V1 (D5).
+- La Fase 6 empezó el 13/10/2026 con la tarea 1 (pasarela Wompi con confirmación automática):
+  ver "Pasarela de pago Wompi" arriba y `README-BACKEND.md`, punto 41. Falta la cuenta comercial
+  de producción; mientras tanto se prueba con las llaves del sandbox.
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr
@@ -194,7 +221,8 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4 y 4 de la Fase 5, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4, 4 de la Fase 5 y
+  1 de la Fase 6, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -334,6 +362,33 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   compara. Cada archivo queda en "Exportaciones guardadas" y se vuelve a descargar tal cual, sin
   regenerarlo; cada descarga queda en Auditoría. En el VPS, `storage/app/private/reportes` debe
   entrar en las copias de seguridad.
+- "Uso de mesas" cuenta ahora las visitas con pedidos en el local (no solo las reservas
+  completadas): por mesa, visitas, ventas, minutos promedio y reservas, y las mesas que no se
+  usaron aparecen como "Sin uso en el periodo".
+
+## Cambios de comportamiento de la Fase 6 (desde el 13/10/2026)
+
+- Con Wompi activo, el Cliente que elige pagar en línea (en el Checkout, en el seguimiento, en Mis
+  pedidos, al reservar o desde el enlace de su reserva) pasa a la página de pago de Wompi y vuelve a
+  "Tu pago": la página se actualiza sola mientras Nequi espera que lo apruebe en la app. El pedido o
+  la reserva se confirman solos al llegar el pago; ya no hay que aprobarlos a mano.
+- Si el pago se rechaza o el Cliente no lo termina, puede intentarlo de nuevo. El sistema pregunta
+  antes a Wompi por el intento anterior para no cobrar dos veces.
+- Mesero > Cobrar y Administrador > Reservas muestran los pagos en curso como "En proceso en Wompi
+  · se confirma solo"; "Aprobar a mano" y "Rechazar a mano" quedan de respaldo y la Auditoría dice
+  quién lo hizo.
+- Administrador > Caja muestra si Wompi está activo y los "pagos por revisar": los casos en que el
+  sistema no decide solo con el dinero (monto distinto, pago aprobado después de rechazado a mano,
+  pedido cancelado ya pagado, reembolso que Wompi no hizo…). Se cierran con una nota de lo que se
+  hizo.
+- Reembolsar un pago en línea en Caja, o cancelar una reserva con depósito pagado en línea, pide
+  la devolución a Wompi. Wompi solo la hace sola con tarjeta; los pagos con Nequi o el botón
+  Bancolombia se devuelven desde el panel de Wompi y quedan en "pagos por revisar" hasta
+  anotarlo.
+- Seguridad: para pagar el depósito de una reserva ya no basta su número; hace falta el enlace
+  secreto de la reserva.
+- En el servidor: `php artisan migrate`, las variables `PASARELA_*` y `WOMPI_*` del
+  `.env.example`, y la URL de eventos en Wompi.
 
 ## Cambios de comportamiento de la Fase 4 (desde el 12/10/2026)
 
