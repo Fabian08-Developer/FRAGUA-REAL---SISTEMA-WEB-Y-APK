@@ -248,8 +248,9 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   ver "Pasarela de pago Wompi" arriba y `README-BACKEND.md`, punto 41. Falta la cuenta comercial
   de producción; mientras tanto se prueba con las llaves del sandbox. Con la tarea 2 (comandas de
   cocina impresas desde el navegador, punto 42) la Fase 6 quedó completa el 13/10/2026. Después
-  se hizo el endurecimiento de seguridad (punto 43, "Antes de abrir al público"). Sigue la prueba de
-  un día completo de operación.
+  se hizo el endurecimiento de seguridad (punto 43, "Antes de abrir al público") y la prueba de un
+  día completo de operación (punto 44): automatizada en `DiaCompletoTest`, y para recorrerla a mano
+  con `PRUEBA-DIA-COMPLETO.md`. Siguen las listas de revisión manual por rol.
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr

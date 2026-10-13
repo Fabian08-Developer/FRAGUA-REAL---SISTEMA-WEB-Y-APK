@@ -1028,6 +1028,34 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       - Se aplica `npm audit fix` sin `--force`. `--force` instalaría Tailwind 4, un cambio mayor
         que rompería los estilos.
       - Comprobación: `npm audit --omit=dev` debe dar 0.
+44. **Prueba de un día completo de operación (13/10/2026), cierre del plan.** Sin migración;
+    1 prueba de punta a punta en `DiaCompletoTest` (107 comprobaciones) y la guía manual
+    `PRUEBA-DIA-COMPLETO.md`, en la raíz del repositorio.
+    - Un solo recorrido por la API, en orden, con los tres roles y los cuatro canales:
+      - apertura de caja;
+      - reserva web con depósito en línea;
+      - pedido local en efectivo;
+      - pedido por QR con tarjeta;
+      - domicilio de invitado contra entrega;
+      - recogida de un cliente pagada en línea, con el aviso «listo para recoger»;
+      - llegada de la reserva con el abono del depósito y el cobro del resto por la cuenta de la mesa;
+      - compras y gastos;
+      - un pedido confirmado que se cancela con la clave del Administrador;
+      - cierre de caja, cierre del día y reportes.
+    - Comprueba que todo cuadra:
+      - efectivo esperado = base + cobros en efectivo − compras y gastos en efectivo, sin descuadre;
+      - el cierre del día con su desglose por forma de pago y por tipo de venta;
+      - ventas totales y resultado operativo iguales al cierre (RNF-M08-002); el resultado operativo
+        solo en PostgreSQL;
+      - uso de mesas;
+      - un comprobante por pedido pagado, con números seguidos;
+      - una comanda por pedido confirmado, ninguna perdida;
+      - las mesas libres al final;
+      - lo esencial en la auditoría.
+    - No encontró errores: las piezas de las Fases 0 a 6 encajan. Pasa en SQLite y en PostgreSQL.
+    - `PRUEBA-DIA-COMPLETO.md` es el mismo recorrido para hacerlo a mano en el navegador, con los
+      precios del sembrado y las cifras que deben salir: ventas $125.000, resultado $90.000 y
+      efectivo esperado $142.000.
 
 ## Qué falta a propósito
 
