@@ -45,6 +45,8 @@ final class CatalogoAuditoria
         // Usuarios
         'registro_cliente' => ['Registro de cliente', 'usuarios'],
         'crear_usuario' => ['Alta de usuario del personal', 'usuarios'],
+        'editar_usuario' => ['Edición de datos de usuario', 'usuarios'],
+        'cambiar_rol' => ['Cambio de rol de usuario', 'usuarios'],
         'activar_usuario' => ['Activación de usuario', 'usuarios'],
         'desactivar_usuario' => ['Desactivación de usuario', 'usuarios'],
         'actualizar_perfil' => ['Actualización del perfil propio', 'usuarios'],

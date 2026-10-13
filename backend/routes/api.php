@@ -214,6 +214,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         // Usuarios (M01): listar, crear Mesero/Administrador, activar/desactivar, revocar sesiones.
         Route::get('/usuarios', [UsuarioController::class, 'index']);
         Route::post('/usuarios', [UsuarioController::class, 'store']);
+        // Fase 3, tarea 2 (RF-M01-003/005): editar datos y rol de una cuenta.
+        Route::put('/usuarios/{usuario}', [UsuarioController::class, 'update']);
         Route::post('/usuarios/{usuario}/activar', [UsuarioController::class, 'activar']);
         Route::post('/usuarios/{usuario}/desactivar', [UsuarioController::class, 'desactivar']);
         Route::post('/usuarios/{usuario}/revocar-sesiones', [UsuarioController::class, 'revocarSesiones']);

@@ -1,5 +1,5 @@
 // M01 — espeja UsuarioController del backend (routes/api.php: GET/POST /usuarios,
-// POST /usuarios/{id}/activar|desactivar|revocar-sesiones). Exclusivo Administrador.
+// PUT /usuarios/{id}, POST /usuarios/{id}/activar|desactivar|revocar-sesiones). Exclusivo Administrador.
 import api from './api'
 import type { Rol, Usuario } from '@/types/models'
 
@@ -10,6 +10,20 @@ export interface CrearUsuarioPayload {
   telefono?: string
   password: string
   password_confirmation: string
+}
+
+// Fase 3, tarea 2 (RF-M01-003/005): datos editables de una cuenta. La contraseña no va aquí.
+export interface EditarUsuarioPayload {
+  nombre: string
+  email: string
+  telefono: string | null
+  role: Rol
+}
+
+export interface UsuarioEditado {
+  usuario: Usuario
+  // true si cambió el rol: el backend cerró todas sus sesiones.
+  sesiones_cerradas: boolean
 }
 
 export interface UsuariosPaginados {
@@ -25,6 +39,9 @@ export const usuarioService = {
   },
   crear(payload: CrearUsuarioPayload) {
     return api.post<Usuario>('/usuarios', payload)
+  },
+  editar(id: number, payload: EditarUsuarioPayload) {
+    return api.put<UsuarioEditado>(`/usuarios/${id}`, payload)
   },
   activar(id: number) {
     return api.post<Usuario>(`/usuarios/${id}/activar`)

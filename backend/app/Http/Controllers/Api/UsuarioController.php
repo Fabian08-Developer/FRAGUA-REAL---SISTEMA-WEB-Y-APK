@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\Usuario\StoreUsuarioRequest;
+use App\Http\Requests\Api\Usuario\UpdateUsuarioRequest;
 use App\Models\User;
 use App\Services\AuditoriaService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 /**
@@ -56,6 +58,53 @@ class UsuarioController extends Controller
         ], $request->user());
 
         return response()->json($usuario, 201);
+    }
+
+    // RF-M01-003/005, HU-M01-003/005 (Fase 3, tarea 2): corregir nombre, correo y teléfono de una
+    // cuenta y cambiar su rol. La contraseña no se toca aquí (CA-M01-003.1): cada quien la cambia en
+    // su perfil o con "¿Olvidaste tu contraseña?".
+    //  - Solo roles del catálogo (RF-M01-022, validado en UpdateUsuarioRequest).
+    //  - El Administrador no cambia su propio rol: podría quedarse sin acceso a esta pantalla.
+    //  - Un cambio de rol cierra todas las sesiones de esa cuenta (RF-M01-023): sus permisos
+    //    cambian y debe volver a entrar; así ninguna pestaña abierta sigue con el rol anterior.
+    //  - Queda en la auditoría: los datos cambiados con antes → después (`editar_usuario`) y el
+    //    cambio de rol aparte (`cambiar_rol`), para poder filtrarlo.
+    public function update(UpdateUsuarioRequest $request, User $usuario)
+    {
+        $datos = $request->validated();
+        $cambiaRol = $datos['role'] !== $usuario->role;
+
+        abort_if($cambiaRol && $usuario->is($request->user()), 422, 'No puedes cambiar tu propio rol. Pídeselo a otro Administrador.');
+
+        $campos = ['nombre', 'email', 'telefono'];
+        $antes = $usuario->only([...$campos, 'role']);
+
+        DB::transaction(function () use ($usuario, $datos, $cambiaRol, $campos, $antes, $request) {
+            $usuario->update($datos);
+
+            $cambios = collect($campos)
+                ->filter(fn (string $campo) => (string) ($antes[$campo] ?? '') !== (string) ($datos[$campo] ?? ''))
+                ->mapWithKeys(fn (string $campo) => [$campo => ['antes' => $antes[$campo], 'despues' => $datos[$campo] ?? null]])
+                ->all();
+
+            if ($cambios) {
+                app(AuditoriaService::class)->registrar('editar_usuario', 'User', $usuario->id, ['cambios' => $cambios], $request->user());
+            }
+
+            if ($cambiaRol) {
+                $sesiones = $usuario->tokens()->count();
+                $usuario->tokens()->delete();
+                app(AuditoriaService::class)->registrar('cambiar_rol', 'User', $usuario->id, [
+                    'cambios' => ['rol' => ['antes' => $antes['role'], 'despues' => $datos['role']]],
+                    'sesiones_cerradas' => $sesiones,
+                ], $request->user());
+            }
+        });
+
+        return response()->json([
+            'usuario' => $usuario->fresh(),
+            'sesiones_cerradas' => $cambiaRol,
+        ]);
     }
 
     // Activar/desactivar es un cambio de estado (columna `activo`), no un borrado — igual

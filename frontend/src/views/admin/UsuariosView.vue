@@ -2,7 +2,7 @@
 // M01 — Usuarios del Administrador: listar (staff y clientes), crear cuentas de
 // Mesero/Administrador, activar/desactivar y revocar sesiones. Ver UsuarioController.
 import { computed, onMounted, ref } from 'vue'
-import { History, KeyRound, Plus, Users as UsersIcon } from 'lucide-vue-next'
+import { History, KeyRound, Pencil, Plus, Users as UsersIcon } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -143,6 +143,68 @@ async function confirmarCrear() {
   }
 }
 
+// ---- Editar usuario y cambiar su rol (Fase 3, tarea 2: RF-M01-003/005, HU-M01-003/005) ----
+// Datos permitidos: nombre, correo, teléfono y rol (CA-M01-003.1). La contraseña no se cambia
+// aquí. Cambiar el rol cierra todas las sesiones de esa cuenta; nadie cambia su propio rol.
+const usuarioEditando = ref<Usuario | null>(null)
+const formEditar = ref({ nombre: '', email: '', telefono: '', role: 'mesero' as Rol })
+const erroresEditar = ref<Record<string, string>>({})
+const errorEditar = ref('')
+const guardandoEdicion = ref(false)
+const mensajeEdicion = ref('')
+
+const modalEditarAbierto = computed({
+  get: () => usuarioEditando.value !== null,
+  set: (abierto: boolean) => {
+    if (!abierto) usuarioEditando.value = null
+  },
+})
+const editandoPropia = computed(() => usuarioEditando.value?.id === auth.usuario?.id)
+const cambiaRol = computed(() => !!usuarioEditando.value && formEditar.value.role !== usuarioEditando.value.role)
+const OPCIONES_ROL_EDITAR: Rol[] = ['administrador', 'mesero', 'cliente']
+
+function abrirEditar(usuario: Usuario) {
+  usuarioEditando.value = usuario
+  formEditar.value = { nombre: usuario.nombre, email: usuario.email, telefono: usuario.telefono ?? '', role: usuario.role }
+  erroresEditar.value = {}
+  errorEditar.value = ''
+}
+
+async function confirmarEditar() {
+  const usuario = usuarioEditando.value
+  if (!usuario) return
+  guardandoEdicion.value = true
+  erroresEditar.value = {}
+  errorEditar.value = ''
+  mensajeEdicion.value = ''
+  mensajeRevocar.value = ''
+  try {
+    const { data } = await usuarioService.editar(usuario.id, {
+      nombre: formEditar.value.nombre,
+      email: formEditar.value.email,
+      telefono: formEditar.value.telefono.trim() || null,
+      role: formEditar.value.role,
+    })
+    reemplazar(data.usuario)
+    if (data.usuario.id === auth.usuario?.id) auth.usuario = data.usuario
+    mensajeEdicion.value = data.sesiones_cerradas
+      ? `${data.usuario.nombre} ahora es ${ROLES[data.usuario.role].texto}. Se cerraron sus sesiones: debe volver a entrar.`
+      : `Datos de ${data.usuario.nombre} actualizados.`
+    usuarioEditando.value = null
+    // Si el filtro de rol ya no lo incluye, se recarga la lista.
+    if (filtroRol.value !== 'todos' && data.usuario.role !== filtroRol.value) await cargar()
+  } catch (e) {
+    const campos = erroresDeValidacion(e)
+    if (Object.keys(campos).length) {
+      erroresEditar.value = campos
+    } else {
+      errorEditar.value = mensajeDeError(e, 'No pudimos guardar los cambios.')
+    }
+  } finally {
+    guardandoEdicion.value = false
+  }
+}
+
 const contadorTexto = computed(() => (total.value === 1 ? '1 usuario' : `${total.value} usuarios`))
 
 onMounted(cargar)
@@ -183,6 +245,7 @@ onMounted(cargar)
 
     <p v-if="error" class="mt-4 alert-error">{{ error }}</p>
     <p v-if="mensajeRevocar" class="mt-4 alert-success">{{ mensajeRevocar }}</p>
+    <p v-if="mensajeEdicion" class="mt-4 alert-success">{{ mensajeEdicion }}</p>
 
     <div v-if="cargando" class="loading-state">Cargando usuarios…</div>
 
@@ -231,11 +294,20 @@ onMounted(cargar)
             <!-- Fase 3, tarea 1 (RF-M01-025): lo que hizo este usuario, en Auditoría. -->
             <router-link
               :to="{ name: 'admin-auditoria', query: { user_id: String(usuario.id) } }"
-              class="col-span-2 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 hover:text-ink sm:min-h-9"
+              class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 hover:text-ink sm:min-h-9"
             >
               <History :size="14" />
               Actividad
             </router-link>
+            <BaseButton
+              variant="ghost"
+              size="sm"
+              :disabled="procesando === usuario.id"
+              @click="abrirEditar(usuario)"
+            >
+              <Pencil :size="14" />
+              Editar
+            </BaseButton>
             <template v-if="usuario.id !== auth.usuario?.id">
             <BaseButton variant="ghost" size="sm" :disabled="procesando === usuario.id" @click="revocarSesiones(usuario)">
               <KeyRound :size="14" />
@@ -316,6 +388,68 @@ onMounted(cargar)
           <BaseButton variant="ghost" type="button" @click="modalAbierto = false">Cancelar</BaseButton>
           <BaseButton variant="primary" type="submit" :disabled="creando">
             {{ creando ? 'Creando…' : 'Crear usuario' }}
+          </BaseButton>
+        </div>
+      </form>
+    </BaseModal>
+
+    <!-- Editar usuario y rol (Fase 3, tarea 2) -->
+    <BaseModal v-model="modalEditarAbierto" title="Editar usuario">
+      <form v-if="usuarioEditando" class="space-y-4" @submit.prevent="confirmarEditar">
+        <label class="block">
+          <span class="field-label">Nombre</span>
+          <input v-model="formEditar.nombre" type="text" class="field" autocomplete="off" />
+          <span v-if="erroresEditar.nombre" class="mt-1 block text-xs text-red-600">{{ erroresEditar.nombre }}</span>
+        </label>
+
+        <label class="block">
+          <span class="field-label">Correo</span>
+          <input v-model="formEditar.email" type="email" class="field" autocomplete="off" />
+          <span v-if="erroresEditar.email" class="mt-1 block text-xs text-red-600">{{ erroresEditar.email }}</span>
+        </label>
+
+        <label class="block">
+          <span class="field-label">Teléfono (opcional)</span>
+          <input v-model="formEditar.telefono" type="tel" class="field" autocomplete="off" />
+          <span v-if="erroresEditar.telefono" class="mt-1 block text-xs text-red-600">{{ erroresEditar.telefono }}</span>
+        </label>
+
+        <div>
+          <p class="field-label">Rol</p>
+          <div class="grid grid-cols-3 gap-2">
+            <button
+              v-for="rol in OPCIONES_ROL_EDITAR"
+              :key="rol"
+              type="button"
+              class="rounded-xl border px-2 py-3 text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              :class="formEditar.role === rol ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 hover:border-brand-300'"
+              :disabled="editandoPropia"
+              :aria-pressed="formEditar.role === rol"
+              @click="formEditar.role = rol"
+            >
+              {{ ROLES[rol].texto }}
+            </button>
+          </div>
+          <span v-if="erroresEditar.role" class="mt-1 block text-xs text-red-600">{{ erroresEditar.role }}</span>
+          <p v-if="editandoPropia" class="mt-2 text-xs text-gray-500">
+            No puedes cambiar tu propio rol; otro Administrador puede hacerlo.
+          </p>
+          <p v-else-if="cambiaRol" class="mt-2 alert-info">
+            Al guardar, {{ usuarioEditando.nombre }} pasa de {{ ROLES[usuarioEditando.role].texto }} a
+            {{ ROLES[formEditar.role].texto }} y se cierran todas sus sesiones: tendrá que volver a entrar.
+          </p>
+        </div>
+
+        <p class="text-xs text-gray-500">
+          La contraseña no se cambia aquí: cada persona la cambia en su perfil o con "¿Olvidaste tu contraseña?".
+        </p>
+
+        <p v-if="errorEditar" class="alert-error">{{ errorEditar }}</p>
+
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <BaseButton variant="ghost" type="button" @click="usuarioEditando = null">Cancelar</BaseButton>
+          <BaseButton variant="primary" type="submit" :disabled="guardandoEdicion">
+            {{ guardandoEdicion ? 'Guardando…' : cambiaRol ? 'Guardar y cambiar rol' : 'Guardar cambios' }}
           </BaseButton>
         </div>
       </form>

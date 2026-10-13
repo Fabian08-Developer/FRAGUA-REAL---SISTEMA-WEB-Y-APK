@@ -56,7 +56,8 @@ soporte guardado en almacenamiento privado y quién corrigió o anuló cada regi
 
 Fase 3 (12/10/2026): `2026_10_17_000001` protege el historial de auditoría en la base de datos
 (triggers que rechazan cambios y borrados en `auditorias`) y agrega un índice por fecha; detalle en
-`README-BACKEND.md`, punto 27. Pruebas automáticas: `php artisan test` (182 en `tests/Feature`).
+`README-BACKEND.md`, punto 27. La tarea 2 (editar usuario y cambiar su rol, punto 28) no necesita
+migración. Pruebas automáticas: `php artisan test` (189 en `tests/Feature`).
 
 ## Decisiones de arquitectura (ADR)
 

@@ -114,7 +114,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 12/10/2026 van 441 de 579 verificables, 76 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 12/10/2026 van 446 de 579 verificables, 77 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -125,7 +125,8 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   se abona a la cuenta de la visita), la tarea 3 (el mismo catálogo en todos los canales) y la
   tarea 4 (compras y gastos completos). Con la tarea 5 (cierre diario completo) la Fase 2 quedó
   completa el 12/10/2026; ver los puntos 22 a 26. La Fase 3 empezó con la tarea 1 (consulta
-  de auditoría y eventos de seguridad); ver el punto 27.
+  de auditoría y eventos de seguridad) y sigue con la tarea 2 (editar usuario y cambiar su rol);
+  ver los puntos 27 y 28.
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr
@@ -239,6 +240,9 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   cierres de sesión, el registro de clientes, los cambios y restablecimientos de contraseña, el
   alta de usuarios del personal y los cambios de configuración (domicilio y depósito).
 - En Usuarios, cada usuario tiene el botón "Actividad", que abre la auditoría filtrada por él.
+- En Usuarios, el botón "Editar" corrige nombre, correo y teléfono y cambia el rol (Administrador,
+  Mesero o Cliente). Cambiar el rol cierra las sesiones de esa persona: debe volver a entrar. Nadie
+  cambia su propio rol, y la contraseña no se cambia desde ahí.
 - El historial de auditoría ya no se puede cambiar ni borrar ni siquiera desde la base de datos.
   Consecuencia: un usuario con historial no se puede borrar de la base de datos (se desactiva,
   como siempre).

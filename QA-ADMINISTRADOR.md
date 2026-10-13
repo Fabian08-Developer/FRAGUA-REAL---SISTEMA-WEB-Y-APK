@@ -32,6 +32,15 @@ permitía editar los valores, pero no había dónde hacerlo).
 - [ ] Activar de nuevo: vuelve a entrar.
 - [ ] Revocar sesiones: el token abierto en otra ventana deja de funcionar (RF-M01-010/023).
 - [ ] Un Mesero no puede abrir `/admin` ni llamar `/usuarios` (403).
+- [ ] "Editar" (Fase 3, tarea 2 — RF-M01-003/005): cambiar nombre, correo y teléfono de un
+      Mesero; el correo de otra cuenta muestra "Ese correo ya lo usa otra cuenta". Su sesión
+      sigue abierta.
+- [ ] Cambiar el rol de un Mesero a Administrador: el modal avisa del cierre de sesiones; al
+      guardar, la ventana donde él estaba conectado lo saca al login, y al entrar ve el panel del
+      Administrador. En Auditoría aparecen "Edición de datos de usuario" y "Cambio de rol de
+      usuario" con el antes → después.
+- [ ] Un Cliente puede pasar a Mesero. En tu propia cuenta el rol aparece bloqueado. La
+      contraseña no aparece en el formulario.
 - [ ] "Actividad" en un usuario abre Auditoría filtrada por él; el aviso azul permite ver también
       lo que pasó sobre su cuenta (intentos fallidos con su correo, desactivación…).
 

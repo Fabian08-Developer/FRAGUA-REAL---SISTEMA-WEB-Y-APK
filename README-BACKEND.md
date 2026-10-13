@@ -534,6 +534,25 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       atajo "Solo seguridad y sesiones", filtros y el detalle legible de cada registro (motivo,
       antes → después, navegador completo). En Usuarios, el botón "Actividad" abre la auditoría
       filtrada por ese usuario, con un atajo para ver también lo que pasó sobre su cuenta.
+28. **Fase 3, tarea 2 (12/10/2026): editar un usuario y cambiar su rol (M01).** RF-M01-003, 005,
+    011, 021, 022, 023, HU-M01-003, 005, CA-M01-003.1/003.2, CA-M01-005.1/005.2. Sin migración;
+    7 pruebas en `EditarUsuarioTest`.
+    - `PUT /usuarios/{id}` (solo Administrador, `UpdateUsuarioRequest`): nombre, correo (único,
+      sin chocar con el suyo), teléfono (vacío = sin teléfono) y rol. Solo esos campos
+      (CA-M01-003.1): la contraseña y el estado activo no se cambian aquí; la contraseña la cambia
+      cada persona en su perfil o con la recuperación, y activar/desactivar tiene su propio botón.
+    - Rol: solo administrador, mesero o cliente (RF-M01-022; cualquier otro, como "cocina" o
+      "domiciliario", se rechaza). Un Cliente puede pasar a Mesero y al revés. El Administrador no
+      puede cambiar su propio rol (se quedaría sin acceso a Usuarios): 422 sin guardar nada.
+    - Cambiar el rol cierra todas las sesiones de esa cuenta (RF-M01-023): sus permisos cambian y
+      ninguna pestaña abierta sigue con el rol anterior. La respuesta trae `sesiones_cerradas`.
+    - Auditoría: `editar_usuario` con el antes → después de lo que cambió (guardar sin cambios no
+      registra nada) y `cambiar_rol` aparte, con el rol anterior, el nuevo y cuántas sesiones se
+      cerraron.
+    - Frontend: botón "Editar" en cada usuario de Administrador > Usuarios; modal con nombre,
+      correo, teléfono y rol (Administrador, Mesero o Cliente). Si el rol cambia, avisa que se
+      cerrarán sus sesiones y el botón dice "Guardar y cambiar rol"; en la cuenta propia el rol
+      aparece bloqueado.
 
 ## Qué falta a propósito
 
