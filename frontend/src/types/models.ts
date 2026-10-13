@@ -11,6 +11,8 @@ export interface Usuario {
   id: number
   nombre: string
   email: string
+  // Fase 3, tarea 3 (RF-M01-007/011): opcional, único, en minúsculas; sirve para iniciar sesión.
+  username: string | null
   telefono: string | null
   role: Rol
   activo: boolean

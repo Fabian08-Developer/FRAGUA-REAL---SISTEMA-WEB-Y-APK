@@ -12,6 +12,8 @@ const props = withDefaults(
     disabled?: boolean
     /** Ícono (lucide-vue-next) que se muestra a la izquierda del campo. */
     icon?: Component
+    /** Pista de autocompletado del navegador (p. ej. "username", "email", "current-password"). */
+    autocomplete?: string
   }>(),
   { disabled: false },
 )
@@ -43,6 +45,7 @@ const tipoReal = computed(() => (esPassword.value && mostrarPassword.value ? 'te
         :value="modelValue"
         :placeholder="placeholder"
         :disabled="disabled"
+        :autocomplete="autocomplete"
         class="w-full rounded-xl border border-[#e3ded4] bg-[#fbfaf7] py-3 pr-4 text-base text-ink placeholder:text-[#a39c8f] transition focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-brand-500/15 disabled:cursor-not-allowed disabled:bg-[#f1efe9] disabled:text-[#8a8379] sm:text-sm"
         :class="[icon ? 'pl-11' : 'pl-4', esPassword ? 'pr-11' : 'pr-4', { '!border-red-400 !ring-red-100': error }]"
         @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"

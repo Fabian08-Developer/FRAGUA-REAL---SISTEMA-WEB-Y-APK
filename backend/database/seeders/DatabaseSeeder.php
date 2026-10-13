@@ -40,20 +40,21 @@ class DatabaseSeeder extends Seeder
     {
         $clave = Hash::make('password');
 
-        // Contraseña de los 3 para pruebas: "password"
+        // Contraseña de los 3 para pruebas: "password". Desde la Fase 3 también entran con su
+        // nombre de usuario: admin, mesero y cliente.
         User::query()->firstOrCreate(
             ['email' => 'admin@fraguareal.com'],
-            ['role' => 'administrador', 'nombre' => 'Admin Fragua Real', 'password' => $clave, 'activo' => true]
+            ['role' => 'administrador', 'nombre' => 'Admin Fragua Real', 'username' => 'admin', 'password' => $clave, 'activo' => true]
         );
 
         User::query()->firstOrCreate(
             ['email' => 'mesero@fraguareal.com'],
-            ['role' => 'mesero', 'nombre' => 'Mesero Demo', 'password' => $clave, 'activo' => true]
+            ['role' => 'mesero', 'nombre' => 'Mesero Demo', 'username' => 'mesero', 'password' => $clave, 'activo' => true]
         );
 
         User::query()->firstOrCreate(
             ['email' => 'cliente@fraguareal.com'],
-            ['role' => 'cliente', 'nombre' => 'Cliente Demo', 'telefono' => '3001234567', 'password' => $clave, 'activo' => true]
+            ['role' => 'cliente', 'nombre' => 'Cliente Demo', 'username' => 'cliente', 'telefono' => '3001234567', 'password' => $clave, 'activo' => true]
         );
     }
 

@@ -3,7 +3,7 @@
 // datos y cambia su propia contraseña. Dos formularios independientes: cada uno
 // envía y valida por separado (AuthController::actualizarPerfil / cambiarPassword).
 import { reactive, ref, watch } from 'vue'
-import { CheckCircle2, KeyRound, Lock, Mail, Phone, User } from 'lucide-vue-next'
+import { AtSign, CheckCircle2, KeyRound, Lock, Mail, Phone, User } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -18,7 +18,7 @@ const ROLES: Record<string, string> = {
 }
 
 // ---- Datos del perfil ----
-const datos = reactive({ nombre: '', telefono: '' })
+const datos = reactive({ nombre: '', telefono: '', username: '' })
 
 watch(
   () => auth.usuario,
@@ -26,6 +26,7 @@ watch(
     if (usuario) {
       datos.nombre = usuario.nombre
       datos.telefono = usuario.telefono ?? ''
+      datos.username = usuario.username ?? ''
     }
   },
   { immediate: true },
@@ -42,7 +43,8 @@ async function guardarDatos() {
   errorDatos.value = ''
   exitoDatos.value = false
   try {
-    await auth.actualizarPerfil({ nombre: datos.nombre, telefono: datos.telefono || undefined })
+    // username siempre se envía: vacío = quitarlo (Fase 3, tarea 3).
+    await auth.actualizarPerfil({ nombre: datos.nombre, telefono: datos.telefono || undefined, username: datos.username.trim() })
     exitoDatos.value = true
   } catch (error) {
     const campos = erroresDeValidacion(error)
@@ -112,6 +114,19 @@ async function cambiarPassword() {
         <form class="mt-5 space-y-4" @submit.prevent="guardarDatos">
           <BaseInput v-model="datos.nombre" label="Nombre" :icon="User" :error="erroresDatos.nombre" />
           <BaseInput label="Correo electrónico" :icon="Mail" :model-value="auth.usuario.email" disabled />
+          <div>
+            <BaseInput
+              v-model="datos.username"
+              label="Nombre de usuario (opcional)"
+              placeholder="Ej. carla.p"
+              autocomplete="username"
+              :icon="AtSign"
+              :error="erroresDatos.username"
+            />
+            <p v-if="!erroresDatos.username" class="mt-1.5 text-xs text-[#6c655c]">
+              Puedes iniciar sesión con tu correo o con este nombre. De 3 a 30 caracteres: letras sin tilde, números, punto, guion o guion bajo.
+            </p>
+          </div>
           <BaseInput v-model="datos.telefono" label="Teléfono (opcional)" :icon="Phone" :error="erroresDatos.telefono" />
 
           <p v-if="errorDatos" class="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorDatos }}</p>

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\Auth;
 
+use App\Support\Usuarios\NombreUsuario;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -16,11 +17,25 @@ class RegisterClienteRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('username')) {
+            $this->merge(['username' => NombreUsuario::normalizar($this->input('username'))]);
+        }
+    }
+
+    public function messages(): array
+    {
+        return NombreUsuario::mensajes();
+    }
+
     public function rules(): array
     {
         return [
             'nombre' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
+            // Fase 3, tarea 3 (RF-M01-007/011): nombre de usuario opcional para iniciar sesión.
+            'username' => NombreUsuario::reglas(),
             'telefono' => ['nullable', 'string', 'max:30'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ];

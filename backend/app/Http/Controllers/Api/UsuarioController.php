@@ -31,6 +31,7 @@ class UsuarioController extends Controller
             ->when($request->busqueda, fn ($q) => $q->where(
                 fn ($q2) => $q2->where('nombre', 'like', "%{$request->busqueda}%")
                     ->orWhere('email', 'like', "%{$request->busqueda}%")
+                    ->orWhere('username', 'like', '%'.mb_strtolower((string) $request->busqueda).'%')
             ))
             ->orderBy('nombre')
             ->paginate(20);
@@ -46,6 +47,7 @@ class UsuarioController extends Controller
             'role' => $request->role,
             'nombre' => $request->nombre,
             'email' => $request->email,
+            'username' => $request->validated('username'),
             'telefono' => $request->telefono,
             'password' => Hash::make($request->password),
             'activo' => true,
@@ -55,6 +57,7 @@ class UsuarioController extends Controller
             'rol' => $usuario->role,
             'nombre' => $usuario->nombre,
             'correo' => $usuario->email,
+            'usuario' => $usuario->username,
         ], $request->user());
 
         return response()->json($usuario, 201);
@@ -76,7 +79,7 @@ class UsuarioController extends Controller
 
         abort_if($cambiaRol && $usuario->is($request->user()), 422, 'No puedes cambiar tu propio rol. Pídeselo a otro Administrador.');
 
-        $campos = ['nombre', 'email', 'telefono'];
+        $campos = array_values(array_intersect(['nombre', 'email', 'username', 'telefono'], array_keys($datos)));
         $antes = $usuario->only([...$campos, 'role']);
 
         DB::transaction(function () use ($usuario, $datos, $cambiaRol, $campos, $antes, $request) {

@@ -41,6 +41,14 @@ permitía editar los valores, pero no había dónde hacerlo).
       usuario" con el antes → después.
 - [ ] Un Cliente puede pasar a Mesero. En tu propia cuenta el rol aparece bloqueado. La
       contraseña no aparece en el formulario.
+- [ ] Nombre de usuario (Fase 3, tarea 3 — RF-M01-007/011): ponerle "mario.m" a un Mesero al
+      crearlo o editarlo; la lista lo muestra como "@mario.m" y la búsqueda lo encuentra. Uno
+      repetido (también con mayúsculas, "Mario.M") o con tilde, espacio o "@" se rechaza con un
+      mensaje claro. Dejarlo vacío lo quita.
+- [ ] En el login, "mario.m" (o "MARIO.M") y la contraseña entran; su correo también. Usuario o
+      contraseña equivocados muestran el mismo mensaje. En Auditoría el inicio de sesión dice por
+      dónde entró.
+- [ ] Mi perfil: elegir o cambiar el propio nombre de usuario y entrar con él.
 - [ ] "Actividad" en un usuario abre Auditoría filtrada por él; el aviso azul permite ver también
       lo que pasó sobre su cuenta (intentos fallidos con su correo, desactivación…).
 

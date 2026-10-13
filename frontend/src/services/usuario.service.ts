@@ -7,6 +7,7 @@ export interface CrearUsuarioPayload {
   role: Extract<Rol, 'mesero' | 'administrador'>
   nombre: string
   email: string
+  username?: string
   telefono?: string
   password: string
   password_confirmation: string
@@ -16,6 +17,8 @@ export interface CrearUsuarioPayload {
 export interface EditarUsuarioPayload {
   nombre: string
   email: string
+  // Fase 3, tarea 3: vacío = sin nombre de usuario (entra solo con el correo).
+  username: string
   telefono: string | null
   role: Rol
 }

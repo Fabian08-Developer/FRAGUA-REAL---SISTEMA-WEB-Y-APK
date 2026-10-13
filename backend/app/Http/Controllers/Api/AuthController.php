@@ -32,6 +32,7 @@ class AuthController extends Controller
             'role' => 'cliente',
             'nombre' => $request->nombre,
             'email' => $request->email,
+            'username' => $request->validated('username'),
             'telefono' => $request->telefono,
             'password' => Hash::make($request->password),
             'activo' => true,
@@ -43,9 +44,16 @@ class AuthController extends Controller
         return response()->json(['user' => $user, 'token' => $token], 201);
     }
 
+    // RF-M01-007 (Fase 3, tarea 3): con el correo o con el nombre de usuario. Si lo escrito lleva
+    // "@" es un correo; si no, un nombre de usuario (se guarda en minúsculas, así que "Mario" y
+    // "mario" son el mismo). El mensaje de error es el mismo en todos los casos.
     public function login(LoginRequest $request)
     {
-        $user = User::where('email', $request->email)->first();
+        $identificador = $request->identificador();
+        $esCorreo = $request->esCorreo();
+        $user = $esCorreo
+            ? User::where('email', $identificador)->first()
+            : User::where('username', mb_strtolower($identificador))->first();
 
         if (! $user || ! Hash::check($request->password, $user->password) || ! $user->activo) {
             // RF-M01-017 (Fase 3, tarea 1): el intento fallido queda registrado con el correo
@@ -54,17 +62,17 @@ class AuthController extends Controller
             $motivo = ! $user ? 'cuenta_inexistente'
                 : (Hash::check($request->password, $user->password) ? 'cuenta_inactiva' : 'contrasena_incorrecta');
             app(AuditoriaService::class)->registrar('inicio_sesion_fallido', 'User', $user?->id, [
-                'correo' => mb_substr((string) $request->email, 0, 120),
+                ($esCorreo ? 'correo' : 'usuario') => mb_substr($identificador, 0, 120),
                 'motivo' => $motivo,
             ]);
 
             throw ValidationException::withMessages([
-                'email' => ['Las credenciales no son válidas o el usuario está inactivo.'],
+                $request->campo() => ['Las credenciales no son válidas o el usuario está inactivo.'],
             ]);
         }
 
         $token = $user->createToken('acceso')->plainTextToken;
-        $this->auditar('inicio_sesion', $user, [], $user);
+        $this->auditar('inicio_sesion', $user, ['via' => $esCorreo ? 'correo' : 'usuario'], $user);
 
         return response()->json(['user' => $user, 'token' => $token]);
     }

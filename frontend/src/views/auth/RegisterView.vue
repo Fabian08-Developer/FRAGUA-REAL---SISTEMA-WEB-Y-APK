@@ -4,7 +4,7 @@
 // refleja el error 422 que devuelva).
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowRight, Lock, Mail, Phone, User } from 'lucide-vue-next'
+import { ArrowRight, AtSign, Lock, Mail, Phone, User } from 'lucide-vue-next'
 import BaseInput from '@/components/common/BaseInput.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import { useAuth } from '@/composables/useAuth'
@@ -16,6 +16,7 @@ const { registrar } = useAuth()
 const nombre = ref('')
 const email = ref('')
 const telefono = ref('')
+const username = ref('')
 const password = ref('')
 const passwordConfirmation = ref('')
 const cargando = ref(false)
@@ -30,6 +31,7 @@ async function onSubmit() {
     await registrar({
       nombre: nombre.value,
       email: email.value,
+      username: username.value.trim() || undefined,
       telefono: telefono.value || undefined,
       password: password.value,
       password_confirmation: passwordConfirmation.value,
@@ -76,7 +78,17 @@ async function onSubmit() {
       label="Correo electrónico"
       placeholder="tu@correo.com"
       :icon="Mail"
+      autocomplete="email"
       :error="erroresCampo.email"
+    />
+    <!-- Fase 3, tarea 3 (RF-M01-007/011): opcional; con él también se puede iniciar sesión. -->
+    <BaseInput
+      v-model="username"
+      label="Nombre de usuario (opcional)"
+      placeholder="Ej. carla.p — para entrar sin escribir el correo"
+      autocomplete="username"
+      :icon="AtSign"
+      :error="erroresCampo.username"
     />
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <BaseInput

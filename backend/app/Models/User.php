@@ -19,7 +19,7 @@ class User extends Authenticatable
     // trait, que el modelo tampoco traía.
     use Notifiable;
 
-    protected $fillable = ['role', 'nombre', 'email', 'telefono', 'password', 'activo'];
+    protected $fillable = ['role', 'nombre', 'email', 'username', 'telefono', 'password', 'activo'];
 
     protected $hidden = ['password', 'remember_token'];
 

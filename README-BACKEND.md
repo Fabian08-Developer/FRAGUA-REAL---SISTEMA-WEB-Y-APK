@@ -553,6 +553,28 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       correo, teléfono y rol (Administrador, Mesero o Cliente). Si el rol cambia, avisa que se
       cerrarán sus sesiones y el botón dice "Guardar y cambiar rol"; en la cuenta propia el rol
       aparece bloqueado.
+29. **Fase 3, tarea 3 (12/10/2026): iniciar sesión con el correo o con un nombre de usuario (M01).**
+    RF-M01-007, 011, 016, RNF-M01-004, RN-USR-04, HU-M01-006, 011. Migración
+    `2026_10_17_000002` (`users.username`, opcional y único); 5 pruebas en `LoginPorUsuarioTest`.
+    - Nombre de usuario (`App\Support\Usuarios\NombreUsuario`, mismas reglas en registro, perfil y
+      Usuarios): opcional; de 3 a 30 caracteres; empieza con una letra; solo letras sin tilde,
+      números, punto, guion y guion bajo; nunca lleva "@". Se guarda en minúsculas y es único sin
+      importar mayúsculas. Las cuentas que ya existían quedan sin nombre de usuario y siguen
+      entrando con su correo.
+    - `POST /auth/login` recibe `login` (correo o nombre de usuario) y `password`; si lo escrito
+      lleva "@" se busca como correo, si no como nombre de usuario. El campo anterior `email` se
+      sigue aceptando (con cualquiera de los dos). El error es el mismo en todos los casos y sale
+      en el campo que se envió. La auditoría guarda por dónde entró (`via`: correo o usuario) y,
+      en los intentos fallidos, el correo o el usuario escrito.
+    - Dónde se pone: al registrarse (opcional), en Mi perfil (cada quien lo elige, cambia o quita;
+      si el formulario no lo envía, no se toca) y en Usuarios al crear o editar una cuenta (con
+      su antes → después en la auditoría). La búsqueda de Usuarios también busca por él.
+    - Seeder: las cuentas de prueba tienen `admin`, `mesero` y `cliente` como nombre de usuario
+      (solo en una base recién sembrada).
+    - Frontend: el login pide "Correo o nombre de usuario" (con autocompletado del navegador);
+      Crear cuenta y Mi perfil tienen el campo opcional; Usuarios lo muestra como "@usuario" y
+      lo pide al crear y editar. `BaseInput` acepta `autocomplete`.
+    - La recuperación de contraseña sigue siendo por correo.
 
 ## Qué falta a propósito
 

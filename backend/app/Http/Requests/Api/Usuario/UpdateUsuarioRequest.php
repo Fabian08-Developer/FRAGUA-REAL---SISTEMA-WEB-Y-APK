@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\Usuario;
 
+use App\Support\Usuarios\NombreUsuario;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -28,6 +29,9 @@ class UpdateUsuarioRequest extends FormRequest
             'email' => is_string($this->email) ? trim($this->email) : $this->email,
             'telefono' => is_string($this->telefono) && trim($this->telefono) === '' ? null : $this->telefono,
         ]);
+        if ($this->has('username')) {
+            $this->merge(['username' => NombreUsuario::normalizar($this->input('username'))]);
+        }
     }
 
     public function rules(): array
@@ -38,6 +42,9 @@ class UpdateUsuarioRequest extends FormRequest
             'nombre' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($usuario?->id)],
             'telefono' => ['nullable', 'string', 'max:30'],
+            // Fase 3, tarea 3 (RF-M01-007/011): vacío = sin nombre de usuario (entra con el correo);
+            // si no se envía, no se toca.
+            'username' => ['sometimes', ...NombreUsuario::reglas($usuario?->id)],
             'role' => ['required', Rule::in(self::ROLES)],
         ];
     }
@@ -45,6 +52,7 @@ class UpdateUsuarioRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...NombreUsuario::mensajes(),
             'email.unique' => 'Ese correo ya lo usa otra cuenta.',
             'role.in' => 'Ese rol no existe. Los roles del sistema son Administrador, Mesero y Cliente.',
         ];

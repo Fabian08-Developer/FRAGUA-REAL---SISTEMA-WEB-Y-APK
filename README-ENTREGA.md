@@ -48,11 +48,14 @@ Frontend en `http://localhost:5173`, API en `http://localhost:8000` (proxy
 
 ### Cuentas de prueba (seeder)
 
-| Rol | Correo | Contraseña |
-|---|---|---|
-| Administrador | admin@fraguareal.com | password |
-| Mesero | mesero@fraguareal.com | password |
-| Cliente | cliente@fraguareal.com | password |
+| Rol | Correo | Usuario | Contraseña |
+|---|---|---|---|
+| Administrador | admin@fraguareal.com | admin | password |
+| Mesero | mesero@fraguareal.com | mesero | password |
+| Cliente | cliente@fraguareal.com | cliente | password |
+
+El usuario (Fase 3) solo existe en una base sembrada después del 12/10/2026; en una base
+anterior se entra con el correo o se le pone desde Usuarios.
 
 El Cliente también puede navegar y pedir como invitado, sin cuenta.
 
@@ -114,7 +117,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
   seguridad.
 - La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 12/10/2026 van 446 de 579 verificables, 77 %). Están ordenadas en el documento "Plan de implementación —
+  (282 de 582 requisitos hechos; al 12/10/2026 van 451 de 579 verificables, 78 %). Están ordenadas en el documento "Plan de implementación —
   Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
   (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
   curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
@@ -125,8 +128,8 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   se abona a la cuenta de la visita), la tarea 3 (el mismo catálogo en todos los canales) y la
   tarea 4 (compras y gastos completos). Con la tarea 5 (cierre diario completo) la Fase 2 quedó
   completa el 12/10/2026; ver los puntos 22 a 26. La Fase 3 empezó con la tarea 1 (consulta
-  de auditoría y eventos de seguridad) y sigue con la tarea 2 (editar usuario y cambiar su rol);
-  ver los puntos 27 y 28.
+  de auditoría y eventos de seguridad), la tarea 2 (editar usuario y cambiar su rol) y la tarea 3
+  (iniciar sesión con correo o nombre de usuario); ver los puntos 27 a 29.
 - Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
   Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
   pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr
@@ -139,7 +142,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
   imprimir el QR.
 - Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2 y 1 de la Fase 3, ninguna borra datos).
+  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2 y 2 de la Fase 3, ninguna borra datos).
 
 ## Cambios de comportamiento de la Fase 0 (09/10/2026)
 
@@ -243,6 +246,9 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 - En Usuarios, el botón "Editar" corrige nombre, correo y teléfono y cambia el rol (Administrador,
   Mesero o Cliente). Cambiar el rol cierra las sesiones de esa persona: debe volver a entrar. Nadie
   cambia su propio rol, y la contraseña no se cambia desde ahí.
+- Se puede iniciar sesión con el correo o con un nombre de usuario. El nombre de usuario es
+  opcional: se elige al crear la cuenta, en Mi perfil o lo pone el Administrador en Usuarios. Las
+  cuentas que ya existían siguen entrando con su correo hasta que se les ponga uno.
 - El historial de auditoría ya no se puede cambiar ni borrar ni siquiera desde la base de datos.
   Consecuencia: un usuario con historial no se puede borrar de la base de datos (se desactiva,
   como siempre).

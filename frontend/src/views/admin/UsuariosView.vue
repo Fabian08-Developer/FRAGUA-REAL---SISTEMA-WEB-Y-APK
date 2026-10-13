@@ -108,6 +108,7 @@ const form = ref({
   role: 'mesero' as Extract<Rol, 'mesero' | 'administrador'>,
   nombre: '',
   email: '',
+  username: '',
   telefono: '',
   password: '',
   password_confirmation: '',
@@ -117,7 +118,7 @@ const errorForm = ref('')
 const creando = ref(false)
 
 function abrirCrear() {
-  form.value = { role: 'mesero', nombre: '', email: '', telefono: '', password: '', password_confirmation: '' }
+  form.value = { role: 'mesero', nombre: '', email: '', username: '', telefono: '', password: '', password_confirmation: '' }
   erroresForm.value = {}
   errorForm.value = ''
   modalAbierto.value = true
@@ -128,7 +129,11 @@ async function confirmarCrear() {
   erroresForm.value = {}
   errorForm.value = ''
   try {
-    await usuarioService.crear({ ...form.value, telefono: form.value.telefono || undefined })
+    await usuarioService.crear({
+      ...form.value,
+      username: form.value.username.trim() || undefined,
+      telefono: form.value.telefono || undefined,
+    })
     modalAbierto.value = false
     await cargar()
   } catch (e) {
@@ -144,10 +149,10 @@ async function confirmarCrear() {
 }
 
 // ---- Editar usuario y cambiar su rol (Fase 3, tarea 2: RF-M01-003/005, HU-M01-003/005) ----
-// Datos permitidos: nombre, correo, teléfono y rol (CA-M01-003.1). La contraseña no se cambia
+// Datos permitidos: nombre, correo, nombre de usuario, teléfono y rol (CA-M01-003.1). La contraseña no se cambia
 // aquí. Cambiar el rol cierra todas las sesiones de esa cuenta; nadie cambia su propio rol.
 const usuarioEditando = ref<Usuario | null>(null)
-const formEditar = ref({ nombre: '', email: '', telefono: '', role: 'mesero' as Rol })
+const formEditar = ref({ nombre: '', email: '', username: '', telefono: '', role: 'mesero' as Rol })
 const erroresEditar = ref<Record<string, string>>({})
 const errorEditar = ref('')
 const guardandoEdicion = ref(false)
@@ -165,7 +170,13 @@ const OPCIONES_ROL_EDITAR: Rol[] = ['administrador', 'mesero', 'cliente']
 
 function abrirEditar(usuario: Usuario) {
   usuarioEditando.value = usuario
-  formEditar.value = { nombre: usuario.nombre, email: usuario.email, telefono: usuario.telefono ?? '', role: usuario.role }
+  formEditar.value = {
+    nombre: usuario.nombre,
+    email: usuario.email,
+    username: usuario.username ?? '',
+    telefono: usuario.telefono ?? '',
+    role: usuario.role,
+  }
   erroresEditar.value = {}
   errorEditar.value = ''
 }
@@ -182,6 +193,7 @@ async function confirmarEditar() {
     const { data } = await usuarioService.editar(usuario.id, {
       nombre: formEditar.value.nombre,
       email: formEditar.value.email,
+      username: formEditar.value.username.trim(),
       telefono: formEditar.value.telefono.trim() || null,
       role: formEditar.value.role,
     })
@@ -237,7 +249,7 @@ onMounted(cargar)
       <input
         v-model="busqueda"
         type="text"
-        placeholder="Buscar por nombre o correo…"
+        placeholder="Buscar por nombre, correo o usuario…"
         class="field sm:w-64"
         @input="buscar"
       />
@@ -285,7 +297,7 @@ onMounted(cargar)
                 </span>
               </p>
               <p class="mt-1 truncate text-xs text-gray-500">
-                {{ usuario.email }}<template v-if="usuario.telefono"> · {{ usuario.telefono }}</template>
+                {{ usuario.email }}<template v-if="usuario.username"> · @{{ usuario.username }}</template><template v-if="usuario.telefono"> · {{ usuario.telefono }}</template>
               </p>
             </div>
           </div>
@@ -365,6 +377,13 @@ onMounted(cargar)
         </label>
 
         <label class="block">
+          <span class="field-label">Nombre de usuario (opcional)</span>
+          <input v-model="form.username" type="text" class="field" autocomplete="off" autocapitalize="none" placeholder="Ej. mario.m" />
+          <span v-if="erroresForm.username" class="mt-1 block text-xs text-red-600">{{ erroresForm.username }}</span>
+          <span v-else class="mt-1 block text-xs text-gray-500">Para entrar sin escribir el correo.</span>
+        </label>
+
+        <label class="block">
           <span class="field-label">Teléfono (opcional)</span>
           <input v-model="form.telefono" type="text" class="field" />
           <span v-if="erroresForm.telefono" class="mt-1 block text-xs text-red-600">{{ erroresForm.telefono }}</span>
@@ -406,6 +425,12 @@ onMounted(cargar)
           <span class="field-label">Correo</span>
           <input v-model="formEditar.email" type="email" class="field" autocomplete="off" />
           <span v-if="erroresEditar.email" class="mt-1 block text-xs text-red-600">{{ erroresEditar.email }}</span>
+        </label>
+
+        <label class="block">
+          <span class="field-label">Nombre de usuario (opcional)</span>
+          <input v-model="formEditar.username" type="text" class="field" autocomplete="off" autocapitalize="none" placeholder="Vacío = entra solo con el correo" />
+          <span v-if="erroresEditar.username" class="mt-1 block text-xs text-red-600">{{ erroresEditar.username }}</span>
         </label>
 
         <label class="block">

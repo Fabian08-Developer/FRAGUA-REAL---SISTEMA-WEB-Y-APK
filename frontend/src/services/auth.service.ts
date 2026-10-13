@@ -3,14 +3,17 @@ import type { Usuario } from '@/types/models'
 
 // Espeja exactamente los Form Requests de AuthController (routes/api.php) —
 // nombres de campo iguales a los del backend (email, no correo).
+// Fase 3, tarea 3 (RF-M01-007): "login" acepta el correo o el nombre de usuario.
 export interface LoginPayload {
-  email: string
+  login: string
   password: string
 }
 
 export interface RegistroPayload {
   nombre: string
   email: string
+  // Opcional (Fase 3, tarea 3): con él también se puede iniciar sesión.
+  username?: string
   telefono?: string
   password: string
   password_confirmation: string
@@ -24,6 +27,8 @@ export interface AuthResponse {
 export interface ActualizarPerfilPayload {
   nombre: string
   telefono?: string
+  // Fase 3, tarea 3: vacío = quitarlo; sin enviar = no se toca.
+  username?: string
 }
 
 export interface CambiarPasswordPayload {

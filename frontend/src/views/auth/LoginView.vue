@@ -1,8 +1,8 @@
 <script setup lang="ts">
-// M01 — RF-M01-007: iniciar sesión con correo y contraseña.
+// M01 — RF-M01-007: iniciar sesión con el correo o el nombre de usuario (Fase 3, tarea 3) y la contraseña.
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Lock, Mail } from 'lucide-vue-next'
+import { ArrowRight, Lock, UserRound } from 'lucide-vue-next'
 import BaseInput from '@/components/common/BaseInput.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import { useAuth } from '@/composables/useAuth'
@@ -22,7 +22,7 @@ function rutaSegunRol(): string {
   return '/'
 }
 
-const email = ref('')
+const identificador = ref('')
 const password = ref('')
 const cargando = ref(false)
 const errorGeneral = ref('')
@@ -33,13 +33,13 @@ async function onSubmit() {
   erroresCampo.value = {}
   cargando.value = true
   try {
-    await login({ email: email.value, password: password.value })
+    await login({ login: identificador.value.trim(), password: password.value })
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : rutaSegunRol()
     router.push(redirect)
   } catch (e) {
     erroresCampo.value = erroresDeValidacion(e)
     if (Object.keys(erroresCampo.value).length === 0) {
-      errorGeneral.value = mensajeDeError(e, 'Correo o contraseña incorrectos.')
+      errorGeneral.value = mensajeDeError(e, 'Usuario o contraseña incorrectos.')
     }
   } finally {
     cargando.value = false
@@ -58,12 +58,13 @@ async function onSubmit() {
       Tu contraseña quedó actualizada. Ingresa con la nueva.
     </p>
     <BaseInput
-      v-model="email"
-      type="email"
-      label="Correo electrónico"
-      placeholder="tu@correo.com"
-      :icon="Mail"
-      :error="erroresCampo.email"
+      v-model="identificador"
+      type="text"
+      label="Correo o nombre de usuario"
+      placeholder="tu@correo.com o tu usuario"
+      autocomplete="username"
+      :icon="UserRound"
+      :error="erroresCampo.login"
     />
     <div>
       <BaseInput
@@ -71,6 +72,7 @@ async function onSubmit() {
         type="password"
         label="Contraseña"
         placeholder="••••••••"
+        autocomplete="current-password"
         :icon="Lock"
         :error="erroresCampo.password"
       />
