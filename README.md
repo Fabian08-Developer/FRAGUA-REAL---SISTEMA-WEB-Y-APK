@@ -90,8 +90,10 @@ de impresión aparte del pedido, sus intentos e impresiones y una clave única p
 (punto 42). El endurecimiento de seguridad (punto 43) no necesita migración. `2026_10_21_000001`
 agrega a `users` la marca `puede_registrar_gastos`: el Mesero autorizado para registrar compras y
 gastos (punto 47). `2026_10_21_000002` agrega `productos.imagen_path`: la foto del producto subida
-desde Catálogo (punto 48). Pruebas automáticas:
-`php artisan test` (316 en `tests/Feature`, incluida la prueba de un día completo de operación,
+desde Catálogo (punto 48). `2026_10_22_000001` solo agrega índices (pedidos por fecha, líneas y
+extras de cada pedido, pagos, reservas): con ellos los reportes de un mes cargan en menos de medio
+segundo (punto 50). Pruebas automáticas:
+`php artisan test` (319 en `tests/Feature`, incluida la prueba de un día completo de operación,
 `DiaCompletoTest`). Pruebas a mano: `PRUEBA-DIA-COMPLETO.md` y una lista por rol
 (`QA-CLIENTE.md`, `QA-MESERO.md` y `QA-ADMINISTRADOR.md`).
 

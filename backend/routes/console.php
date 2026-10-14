@@ -72,3 +72,32 @@ Artisan::command('fragua:revisar-produccion', function (\App\Services\RevisionPr
 
     return 0;
 })->purpose('Revisa la configuración de seguridad antes de abrir al público');
+
+// Fase 7, tarea 5 (13/10/2026, RNF-M08-001): mide cuánto tarda cada reporte con los datos reales,
+// para el último mes y con la comparación contra el periodo anterior (lo que hace la pantalla de
+// Reportes con «Comparar»). Solo lee. Correrlo en el VPS cuando ya haya historia: si un reporte pasa
+// de 2 segundos, revisar que la migración de índices (2026_10_22_000001) esté aplicada.
+Artisan::command('reportes:medir {--dias=30 : Días hacia atrás, contando hoy}', function (\App\Services\ReporteService $reportes) {
+    $dias = max(1, min((int) $this->option('dias'), 366));
+    $hoy = now('America/Bogota');
+    $periodo = \App\Support\Reportes\PeriodoReporte::resolver('personalizado', $hoy->copy()->subDays($dias - 1)->toDateString(), $hoy->toDateString());
+    $anterior = $periodo->anterior();
+    $pedidos = \App\Models\Pedido::where('estado', 'finalizado')->whereBetween('finalizado_at', [$periodo->desde, $periodo->hasta])->count();
+    $this->line("Periodo: {$periodo->desdeFecha} a {$periodo->hastaFecha} (pedidos finalizados: {$pedidos}), con comparación.");
+
+    $filas = [];
+    foreach (['ventas-totales', 'ventas-por-producto', 'ventas-por-tipo-y-metodo', 'compras-y-gastos', 'resultado-operativo', 'uso-de-mesas'] as $reporte) {
+        $inicio = microtime(true);
+        $reportes->calcular($reporte, $periodo);
+        $reportes->calcular($reporte, $anterior);
+        $ms = (int) round((microtime(true) - $inicio) * 1000);
+        $filas[] = [$reporte, "{$ms} ms", $ms > 2000 ? 'LENTO' : 'OK'];
+    }
+    $this->table(['Reporte', 'Tiempo', 'Estado'], $filas);
+    $lento = collect($filas)->contains(fn ($f) => $f[2] === 'LENTO');
+    $lento
+        ? $this->warn('Algún reporte pasa de 2 segundos: revisa que las migraciones estén al día (php artisan migrate --force).')
+        : $this->info('Todos los reportes responden en menos de 2 segundos.');
+
+    return 0;
+})->purpose('Mide cuánto tardan los reportes del último mes con los datos reales');

@@ -1204,6 +1204,53 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       La franja se actualiza después de cada cobro.
     - Pruebas: `CajaEstadoMeseroTest` (2).
 
+50. **Fase 7, tarea 5 (13/10/2026): reportes de un mes completo a buena velocidad (M08).**
+    RNF-M08-001 («tiempo razonable incluso para periodos amplios, por ejemplo un mes completo»).
+    Migración `2026_10_22_000001_indices_de_rendimiento`: solo agrega índices, no cambia datos.
+    - Cómo se midió: una base PostgreSQL con un año de historia de prueba: unos 110.000 pedidos,
+      330.000 líneas, 99.000 extras, 104.000 pagos y los cierres diarios. Cada reporte se pidió para
+      30 días con «Comparar» (el periodo y el anterior).
+    - Lo que se encontró: PostgreSQL no crea índices para las llaves foráneas. Para sumar los extras,
+      cada línea vendida recorría la tabla entera de extras, y cada reporte leía todos los pedidos de
+      la historia.
+
+      | Reporte, 30 días | Antes | Después, con «Comparar» |
+      |---|---|---|
+      | Ventas por producto | más de 2 minutos (sin comparar) | 0,45 s |
+      | Ventas por tipo y método | más de 1 minuto (sin comparar) | 0,2 s |
+      | Uso de mesas | 0,66 s | 0,05 s |
+      | Resultado operativo (con días sin cierre) | 0,05 s | 0,01 s |
+      | Ventas totales y Compras y gastos | menos de 0,03 s | menos de 0,01 s |
+
+      En las dos primeras filas, «Antes» es sin comparar; con «Comparar» era el doble.
+
+      Un año completo de «Ventas por producto» tarda 1,5 s. El tablero de hoy, que usa «Ventas por
+      tipo», también se beneficia.
+    - Los índices nuevos cubren:
+      - lo que leen los reportes: pedidos finalizados por fecha, pedidos por fecha de creación,
+        líneas de cada pedido, extras de cada línea, pagos por fecha y reservas por fecha;
+      - búsquedas de todos los días que crecen con el tiempo: pedidos de una mesa o de un cliente,
+        pagos de un pedido o de un turno, reservas de una mesa y ajustes de un turno.
+    - `ReporteService`:
+      - `usoDeMesas()` lee filas simples en vez de un modelo por pedido y compara las horas en
+        segundos. Con un mes de pedidos, armar los modelos era casi todo el tiempo del reporte.
+      - `resultadoOperativo()` limita los días sin cierre a su rango de horas, así usa el índice. La
+        fecha de cada pedido se sigue tomando en hora de Colombia.
+
+      Las cifras de los 6 reportes se compararon antes y después con la misma base y son idénticas
+      (RNF-M08-002).
+    - Caché de periodos cerrados: no hizo falta. Con estos tiempos se prefirió recalcular siempre,
+      para que un reporte nunca muestre cifras viejas después de una anulación o un ajuste del
+      cierre.
+    - Comando `php artisan reportes:medir [--dias=30]`: mide los 6 reportes del último mes con la
+      comparación y marca «LENTO» lo que pase de 2 segundos. Solo lee. Sirve para revisar el VPS cuando
+      ya tenga historia real.
+    - Opcional en el VPS: `ALTER DATABASE nombre_de_tu_base SET jit = off;`. El compilador JIT de PostgreSQL le
+      sumaba unos 40 ms a cada consulta grande de los reportes.
+    - Pruebas: `ReportesRendimientoTest` (3). Revisan los índices, el resultado operativo con días
+      sin cierre (un pedido de las 11:30 p. m. cuenta en su día de Colombia) y el comando. Las dos
+      últimas corren solo en PostgreSQL.
+
 ## Qué falta a propósito
 
 Cada uno de los puntos abiertos ya está documentado en los documentos oficiales de módulo (no son
@@ -1233,9 +1280,11 @@ brechas de documentación, solo de implementación técnica):
   nativamente — falta una librería como `phpoffice/phpspreadsheet` para un `.xlsx` con
   formato) y un PDF real de una sola página sin dependencias externas (un reporte más largo
   se trunca — falta paginación real y una librería como `dompdf`).
-- **Caché de reportes de periodos ya cerrados**: recomendación de arquitectura explícita en
-  `M08...docx` sección 15; la pantalla sigue recalculando cada consulta (los archivos exportados sí
-  quedan guardados desde el punto 39).
+- **Caché de reportes de periodos ya cerrados**: NO HIZO FALTA (13/10/2026, punto 50). Era una
+  recomendación de arquitectura de `M08...docx` sección 15. Con los índices, un mes con «Comparar»
+  tarda menos de medio segundo sobre un año de historia. Se prefirió recalcular siempre, para que un
+  reporte nunca muestre cifras viejas. El resultado operativo ya se arma con los cierres diarios,
+  como pide esa misma sección. Los archivos exportados quedan guardados desde el punto 39.
 - **Generación asíncrona de exportaciones**: recomendación de arquitectura explícita en
   `M08...docx` sección 15; hoy `/reportes/exportar` genera el archivo de forma síncrona.
 - **`DomicilioController` dedicado**: no hace falta — M07 vive dentro de `PedidoController`

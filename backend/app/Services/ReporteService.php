@@ -216,8 +216,16 @@ class ReporteService
 
         if (! empty($diasSinCierre)) {
             $placeholders = implode(',', array_fill(0, count($diasSinCierre), '?'));
+            // Fase 7, tarea 5 (RNF-M08-001): el rango de horas de los días sin cierre deja usar el
+            // índice de pedidos finalizados por fecha; sin él se leían todos los pedidos de la historia.
+            $zona = 'America/Bogota';
+            $rango = [
+                CarbonImmutable::parse(min($diasSinCierre), $zona)->startOfDay()->utc(),
+                CarbonImmutable::parse(max($diasSinCierre), $zona)->endOfDay()->utc(),
+            ];
 
             $totalVentas += (float) Pedido::where('estado', 'finalizado')
+                ->whereBetween('finalizado_at', $rango)
                 ->whereRaw("DATE((finalizado_at AT TIME ZONE 'UTC') AT TIME ZONE 'America/Bogota') IN ({$placeholders})", $diasSinCierre)
                 ->sum('total');
 
@@ -268,24 +276,30 @@ class ReporteService
             ->groupBy('mesa_id')
             ->pluck('cantidad', 'mesa_id');
 
+        // Fase 7, tarea 5 (RNF-M08-001): se leen filas simples, sin armar un modelo por pedido, y las
+        // horas se comparan como segundos (se guardan en UTC). Con un mes de pedidos, crear los modelos
+        // y sus fechas era casi todo el tiempo de este reporte. El resultado es el mismo.
         $pedidos = Pedido::where('tipo', 'local')->whereNotNull('mesa_id')
             ->where('estado', '!=', 'cancelado')
             ->whereBetween('created_at', [$desde, $hasta])
             ->orderBy('mesa_id')->orderBy('created_at')->orderBy('id')
+            ->toBase()
             ->get(['id', 'mesa_id', 'estado', 'total', 'created_at', 'finalizado_at', 'cancelado_at']);
+        $segundos = fn (?string $fecha) => $fecha === null ? null : strtotime($fecha.' UTC');
 
-        $usoPorMesa = $pedidos->groupBy('mesa_id')->map(function ($deLaMesa) {
+        $usoPorMesa = $pedidos->groupBy('mesa_id')->map(function ($deLaMesa) use ($segundos) {
             $visitas = [];
             foreach ($deLaMesa as $pedido) {
-                $cierre = $pedido->finalizado_at ?? $pedido->cancelado_at; // null: sigue activo
+                $inicio = $segundos($pedido->created_at);
+                $cierre = $segundos($pedido->finalizado_at ?? $pedido->cancelado_at); // null: sigue activo
                 $actual = array_key_last($visitas);
                 $sigueAbierta = $actual !== null
-                    && ($visitas[$actual]['fin'] === null || $pedido->created_at->lte($visitas[$actual]['fin']));
+                    && ($visitas[$actual]['fin'] === null || $inicio <= $visitas[$actual]['fin']);
                 if ($sigueAbierta) {
                     $fin = $visitas[$actual]['fin'];
-                    $visitas[$actual]['fin'] = ($fin === null || $cierre === null) ? null : $fin->max($cierre);
+                    $visitas[$actual]['fin'] = ($fin === null || $cierre === null) ? null : max($fin, $cierre);
                 } else {
-                    $visitas[] = ['inicio' => $pedido->created_at, 'fin' => $cierre];
+                    $visitas[] = ['inicio' => $inicio, 'fin' => $cierre];
                 }
             }
             $cerradas = array_filter($visitas, fn ($v) => $v['fin'] !== null);
@@ -295,7 +309,7 @@ class ReporteService
                 'pedidos_locales' => $deLaMesa->count(),
                 'ventas' => (float) $deLaMesa->where('estado', 'finalizado')->sum('total'),
                 'minutos_promedio' => $cerradas
-                    ? (int) round(array_sum(array_map(fn ($v) => $v['inicio']->diffInMinutes($v['fin']), $cerradas)) / count($cerradas))
+                    ? (int) round(array_sum(array_map(fn ($v) => ($v['fin'] - $v['inicio']) / 60, $cerradas)) / count($cerradas))
                     : null,
             ];
         });

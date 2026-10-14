@@ -413,6 +413,16 @@ Antes de probar: `composer update phpoffice/phpspreadsheet --with-all-dependenci
       Ventas, Minutos promedio por visita y Reservas completadas.
 - [ ] Un Mesero no puede abrir Reportes (403).
 
+### 8d. Velocidad con un mes completo (Fase 7, tarea 5 — RNF-M08-001)
+Antes de probar: `php artisan migrate` en `backend` (migración `2026_10_22_000001`, solo índices).
+- [ ] Elegir "Mes" (o un rango personalizado de 30 días) con "Comparar con el periodo anterior"
+      marcado: cada uno de los 6 reportes aparece en menos de 2 segundos.
+- [ ] Las cifras son las mismas que antes de la migración: por ejemplo, Ventas totales del mes
+      coincide con la suma de los cierres diarios del mes más el día de hoy (RNF-M08-002).
+- [ ] En el servidor, con historia real: `php artisan reportes:medir` muestra una tabla con los 6
+      reportes del último mes y todos dicen "OK". Si alguno dice "LENTO", revisar que
+      `php artisan migrate` esté al día.
+
 ## 9. Pedidos (supervisión)
 - [ ] Filtros por estado y canal; paginación con más de 20 pedidos.
 - [ ] Confirmar, marcar preparando y cancelar con motivo (el Administrador cancela también lo confirmado).

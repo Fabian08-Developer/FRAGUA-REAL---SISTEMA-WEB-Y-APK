@@ -213,8 +213,12 @@ uno. Quedó esta lista, en orden:
    el Inicio y Nuevo pedido.
 4. **Estado de la caja para el Mesero** (RF-M06-023, HU-M06-009). Hecha el 13/10/2026,
    `README-BACKEND.md`, punto 49. Cobrar muestra si la caja está abierta y el efectivo esperado.
-5. **Reportes de un mes completo a buena velocidad** (RNF-M08-001). Medir con datos de un mes y
-   agregar índices o caché para los periodos ya cerrados si hace falta.
+5. **Reportes de un mes completo a buena velocidad** (RNF-M08-001). Hecha el 13/10/2026,
+   `README-BACKEND.md`, punto 50. Se midió con un año de historia de prueba. Con índices nuevos, un
+   mes con «Comparar» tarda menos de medio segundo; antes «Ventas por producto» pasaba de 2 minutos.
+   La caché no hizo falta.
+
+Con esto la Fase 7 queda completa.
 
 El **mapa simple del salón** (RF-M05-022, opcional según el documento) queda para el futuro
 (decisión del 13/10/2026).
@@ -528,8 +532,13 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   Auditoría.
 - Mesero > Cobrar muestra arriba si la caja de hoy está abierta, quién la abrió y el efectivo
   esperado. Si no está abierta, o ya se cerró, lo dice y apaga los botones de cobro.
+- Los reportes de un mes (o más) cargan rápido aunque la base ya tenga mucha historia. Las cifras
+  son las mismas de antes.
 - En el servidor:
-  - `php artisan migrate`: dos migraciones nuevas, `2026_10_21_000001` y `000002`;
+  - `php artisan migrate`: tres migraciones nuevas, `2026_10_21_000001` y `000002` y
+    `2026_10_22_000001` (solo índices, no cambia datos);
+  - cuando ya haya historia, `php artisan reportes:medir` dice cuánto tarda cada reporte del último
+    mes y marca «LENTO» lo que pase de 2 segundos;
   - la extensión GD de PHP (`sudo apt install php-gd`; la «Revisión antes de producción» avisa si
     falta);
   - incluir `storage/app/private/productos` en las copias de seguridad.
