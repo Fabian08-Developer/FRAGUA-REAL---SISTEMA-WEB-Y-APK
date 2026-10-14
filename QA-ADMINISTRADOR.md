@@ -118,6 +118,15 @@ RF-M01-017/024/025, HU-M01-015/020, RNF-TRANS-022/023, RN-USR-12/13.
 - [ ] Precio en cero o un nombre de producto o categoría repetido: mensaje claro bajo el campo.
 - [ ] Cambiar el precio de un producto queda en la auditoría con el valor anterior y el nuevo (RF-M04-022).
 - [ ] Combos: crear con vigencia; se oculta si un componente está agotado (RN-M04-11).
+- [ ] Fase 7, tarea 1 (RF-M04-013/014): un combo con un solo producto (1 unidad) no se guarda
+      ("Un combo lleva al menos dos productos"); con 2 del mismo producto, sí. Al armarlo y en la
+      lista se ve "Por separado $… · ahorro $… (n %)"; si el precio del combo es igual o mayor que
+      la suma, el aviso sale en amarillo.
+- [ ] Fase 7, tarea 1 (RF-M04-009, RN-M04-04): apagar (desmarcar "Activa") todas las
+      presentaciones de la Hamburguesa Clásica: el producto dice "No se ofrece: ninguna presentación
+      está activa y disponible", desaparece del Menú, del QR y de Nuevo pedido, y el Combo Clásico
+      también. Al activar una presentación, vuelven. Un pedido armado a mano sin presentación
+      (por la API) se rechaza con "Elige la presentación de …".
 - [ ] Un combo activo aparece en la pestaña "Combos" del Menú del Cliente, del QR de mesa y de
       "Nuevo pedido" del Mesero, con lo que incluye ("1 × Hamburguesa Clásica · 1 × Gaseosa
       400ml"); fuera de su vigencia no aparece en ninguno (RF-M04-020/031 — antes solo el Mesero

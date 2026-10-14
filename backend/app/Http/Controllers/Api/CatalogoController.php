@@ -114,7 +114,10 @@ class CatalogoController extends Controller
 
         if ($esPublico) {
             $query->where('activo', true)->where('disponible', true)
-                ->whereHas('categoria', fn ($q) => $q->where('activo', true));
+                ->whereHas('categoria', fn ($q) => $q->where('activo', true))
+                // Fase 7, tarea 1 (RN-M04-04): sin presentaciones, o con al menos una que se pueda vender.
+                ->where(fn ($q) => $q->whereDoesntHave('variantes')
+                    ->orWhereHas('variantes', fn ($v) => $v->where('activa', true)->where('disponible', true)));
         }
         if ($request->filled('q')) {
             $texto = '%'.mb_strtolower(trim((string) $request->input('q'))).'%';

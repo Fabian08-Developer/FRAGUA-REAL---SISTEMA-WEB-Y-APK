@@ -105,7 +105,8 @@ Al preparar la lista se revisó el código de cada pantalla. Se corrigieron dos 
   - El total suma el domicilio vigente.
 - [ ] **Recogida**: pide nombre y teléfono, con el correo opcional ("le avisamos cuando esté listo"). Un correo mal escrito no deja continuar. No suma domicilio.
 - [ ] "Buscar producto en todo el menú" encuentra sin importar tildes ni mayúsculas ("clasica" encuentra "Clásica"). Sin resultados: "Ningún producto disponible coincide con la búsqueda.".
-- [ ] Un producto con tamaños pide la "Presentación". Un tamaño agotado no aparece.
+- [ ] Un producto con tamaños pide la "Presentación". Un tamaño agotado no aparece. Con todos sus
+      tamaños agotados (en Menú), el producto ya no sale en Nuevo pedido (Fase 7).
 - [ ] Extras:
   - los generales salen con todos los productos que los ofrecen;
   - el específico, solo con su producto.
@@ -180,6 +181,8 @@ Al preparar la lista se revisó el código de cada pantalla. Se corrigieron dos 
   - el Cliente ya no lo ve en el Menú ni en el QR;
   - un pedido con él se rechaza.
 - [ ] Agotar solo un tamaño (p. ej. Clásica Familiar): el Cliente sigue viendo la Personal.
+- [ ] Agotar los dos tamaños de la Clásica: la pantalla dice "Con todos los tamaños agotados, el
+      producto no se ofrece", y la Clásica y el Combo Clásico desaparecen del Menú y del QR (Fase 7).
 - [ ] Con el producto agotado, la pantalla dice "Con el producto agotado no se vende ningún tamaño.".
 - [ ] Agotar la Gaseosa oculta el Combo Clásico en el Menú, el QR y Nuevo pedido. Al volver a "Disponible", reaparece.
 - [ ] Cada cambio queda en la Auditoría con el nombre del Mesero.

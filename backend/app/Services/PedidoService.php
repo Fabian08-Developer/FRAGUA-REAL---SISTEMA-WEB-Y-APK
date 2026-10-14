@@ -226,6 +226,10 @@ class PedidoService
                     throw new RuntimeException("\"{$producto->nombre} ({$variante->nombre})\" está agotado.");
                 }
                 $precioUnitario = (float) $variante->precio;
+            } elseif ($producto->tieneVariantes()) {
+                // Fase 7, tarea 1 (RN-M04-04): un producto con presentaciones se pide con una de
+                // ellas. Antes se aceptaba sin presentación, al precio base, que puede ser menor.
+                throw new InvalidArgumentException("Elige la presentación de \"{$producto->nombre}\".");
             }
         } else {
             throw new InvalidArgumentException('Cada línea requiere producto_id o combo_id.');

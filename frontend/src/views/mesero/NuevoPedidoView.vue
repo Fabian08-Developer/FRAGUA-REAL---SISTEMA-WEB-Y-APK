@@ -158,7 +158,10 @@ async function cargarCatalogo() {
       catalogoService.combos(),
     ])
     categorias.value = listaCategorias
-    productos.value = listaProductos.filter((p) => p.activo && p.disponible)
+    // Fase 7, tarea 1 (RN-M04-04): un producto con presentaciones necesita al menos una vendible.
+    productos.value = listaProductos.filter(
+      (p) => p.activo && p.disponible && (!(p.variantes?.length) || p.variantes.some((v) => v.activa && v.disponible !== false)),
+    )
     combos.value = listaCombos
     categoriaActivaId.value = listaCombos.length ? CATEGORIA_COMBOS : (listaCategorias[0]?.id ?? CATEGORIA_COMBOS)
   } catch (e) {

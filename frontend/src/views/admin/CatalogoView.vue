@@ -52,6 +52,31 @@ function formatoMoneda(valor: number) {
   return Number(valor).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
 }
 
+// Fase 7, tarea 1 (RF-M04-009, RN-M04-04): un producto con presentaciones solo se ofrece si al
+// menos una está activa y no agotada; aquí se avisa cuando no queda ninguna.
+function sinPresentacionVendible(producto: Producto) {
+  const variantes = producto.variantes ?? []
+  return variantes.length > 0 && !variantes.some((v) => v.activa && v.disponible !== false)
+}
+
+// Fase 7, tarea 1 (RF-M04-014): referencia administrativa del combo frente a sus productos
+// comprados por separado (al precio base de cada uno). El precio del combo lo pone el
+// Administrador (RN-M04-06); esto solo lo muestra.
+function comparacionCombo(precio: number, suma: number) {
+  if (!suma || !precio) return null
+  const diferencia = suma - Number(precio)
+  if (diferencia > 0) {
+    const pct = Math.round((diferencia / suma) * 100)
+    return { texto: `Por separado ${formatoMoneda(suma)} · ahorro ${formatoMoneda(diferencia)} (${pct} %)`, alerta: false }
+  }
+  if (diferencia === 0) return { texto: `Por separado ${formatoMoneda(suma)} · sin ahorro para el cliente`, alerta: true }
+  return { texto: `Por separado ${formatoMoneda(suma)} · el combo cuesta ${formatoMoneda(-diferencia)} más`, alerta: true }
+}
+
+function sumaComponentesCombo(combo: Combo) {
+  return (combo.productos ?? []).reduce((acc, p) => acc + Number(p.precio_base) * (p.pivot?.cantidad ?? 1), 0)
+}
+
 function fechaParaInput(v: string | null): string {
   return v ? v.slice(0, 10) : ''
 }
@@ -422,6 +447,13 @@ const formCombo = ref({
   activo: true,
 })
 const productosCombo = ref<Record<number, number>>({})
+const sumaFormCombo = computed(() =>
+  Object.entries(productosCombo.value).reduce((acc, [id, cantidad]) => {
+    const producto = productos.value.find((p) => p.id === Number(id))
+    return acc + (producto && cantidad > 0 ? Number(producto.precio_base) * cantidad : 0)
+  }, 0),
+)
+const unidadesFormCombo = computed(() => Object.values(productosCombo.value).reduce((acc, c) => acc + (c > 0 ? c : 0), 0))
 const erroresCombo = ref<Record<string, string>>({})
 const errorCombo = ref('')
 const guardandoCombo = ref(false)
@@ -481,6 +513,12 @@ async function confirmarCombo() {
   guardandoCombo.value = true
   erroresCombo.value = {}
   errorCombo.value = ''
+  if (unidadesFormCombo.value < 2) {
+    // RF-M04-013: el servidor también lo valida.
+    erroresCombo.value = { productos: 'Un combo lleva al menos dos productos (pueden ser 2 del mismo).' }
+    guardandoCombo.value = false
+    return
+  }
   try {
     const productosPayload = Object.entries(productosCombo.value)
       .filter(([, cantidad]) => cantidad > 0)
@@ -900,6 +938,9 @@ onMounted(cargar)
               <template v-if="producto.variantes?.length"> · {{ producto.variantes.length }} variante(s)</template>
               <template v-if="producto.extras_especificos?.length"> · {{ producto.extras_especificos.length }} extra(s)</template>
             </p>
+            <p v-if="producto.activo && sinPresentacionVendible(producto)" class="mt-0.5 text-xs font-medium text-amber-700">
+              No se ofrece: ninguna presentación está activa y disponible.
+            </p>
           </div>
           <div class="grid shrink-0 grid-cols-2 gap-2 sm:flex">
             <BaseButton
@@ -944,6 +985,13 @@ onMounted(cargar)
             <p class="mt-1 text-xs text-gray-500">
               {{ formatoMoneda(combo.precio) }} · {{ combo.productos?.length ?? 0 }} producto(s) ·
               {{ vigenciaTexto(combo.vigencia_inicio, combo.vigencia_fin) }}
+            </p>
+            <p
+              v-if="comparacionCombo(combo.precio, sumaComponentesCombo(combo))"
+              class="mt-0.5 text-xs"
+              :class="comparacionCombo(combo.precio, sumaComponentesCombo(combo))?.alerta ? 'text-amber-700' : 'text-emerald-700'"
+            >
+              {{ comparacionCombo(combo.precio, sumaComponentesCombo(combo))?.texto }}
             </p>
           </div>
           <BaseButton variant="ghost" size="sm" class="shrink-0" @click="abrirEditarCombo(combo)">
@@ -1131,6 +1179,7 @@ onMounted(cargar)
         <!-- Variantes (M04 parte 2) — solo tiene sentido con el producto ya creado -->
         <div v-if="productoEditando" class="space-y-3 border-t border-gray-200 pt-4">
           <p class="field-label">Variantes (tamaños/presentaciones)</p>
+          <p class="text-xs text-gray-500">Con presentaciones, el cliente y el Mesero eligen una al pedir. Si ninguna queda activa y disponible, el producto deja de ofrecerse.</p>
           <div v-if="variantesEdicion.length" class="space-y-2">
             <div v-for="v in variantesEdicion" :key="v.id ?? v.nombre" class="flex flex-wrap items-center gap-2">
               <input v-model="v.nombre" type="text" placeholder="Nombre" class="min-w-0 flex-1 field-sm" />
@@ -1237,6 +1286,14 @@ onMounted(cargar)
             </label>
           </div>
           <span v-if="erroresCombo.productos" class="mt-1 block text-xs text-red-600">{{ erroresCombo.productos }}</span>
+          <p
+            v-else-if="comparacionCombo(Number(formCombo.precio), sumaFormCombo)"
+            class="mt-1.5 text-xs"
+            :class="comparacionCombo(Number(formCombo.precio), sumaFormCombo)?.alerta ? 'text-amber-700' : 'text-emerald-700'"
+          >
+            {{ comparacionCombo(Number(formCombo.precio), sumaFormCombo)?.texto }}
+            <span class="text-gray-400">(a precio base; solo como referencia)</span>
+          </p>
         </div>
 
         <div>

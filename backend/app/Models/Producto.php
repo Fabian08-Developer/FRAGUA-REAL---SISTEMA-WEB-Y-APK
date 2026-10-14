@@ -54,8 +54,26 @@ class Producto extends Model
 
     // RN-M04-08: agotado/inactivo no puede agregarse a un pedido nuevo (RF-M04-018).
     // RF-M04-003 (Fase 0, tarea 2): desactivar una categoría también saca sus productos.
+    // Fase 7, tarea 1 (RF-M04-009, RN-M04-04): un producto con presentaciones solo se ofrece si
+    // al menos una está activa y no agotada. Antes seguía en el menú (y se podía pedir al precio
+    // base) aunque todas sus presentaciones estuvieran apagadas.
     public function puedeAgregarseAPedido(): bool
     {
-        return $this->activo && $this->disponible && ($this->categoria?->activo ?? true);
+        return $this->activo && $this->disponible && ($this->categoria?->activo ?? true)
+            && (! $this->tieneVariantes() || $this->tieneVarianteVendible());
+    }
+
+    /** Tiene presentaciones (tamaños) definidas, activas o no (RF-M04-008). */
+    public function tieneVariantes(): bool
+    {
+        return $this->relationLoaded('variantes') ? $this->variantes->isNotEmpty() : $this->variantes()->exists();
+    }
+
+    /** Al menos una presentación activa y no agotada (RN-M04-04, RF-M04-018). */
+    public function tieneVarianteVendible(): bool
+    {
+        return $this->relationLoaded('variantes')
+            ? $this->variantes->contains(fn (Variante $v) => $v->puedeVenderse())
+            : $this->variantes()->where('activa', true)->where('disponible', true)->exists();
     }
 }

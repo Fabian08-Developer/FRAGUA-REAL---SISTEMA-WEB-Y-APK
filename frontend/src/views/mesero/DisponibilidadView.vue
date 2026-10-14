@@ -198,6 +198,12 @@ onMounted(cargar)
             </button>
           </li>
           <li v-if="!p.disponible" class="pl-3 text-xs text-gray-500">Con el producto agotado no se vende ningún tamaño.</li>
+          <li
+            v-else-if="variantesActivas(p).length && !variantesActivas(p).some((v) => v.disponible !== false)"
+            class="pl-3 text-xs font-medium text-amber-700"
+          >
+            Con todos los tamaños agotados, el producto no se ofrece.
+          </li>
         </ul>
       </li>
     </ul>

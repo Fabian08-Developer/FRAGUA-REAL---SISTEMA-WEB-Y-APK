@@ -57,6 +57,8 @@ Al preparar la lista se revisó el código pantalla por pantalla y aparecieron c
 
 - [ ] Las categorías salen como pestañas. Cada una muestra sus productos con "Desde $…".
 - [ ] Un producto agotado o de una categoría desactivada no aparece. Con el Mesero, en Menú, agota la Gaseosa: al recargar, el Cliente ya no la ve.
+- [ ] Con el Mesero, agota los dos tamaños de la Hamburguesa Clásica: al recargar, la Clásica y el
+      Combo Clásico ya no aparecen (Fase 7). Vuelve a dejarlos disponibles.
 - [ ] Elegir la Hamburguesa Clásica abre "Tu elección" (en el teléfono, un panel que sube desde abajo):
   - aparecen Personal y Familiar;
   - cambiar a Familiar cambia el precio del botón;

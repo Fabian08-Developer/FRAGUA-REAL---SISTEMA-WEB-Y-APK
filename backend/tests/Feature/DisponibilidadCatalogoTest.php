@@ -83,7 +83,9 @@ class DisponibilidadCatalogoTest extends TestCase
         Sanctum::actingAs($this->cliente);
         $publico = collect($this->getJson('/api/productos')->assertOk()->json());
         $this->assertNull($publico->firstWhere('nombre', 'Limonada'));
-        $this->assertSame([], $publico->firstWhere('nombre', 'Clásica')['variantes']);
+        // Fase 7, tarea 1 (RN-M04-04): con su única presentación agotada, la Clásica ya no se
+        // ofrece (antes salía sin presentaciones y se podía pedir al precio base).
+        $this->assertNull($publico->firstWhere('nombre', 'Clásica'));
 
         Sanctum::actingAs($this->mesero);
         $personal = collect($this->getJson('/api/productos')->json());

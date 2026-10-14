@@ -1103,6 +1103,30 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
       `utils/redireccion.ts` solo acepta rutas internas: un enlace armado con
       `?redirect=//otro-sitio` no saca a nadie del sitio.
 
+46. **Fase 7, tarea 1 (13/10/2026): reglas del catálogo que estaban a medias (M04).** Sin migración.
+    La Fase 7 nace de revisar otra vez, ID por ID, los requisitos de M00 a M08 contra el código
+    (ver "Fase 7" en `README-ENTREGA.md`). Esta primera tarea cierra tres reglas del catálogo:
+    - CORREGIDO (RF-M04-009, RN-M04-04): un producto con presentaciones (tamaños) se podía pedir
+      **sin presentación, al precio base**, que puede ser menor que cualquier tamaño. Además seguía
+      en el menú aunque todas sus presentaciones estuvieran apagadas o agotadas. Ahora:
+      - `PedidoService` exige la presentación («Elige la presentación de "…"»), también en la
+        cotización.
+      - `Producto::puedeAgregarseAPedido()` pide al menos una presentación activa y no agotada.
+        Con eso el producto y los combos que lo usan salen del menú público y del QR. El personal
+        lo sigue viendo para volver a habilitarlo.
+      - En pantalla: Nuevo pedido ya no lo ofrece; Catálogo avisa «No se ofrece: ninguna
+        presentación está activa y disponible»; la pestaña Menú del Mesero dice que con todos los
+        tamaños agotados el producto no se ofrece.
+    - CORREGIDO (RF-M04-013): un combo se podía guardar con **un solo producto**. Ahora lleva al
+      menos dos unidades (dos productos distintos, o dos del mismo), y cada producto va una sola vez
+      con su cantidad.
+    - NUEVO (RF-M04-014): Catálogo > Combos muestra la referencia que pide el documento: cuánto
+      costarían los productos por separado (a precio base) y el ahorro del cliente, o un aviso si
+      el combo no ahorra o cuesta más. Aparece en la lista y mientras se arma el combo. El precio
+      sigue siendo el que pone el Administrador (RN-M04-06).
+    - Pruebas: `CatalogoReglasFase7Test` (3). Se ajustó `DisponibilidadCatalogoTest`: con su
+      única presentación agotada, el producto ya no se ofrece.
+
 ## Qué falta a propósito
 
 Cada uno de los puntos abiertos ya está documentado en los documentos oficiales de módulo (no son

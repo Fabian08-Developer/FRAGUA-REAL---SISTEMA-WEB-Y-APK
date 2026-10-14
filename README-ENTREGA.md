@@ -198,6 +198,29 @@ corregido, con pruebas (`README-BACKEND.md`, punto 45):
 Antes de probar en el equipo hay que compilar el frontend (`npm run build` en `frontend`). El
 backend no trae migraciones nuevas.
 
+## Fase 7 — cerrar lo que quedó a medias (desde el 13/10/2026)
+
+Con el plan terminado, se revisaron de nuevo los requisitos de M00 a M08 contra el código, uno por
+uno. Quedó esta lista, en orden:
+
+1. **Reglas del catálogo** (RF-M04-009, 013, 014; RN-M04-04). Hecha el 13/10/2026,
+   `README-BACKEND.md`, punto 46.
+2. **Fotos de los productos** (RF-M04-004, HU-M04-002, RNF-M04-002). Hoy el Administrador solo
+   puede pegar una dirección de imagen y el Menú no la muestra. La tarea es subir la foto desde
+   Catálogo y verla en el Menú, el QR de mesa, el Inicio y Nuevo pedido.
+3. **Estado de la caja para el Mesero** (RF-M06-023, HU-M06-009). El Mesero solo se entera de
+   que la caja está cerrada cuando intenta cobrar.
+4. **Reportes de un mes completo a buena velocidad** (RNF-M08-001). Medir con datos de un mes y
+   agregar índices o caché para los periodos ya cerrados si hace falta.
+5. Por decidir: el **mapa simple del salón** (RF-M05-022, opcional según el documento) y el
+   **«usuario autorizado»** de Compras y gastos (RNF-TRANS-012, RF-M03-32, HU-M03-01 a 05). La
+   decisión D7 lo dejó en V1 solo para el Administrador.
+
+Fuera del código siguen:
+- el SMS (D3);
+- la cuenta comercial de Wompi;
+- el agente de impresión junto a la impresora POS (D5).
+
 ## Bug real encontrado y corregido en este cierre
 
 `GET /caja/turno-actual` devolvía el JSON `{}` en vez de `null` cuando no
@@ -479,6 +502,15 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   comandas nuevas", permitir las ventanas emergentes del sitio y abrir Chrome con impresión
   automática (`--kiosk-printing`) con la impresora de 80 mm como predeterminada. Así salen solas.
   La impresión sin nadie que mire (un agente local junto a la impresora) queda para después de V1.
+
+## Cambios de comportamiento de la Fase 7 (desde el 13/10/2026)
+
+- Un producto con presentaciones (por ejemplo, Personal y Familiar) se pide siempre con una de
+  ellas. Si todas están apagadas o agotadas, el producto deja de ofrecerse en el Menú, el QR y
+  Nuevo pedido, junto con los combos que lo usan. En Catálogo aparece el aviso «No se ofrece».
+- Un combo lleva al menos dos productos: dos distintos, o dos del mismo.
+- Catálogo > Combos muestra cuánto costarían los productos por separado y el ahorro del cliente.
+  Si el combo no ahorra o cuesta más, lo avisa en amarillo.
 
 ## Cambios de comportamiento de la Fase 4 (desde el 12/10/2026)
 
