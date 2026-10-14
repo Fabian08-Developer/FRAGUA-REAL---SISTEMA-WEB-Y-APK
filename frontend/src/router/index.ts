@@ -162,6 +162,13 @@ const router = createRouter({
         { path: 'reservas', name: 'mesero-reservas', component: () => import('@/views/admin/ReservasView.vue') },
         // Fase 1, tarea 5 (HU-M04-009/010/013): agotado/disponible y búsqueda del menú.
         { path: 'menu', name: 'mesero-menu', component: () => import('@/views/mesero/DisponibilidadView.vue') },
+        // Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32): solo con el permiso de compras y gastos.
+        {
+          path: 'gastos',
+          name: 'mesero-gastos',
+          component: () => import('@/views/mesero/GastosView.vue'),
+          meta: { permisoGastos: true },
+        },
       ],
     },
 
@@ -192,6 +199,11 @@ router.beforeEach(async (to) => {
   const rolesPermitidos = to.meta.roles as Rol[] | undefined
   if (rolesPermitidos && !(auth.rol && rolesPermitidos.includes(auth.rol))) {
     return { name: 'home' }
+  }
+
+  // Fase 7, tarea 2: la pestaña Gastos del Mesero exige el permiso (el servidor también lo revisa).
+  if (to.meta.permisoGastos && !auth.usuario?.puede_registrar_gastos) {
+    return { name: 'mesero-pedidos' }
   }
 
   return true

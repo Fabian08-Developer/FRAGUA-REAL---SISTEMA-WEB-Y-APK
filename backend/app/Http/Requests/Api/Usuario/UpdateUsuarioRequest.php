@@ -46,6 +46,8 @@ class UpdateUsuarioRequest extends FormRequest
             // si no se envía, no se toca.
             'username' => ['sometimes', ...NombreUsuario::reglas($usuario?->id)],
             'role' => ['required', Rule::in(self::ROLES)],
+            // Fase 7, tarea 2 (RF-M03-32): permiso de compras y gastos, solo para un Mesero.
+            'puede_registrar_gastos' => ['sometimes', 'boolean'],
         ];
     }
 

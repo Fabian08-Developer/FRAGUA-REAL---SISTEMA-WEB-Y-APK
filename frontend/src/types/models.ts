@@ -16,6 +16,8 @@ export interface Usuario {
   telefono: string | null
   role: Rol
   activo: boolean
+  // Fase 7, tarea 2 (RF-M03-32): Mesero autorizado para registrar compras y gastos.
+  puede_registrar_gastos?: boolean
   // Solo en GET /usuarios (Fase 3, tarea 4): cuántas sesiones vigentes tiene.
   sesiones_activas?: number
 }

@@ -124,6 +124,15 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     });
 
     Route::middleware('role:administrador,mesero')->group(function () {
+        // Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32): compras y gastos para el Administrador y el
+        // Mesero con permiso; el controlador y StoreCompraGastoRequest lo revisan, y el Mesero
+        // solo ve lo suyo. Fase 2, tarea 4: categorías por tipo y soporte (RF-M03-07, RNF-M03-11).
+        Route::get('/compras-gastos', [CompraGastoController::class, 'index']);
+        Route::get('/compras-gastos/categorias', [CompraGastoController::class, 'categorias']);
+        Route::post('/compras-gastos/{compraGasto}/soporte', [CompraGastoController::class, 'adjuntarSoporte']);
+        Route::get('/compras-gastos/{compraGasto}/soporte', [CompraGastoController::class, 'verSoporte']);
+        Route::post('/compras-gastos', [CompraGastoController::class, 'store']);
+
         Route::post('/pedidos/{pedido}/confirmar', [PedidoController::class, 'confirmar']);
         Route::post('/pedidos/{pedido}/preparando', [PedidoController::class, 'marcarPreparando']);
         // Fase 4, tarea 5 (RF-M07-R-012): la recogida está lista y se avisa al cliente por correo.
@@ -295,13 +304,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         // Pagos: anular (control financiero)
         Route::post('/pagos/{pago}/anular', [PagoController::class, 'anular']);
 
-        // Compras/Gastos/Cierre Diario (M03)
-        Route::get('/compras-gastos', [CompraGastoController::class, 'index']);
-        // Fase 2, tarea 4: categorías por tipo y soporte (RF-M03-07, RNF-M03-11).
-        Route::get('/compras-gastos/categorias', [CompraGastoController::class, 'categorias']);
-        Route::post('/compras-gastos/{compraGasto}/soporte', [CompraGastoController::class, 'adjuntarSoporte']);
-        Route::get('/compras-gastos/{compraGasto}/soporte', [CompraGastoController::class, 'verSoporte']);
-        Route::post('/compras-gastos', [CompraGastoController::class, 'store']);
+        // Compras/Gastos/Cierre Diario (M03). Registrar, consultar y el soporte están más arriba,
+        // en el grupo del personal (Fase 7, tarea 2: también el Mesero con permiso).
         // RF-M03-14: editar un registro activo.
         Route::put('/compras-gastos/{compraGasto}', [CompraGastoController::class, 'update']);
         Route::post('/compras-gastos/{compraGasto}/anular', [CompraGastoController::class, 'anular']);

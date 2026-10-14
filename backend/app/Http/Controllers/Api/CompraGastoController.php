@@ -14,7 +14,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * M03 — Compras, Gastos y Cierre Diario. Exclusivo del Administrador (control financiero).
+ * M03 — Compras, Gastos y Cierre Diario. Del Administrador (control financiero).
+ *
+ * Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32, HU-M03-01 a 03): un Mesero con el permiso
+ * `puede_registrar_gastos` registra compras y gastos, adjunta su soporte y consulta lo que él
+ * mismo registró. Editar, anular, los totales de todo el negocio y el cierre diario siguen siendo
+ * solo del Administrador.
  */
 class CompraGastoController extends Controller
 {
@@ -29,7 +34,8 @@ class CompraGastoController extends Controller
     // activos, RN-M03-04). Muestra quién registró, corrigió y anuló cada registro.
     public function index(Request $request)
     {
-        abort_if(! $request->user()->esAdministrador(), 403);
+        $usuario = $request->user();
+        abort_if(! $usuario->puedeRegistrarComprasGastos(), 403);
         $filtros = $request->validate([
             'desde' => ['nullable', 'date'],
             'hasta' => ['nullable', 'date', 'after_or_equal:desde'],
@@ -41,6 +47,10 @@ class CompraGastoController extends Controller
         ]);
 
         $consulta = $this->compraGastoService->consulta($filtros);
+        // El Mesero autorizado solo ve lo que él registró (y sus totales).
+        if (! $usuario->esAdministrador()) {
+            $consulta->where('registrado_por', $usuario->id);
+        }
         $pagina = (clone $consulta)
             ->with(['registradoPorUsuario', 'editadoPorUsuario', 'anuladoPorUsuario'])
             ->latest('fecha')->latest('id')
@@ -54,7 +64,7 @@ class CompraGastoController extends Controller
     // Categorías V1 por tipo (M03, sección 9), para los selectores del formulario y los filtros.
     public function categorias(Request $request)
     {
-        abort_if(! $request->user()->esAdministrador(), 403);
+        abort_if(! $request->user()->puedeRegistrarComprasGastos(), 403);
 
         return response()->json(CompraGastoService::categorias());
     }
@@ -81,16 +91,20 @@ class CompraGastoController extends Controller
     // RF-M03-07, HU-M03-02: adjuntar o reemplazar el soporte (multipart, campo "soporte").
     public function adjuntarSoporte(Request $request, CompraGasto $compraGasto)
     {
-        abort_if(! $request->user()->esAdministrador(), 403);
+        $this->autorizarRegistro($request, $compraGasto);
+        // El Mesero autorizado solo completa sus registros activos; reemplazar el soporte de uno
+        // anulado o de otro es cosa del Administrador.
+        abort_if(! $request->user()->esAdministrador() && ! $compraGasto->estaActivo(), 422, 'Este registro está anulado.');
         $request->validate(['soporte' => ['required', ...array_slice(StoreCompraGastoRequest::reglasSoporte(), 1)]], StoreCompraGastoRequest::mensajes());
 
         return response()->json($this->compraGastoService->adjuntarSoporte($compraGasto, $request->file('soporte'), $request->user()));
     }
 
-    // RNF-M03-11: el soporte solo se ve con sesión de Administrador; no hay enlace público.
+    // RNF-M03-11: el soporte solo se ve con sesión (el Administrador, o el Mesero autorizado que
+    // lo registró); no hay enlace público.
     public function verSoporte(Request $request, CompraGasto $compraGasto)
     {
-        abort_if(! $request->user()->esAdministrador(), 403);
+        $this->autorizarRegistro($request, $compraGasto);
         abort_if(! $this->compraGastoService->existeSoporte($compraGasto), 404, 'Este registro no tiene soporte.');
 
         return Storage::disk(CompraGastoService::DISCO_SOPORTES)->response(
@@ -149,5 +163,13 @@ class CompraGastoController extends Controller
         abort_if(! $request->user()->esAdministrador(), 403);
 
         return response()->json($this->cierreDiarioService->consulta($cierre));
+    }
+
+    /** El Administrador ve todo; el Mesero autorizado, solo lo que registró él (404 lo demás). */
+    private function autorizarRegistro(Request $request, CompraGasto $compraGasto): void
+    {
+        $usuario = $request->user();
+        abort_if(! $usuario->puedeRegistrarComprasGastos(), 403);
+        abort_if(! $usuario->esAdministrador() && (int) $compraGasto->registrado_por !== (int) $usuario->id, 404);
     }
 }

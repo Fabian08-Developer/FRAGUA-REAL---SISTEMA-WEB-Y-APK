@@ -84,8 +84,13 @@ const enlacesMesero: Enlace[] = [
   { to: '/mesero/menu', label: 'Menú', corto: 'Menú', icon: UtensilsCrossed }, // M04 (Fase 1)
   { to: '/mesero/caja', label: 'Cobrar', corto: 'Cobrar', icon: Wallet }, // M06
 ]
+// Fase 7, tarea 2 (RF-M03-32): solo el Mesero con permiso de compras y gastos.
+const enlaceGastos: Enlace = { to: '/mesero/gastos', label: 'Gastos', corto: 'Gastos', icon: Receipt }
 
-const enlaces = computed(() => (props.variant === 'admin' ? enlacesAdmin : enlacesMesero))
+const enlaces = computed(() => {
+  if (props.variant === 'admin') return enlacesAdmin
+  return usuario.value?.puede_registrar_gastos ? [...enlacesMesero, enlaceGastos] : enlacesMesero
+})
 
 // "/admin" y "/mesero" son el índice de cada zona pero también el PREFIJO de todas las demás
 // ("/mesero/mesas" empieza con "/mesero") — por eso el índice solo se marca con coincidencia
@@ -261,7 +266,10 @@ const iniciales = computed(() =>
     class="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-nav backdrop-blur md:hidden"
     aria-label="Navegación principal"
   >
-    <div class="mx-auto grid h-[4.25rem] max-w-md grid-cols-5 px-1">
+    <div
+      class="mx-auto grid h-[4.25rem] max-w-md px-1"
+      :style="{ gridTemplateColumns: `repeat(${enlaces.length}, minmax(0, 1fr))` }"
+    >
       <router-link
         v-for="item in enlaces"
         :key="item.to"

@@ -19,18 +19,30 @@ class User extends Authenticatable
     // trait, que el modelo tampoco traía.
     use Notifiable;
 
-    protected $fillable = ['role', 'nombre', 'email', 'username', 'telefono', 'password', 'activo'];
+    protected $fillable = ['role', 'nombre', 'email', 'username', 'telefono', 'password', 'activo', 'puede_registrar_gastos'];
 
     protected $hidden = ['password', 'remember_token'];
 
+    // Igual que el valor por defecto de la columna, para que una cuenta recién creada ya lo traiga.
+    protected $attributes = ['puede_registrar_gastos' => false];
+
     protected $casts = [
         'activo' => 'boolean',
+        'puede_registrar_gastos' => 'boolean',
     ];
 
     // ---- Roles (RNF-TRANS-011) ----
     public function esAdministrador(): bool { return $this->role === 'administrador'; }
     public function esMesero(): bool { return $this->role === 'mesero'; }
     public function esCliente(): bool { return $this->role === 'cliente'; }
+
+    // Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32): el «usuario autorizado» de M03. Un Mesero con
+    // el permiso registra compras y gastos, adjunta el soporte y ve lo que él registró; editar,
+    // anular y el cierre diario siguen siendo del Administrador. No es un rol nuevo.
+    public function puedeRegistrarComprasGastos(): bool
+    {
+        return $this->esAdministrador() || ($this->esMesero() && (bool) $this->puede_registrar_gastos);
+    }
 
     // ---- Relaciones ----
     public function pedidosComoCliente(): HasMany

@@ -314,6 +314,13 @@ túnel); sin ella, la página de retorno y `php artisan pasarela:conciliar` igua
 - [ ] Un Mesero no puede abrir `GET /pasarela/estado` ni `/pasarela/transacciones` (403).
 
 ## 7. Compras y gastos (M03)
+- [ ] Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32): en Usuarios > Editar de un Mesero, marcar
+      «Puede registrar compras y gastos». La lista lo muestra con la etiqueta "Compras y gastos" y
+      Auditoría registra "Cambio de permiso de compras y gastos" (antes → después). Sus sesiones
+      siguen abiertas. Al pasarlo a Cliente o Administrador, la casilla desaparece y el permiso se
+      quita. En un Administrador o un Cliente la casilla no aparece.
+- [ ] Lo que registra ese Mesero aparece aquí con "registrado por …"; tú lo puedes corregir o
+      anular como cualquier otro registro.
 - [ ] Registrar una compra y un gasto; editar uno activo (RF-M03-14).
 - [ ] Anular: nunca se borra y un anulado ya no se puede editar (RN-M03-04).
 - [ ] La categoría se elige de la lista según el tipo (Compra: Alimentos, Bebidas, Empaques,

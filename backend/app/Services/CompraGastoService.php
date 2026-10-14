@@ -196,6 +196,10 @@ class CompraGastoService
         }
 
         $dias = implode(' y ', array_map(fn ($f) => \Illuminate\Support\Carbon::parse($f)->format('d/m/Y'), array_keys($cierres)));
+        // Fase 7, tarea 2: el Mesero autorizado no corrige días cerrados (RN-M03-08).
+        if ($actor && ! $actor->esAdministrador()) {
+            throw new RuntimeException("El día {$dias} ya tiene cierre: pídele al Administrador que lo registre.");
+        }
         $password = $data['password_confirmacion'] ?? null;
         if (! $actor || ! $actor->esAdministrador() || empty($password) || ! Hash::check($password, $actor->password)) {
             throw new AutorizacionRequerida(

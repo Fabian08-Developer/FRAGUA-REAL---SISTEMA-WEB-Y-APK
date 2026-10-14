@@ -79,13 +79,20 @@ class UsuarioController extends Controller
     {
         $datos = $request->validated();
         $cambiaRol = $datos['role'] !== $usuario->role;
+        // Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32): el permiso de compras y gastos es solo de un
+        // Mesero; si deja de serlo, se le quita. No es un rol: no cierra sus sesiones.
+        $permisoAntes = (bool) $usuario->puede_registrar_gastos;
+        if ($datos['role'] !== 'mesero') {
+            $datos['puede_registrar_gastos'] = false;
+        }
+        $permisoDespues = (bool) ($datos['puede_registrar_gastos'] ?? $permisoAntes);
 
         abort_if($cambiaRol && $usuario->is($request->user()), 422, 'No puedes cambiar tu propio rol. Pídeselo a otro Administrador.');
 
         $campos = array_values(array_intersect(['nombre', 'email', 'username', 'telefono'], array_keys($datos)));
         $antes = $usuario->only([...$campos, 'role']);
 
-        DB::transaction(function () use ($usuario, $datos, $cambiaRol, $campos, $antes, $request) {
+        DB::transaction(function () use ($usuario, $datos, $cambiaRol, $campos, $antes, $request, $permisoAntes, $permisoDespues) {
             $usuario->update($datos);
 
             $cambios = collect($campos)
@@ -95,6 +102,12 @@ class UsuarioController extends Controller
 
             if ($cambios) {
                 app(AuditoriaService::class)->registrar('editar_usuario', 'User', $usuario->id, ['cambios' => $cambios], $request->user());
+            }
+
+            if ($permisoAntes !== $permisoDespues) {
+                app(AuditoriaService::class)->registrar('cambiar_permiso_gastos', 'User', $usuario->id, [
+                    'cambios' => ['puede_registrar_gastos' => ['antes' => $permisoAntes, 'despues' => $permisoDespues]],
+                ], $request->user());
             }
 
             if ($cambiaRol) {

@@ -87,8 +87,10 @@ reembolso. También agrega a `pagos` cómo se aprobó (`confirmado_via`: pasarel
 (`confirmado_por`), y a `reservas` el `deposito_confirmado_via` (punto 41). `2026_10_20_000002` crea
 `comandas`: lo que se manda a la cocina de cada pedido (inicial, cambios o cancelación), con su estado
 de impresión aparte del pedido, sus intentos e impresiones y una clave única para no duplicarla
-(punto 42). El endurecimiento de seguridad (punto 43) no necesita migración. Pruebas automáticas:
-`php artisan test` (307 en `tests/Feature`, incluida la prueba de un día completo de operación,
+(punto 42). El endurecimiento de seguridad (punto 43) no necesita migración. `2026_10_21_000001`
+agrega a `users` la marca `puede_registrar_gastos`: el Mesero autorizado para registrar compras y
+gastos (punto 47). Pruebas automáticas:
+`php artisan test` (311 en `tests/Feature`, incluida la prueba de un día completo de operación,
 `DiaCompletoTest`). Pruebas a mano: `PRUEBA-DIA-COMPLETO.md` y una lista por rol
 (`QA-CLIENTE.md`, `QA-MESERO.md` y `QA-ADMINISTRADOR.md`).
 

@@ -50,6 +50,7 @@ final class CatalogoAuditoria
         'crear_usuario' => ['Alta de usuario del personal', 'usuarios'],
         'editar_usuario' => ['Edición de datos de usuario', 'usuarios'],
         'cambiar_rol' => ['Cambio de rol de usuario', 'usuarios'],
+        'cambiar_permiso_gastos' => ['Cambio de permiso de compras y gastos', 'usuarios'],
         'activar_usuario' => ['Activación de usuario', 'usuarios'],
         'desactivar_usuario' => ['Desactivación de usuario', 'usuarios'],
         'actualizar_perfil' => ['Actualización del perfil propio', 'usuarios'],

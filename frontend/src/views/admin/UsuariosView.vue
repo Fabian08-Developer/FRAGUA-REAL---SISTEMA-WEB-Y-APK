@@ -214,7 +214,7 @@ async function confirmarCrear() {
 // Datos permitidos: nombre, correo, nombre de usuario, teléfono y rol (CA-M01-003.1). La contraseña no se cambia
 // aquí. Cambiar el rol cierra todas las sesiones de esa cuenta; nadie cambia su propio rol.
 const usuarioEditando = ref<Usuario | null>(null)
-const formEditar = ref({ nombre: '', email: '', username: '', telefono: '', role: 'mesero' as Rol })
+const formEditar = ref({ nombre: '', email: '', username: '', telefono: '', role: 'mesero' as Rol, puede_registrar_gastos: false })
 const erroresEditar = ref<Record<string, string>>({})
 const errorEditar = ref('')
 const guardandoEdicion = ref(false)
@@ -238,6 +238,7 @@ function abrirEditar(usuario: Usuario) {
     username: usuario.username ?? '',
     telefono: usuario.telefono ?? '',
     role: usuario.role,
+    puede_registrar_gastos: !!usuario.puede_registrar_gastos,
   }
   erroresEditar.value = {}
   errorEditar.value = ''
@@ -258,6 +259,7 @@ async function confirmarEditar() {
       username: formEditar.value.username.trim(),
       telefono: formEditar.value.telefono.trim() || null,
       role: formEditar.value.role,
+      puede_registrar_gastos: formEditar.value.role === 'mesero' && formEditar.value.puede_registrar_gastos,
     })
     reemplazar(data.usuario)
     if (data.usuario.id === auth.usuario?.id) auth.usuario = data.usuario
@@ -357,6 +359,7 @@ onMounted(cargar)
                 >
                   {{ usuario.activo ? 'Activo' : 'Inactivo' }}
                 </span>
+                <span v-if="usuario.puede_registrar_gastos" class="badge bg-sky-50 text-sky-700 ring-sky-600/20">Compras y gastos</span>
               </p>
               <p class="mt-1 truncate text-xs text-gray-500">
                 {{ usuario.email }}<template v-if="usuario.username"> · @{{ usuario.username }}</template><template v-if="usuario.telefono"> · {{ usuario.telefono }}</template>
@@ -556,6 +559,19 @@ onMounted(cargar)
             {{ ROLES[formEditar.role].texto }} y se cierran todas sus sesiones: tendrá que volver a entrar.
           </p>
         </div>
+
+        <!-- Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32): el «usuario autorizado» de M03. -->
+        <label v-if="formEditar.role === 'mesero'" class="flex items-start gap-3 rounded-xl border border-gray-200 p-3">
+          <input v-model="formEditar.puede_registrar_gastos" type="checkbox" class="mt-0.5 size-[18px] accent-brand-600" />
+          <span class="text-sm text-gray-700">
+            <span class="font-semibold text-ink">Puede registrar compras y gastos</span>
+            <span class="mt-0.5 block text-xs text-gray-500">
+              Tendrá la pestaña «Gastos»: registra lo que paga para el negocio, adjunta el recibo y ve solo lo que él
+              registró. Corregir, anular y el cierre del día siguen siendo tuyos. Un gasto en efectivo se descuenta
+              de la caja del día.
+            </span>
+          </span>
+        </label>
 
         <p class="text-xs text-gray-500">
           La contraseña no se cambia aquí: cada persona la cambia en su perfil o con "¿Olvidaste tu contraseña?".

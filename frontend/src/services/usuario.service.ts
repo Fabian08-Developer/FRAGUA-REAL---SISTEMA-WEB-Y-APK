@@ -21,6 +21,8 @@ export interface EditarUsuarioPayload {
   username: string
   telefono: string | null
   role: Rol
+  // Fase 7, tarea 2 (RF-M03-32): solo cuenta para un Mesero; al cambiar a otro rol se quita.
+  puede_registrar_gastos?: boolean
 }
 
 export interface UsuarioEditado {

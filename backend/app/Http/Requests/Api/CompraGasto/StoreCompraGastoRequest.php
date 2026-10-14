@@ -17,7 +17,8 @@ class StoreCompraGastoRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->esAdministrador() ?? false;
+        // Fase 7, tarea 2: también el Mesero con permiso de compras y gastos (RF-M03-32).
+        return $this->user()?->puedeRegistrarComprasGastos() ?? false;
     }
 
     public function rules(): array

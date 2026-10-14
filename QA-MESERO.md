@@ -40,7 +40,7 @@ Al preparar la lista se revisó el código de cada pantalla. Se corrigieron dos 
 ## 1. Entrada y navegación (M01 — RF-M01-007/009/010)
 
 - [ ] Iniciar sesión con `mesero` (o `MESERO`) lleva directo a Pedidos, no al sitio del Cliente.
-- [ ] El menú tiene Pedidos, Mesas, Reservas, Menú y Cobrar:
+- [ ] El menú tiene Pedidos, Mesas, Reservas, Menú y Cobrar (y Gastos, con permiso; sección 8b):
   - en el teléfono, como barra de pestañas abajo;
   - en la tableta, como riel a la izquierda;
   - en el PC, como barra lateral.
@@ -207,6 +207,28 @@ Al preparar la lista se revisó el código de cada pantalla. Se corrigieron dos 
 - [ ] Al pagar completo, el aviso dice "Cobro registrado. … quedó finalizado." y aparece "Imprimir comprobante FR-…". Si falta algo (p. ej. confirmar la recogida), dice "Pago completo. … Hazlo en Pedidos.".
 - [ ] Sin nada pendiente: "No hay pedidos pendientes de cobro · Todo al día por ahora.".
 - [ ] El Mesero no puede abrir ni cerrar la caja, ni anular pagos: eso es del Administrador.
+
+## 8b. Gastos, con permiso (M03 — Fase 7, tarea 2: RNF-TRANS-012, RF-M03-32, HU-M03-01 a 03)
+
+Solo para un Mesero al que el Administrador le marcó «Puede registrar compras y gastos» en
+Usuarios.
+
+- [ ] Sin el permiso no hay pestaña «Gastos», y `/mesero/gastos` lleva a Pedidos. En la pestaña
+      Red, `/api/compras-gastos` responde 403.
+- [ ] Con el permiso, al recargar la página aparece «Gastos». En el teléfono, la barra de abajo
+      tiene 6 pestañas sin cortarse.
+- [ ] "Registrar" un gasto "Transporte" de $12.000 en efectivo, con la foto del recibo:
+      - aparece en la lista con "Ver soporte";
+      - el efectivo esperado de la caja baja $12.000 (verlo con el Administrador en Caja).
+- [ ] Registrar uno sin recibo y luego "Adjuntar foto o PDF del recibo": queda con "Ver soporte".
+      Un archivo Word se rechaza con un mensaje claro.
+- [ ] La lista muestra solo lo que registró este Mesero, no lo del Administrador ni lo de otros.
+- [ ] No hay botones para corregir ni anular. Si el Administrador anula uno, sale "Anulado por el
+      Administrador: <motivo>".
+- [ ] Con una fecha de un día ya cerrado: "ya tiene cierre: pídele al Administrador que lo
+      registre". Una fecha futura no se puede elegir.
+- [ ] En la pestaña Red, `/api/cierres-diarios` y anular (`/api/compras-gastos/{id}/anular`)
+      responden 403.
 
 ## 9. Un turno completo
 

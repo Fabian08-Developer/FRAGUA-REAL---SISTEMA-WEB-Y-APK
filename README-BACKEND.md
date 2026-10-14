@@ -1127,6 +1127,36 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
     - Pruebas: `CatalogoReglasFase7Test` (3). Se ajustó `DisponibilidadCatalogoTest`: con su
       única presentación agotada, el producto ya no se ofrece.
 
+47. **Fase 7, tarea 2 (13/10/2026): el «usuario autorizado» de Compras y gastos (M03, M01).**
+    RNF-TRANS-012, RF-M03-32, HU-M03-01 a 03. La decisión D7 lo dejaba en V1 solo para el
+    Administrador; el 13/10/2026 se decidió que un Mesero con permiso registre, adjunte el soporte
+    y vea solo lo suyo.
+    - Migración `2026_10_21_000001_agregar_permiso_gastos_a_users`: `users.puede_registrar_gastos`
+      (falso para todos al migrar). No es un rol nuevo; `User::puedeRegistrarComprasGastos()` es
+      verdadero para el Administrador y para un Mesero con la marca.
+    - Usuarios > Editar (solo para un Mesero): casilla «Puede registrar compras y gastos».
+      `UsuarioController::update()` deja el cambio en Auditoría («Cambio de permiso de compras y
+      gastos», antes → después). No cierra sus sesiones, porque no es un cambio de rol. Si la cuenta
+      pasa a otro rol, el permiso se quita.
+    - Rutas: registrar, consultar, categorías y el soporte (ver y adjuntar) pasaron al grupo del
+      personal. `StoreCompraGastoRequest` y `CompraGastoController` revisan el permiso:
+      - el Mesero solo ve lo que él registró, con sus totales;
+      - el soporte de otro le responde 404;
+      - solo adjunta soporte a sus registros activos;
+      - editar, anular, `cierres-diarios` y su PDF siguen siendo solo del Administrador.
+    - Un día con cierre formal no lo registra el Mesero: «pídele al Administrador que lo registre»
+      (RN-M03-08). Un gasto en efectivo baja el efectivo esperado de la caja, igual que antes.
+    - Pantalla nueva `views/mesero/GastosView.vue`, en la pestaña «Gastos» del Mesero. Solo
+      aparece con el permiso, y la ruta también lo exige. Tiene:
+      - registrar con la foto o el PDF del recibo;
+      - la lista de lo que él registró;
+      - «Adjuntar foto o PDF del recibo» después.
+      
+      La barra de pestañas del teléfono se ajusta a 6 pestañas. El permiso se ve en la pestaña al
+      volver a cargar la página o al entrar de nuevo.
+    - Pruebas: `ComprasGastosMeseroAutorizadoTest` (4).
+    - El mapa del salón (RF-M05-022, opcional) quedó para el futuro por decisión del 13/10/2026.
+
 ## Qué falta a propósito
 
 Cada uno de los puntos abiertos ya está documentado en los documentos oficiales de módulo (no son
