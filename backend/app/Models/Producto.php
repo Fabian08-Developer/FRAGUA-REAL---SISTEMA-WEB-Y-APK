@@ -14,6 +14,9 @@ class Producto extends Model
         'tipo_venta', 'disponible', 'imagen_url', 'activo',
     ];
 
+    // Fase 7, tarea 3: la ruta interna del archivo no viaja; la pantalla usa `imagen_url`.
+    protected $hidden = ['imagen_path'];
+
     protected $casts = [
         'disponible' => 'boolean',
         'activo' => 'boolean',

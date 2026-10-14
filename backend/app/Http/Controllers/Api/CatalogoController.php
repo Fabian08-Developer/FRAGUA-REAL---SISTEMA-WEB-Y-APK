@@ -16,8 +16,10 @@ use App\Models\Producto;
 use App\Models\Variante;
 use App\Services\CatalogoService;
 use App\Services\ComboService;
+use App\Services\FotoProductoService;
 use App\Services\PromocionService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * M04 — Menú y Catálogo. Agrupa categorías, productos, variantes/extras (a través del
@@ -144,6 +146,53 @@ class CatalogoController extends Controller
         return response()->json($productos);
     }
 
+    // ---- Fase 7, tarea 3 (RF-M04-004, HU-M04-002, RNF-M04-002): foto del producto ----
+
+    // Pública: la ve el Menú, el QR y el Inicio sin sesión. Lleva caché larga porque la dirección
+    // cambia (?v=…) cada vez que se sube otra foto.
+    public function verFoto(Producto $producto, FotoProductoService $fotos)
+    {
+        abort_if(! $fotos->existe($producto), 404);
+        $ruta = (string) $producto->imagen_path;
+        $tipo = match (strtolower(pathinfo($ruta, PATHINFO_EXTENSION))) {
+            'webp' => 'image/webp',
+            'png' => 'image/png',
+            default => 'image/jpeg',
+        };
+
+        return Storage::disk(FotoProductoService::DISCO)->response($ruta, basename($ruta), [
+            'Content-Type' => $tipo,
+            'Cache-Control' => 'public, max-age=31536000, immutable',
+        ], 'inline');
+    }
+
+    public function subirFoto(Request $request, Producto $producto, FotoProductoService $fotos)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+        $request->validate([
+            'foto' => [
+                'required', 'file', 'mimes:jpg,jpeg,png,webp', 'mimetypes:image/jpeg,image/png,image/webp',
+                'max:'.config('fragua_real.foto_producto_max_kb', 5120),
+                'dimensions:min_width=200,min_height=200,max_width=8000,max_height=8000',
+            ],
+        ], [
+            'foto.required' => 'Elige una foto.',
+            'foto.mimes' => 'La foto debe ser JPG, PNG o WebP.',
+            'foto.mimetypes' => 'La foto debe ser JPG, PNG o WebP.',
+            'foto.max' => 'La foto es muy pesada (máximo '.round(config('fragua_real.foto_producto_max_kb', 5120) / 1024).' MB).',
+            'foto.dimensions' => 'La foto debe medir al menos 200 × 200 píxeles.',
+        ]);
+
+        return response()->json($fotos->guardar($producto, $request->file('foto'), $request->user())->load(['categoria', 'extrasGenerales:id,nombre']));
+    }
+
+    public function quitarFoto(Request $request, Producto $producto, FotoProductoService $fotos)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+
+        return response()->json($fotos->quitar($producto, $request->user())->load(['categoria', 'extrasGenerales:id,nombre']));
+    }
+
     public function storeProducto(StoreProductoRequest $request)
     {
         $data = $request->validated();
@@ -167,6 +216,11 @@ class CatalogoController extends Controller
         $data = $request->validated();
         $generales = $data['extras_generales'] ?? null;
         unset($data['extras_generales']);
+
+        // Fase 7, tarea 3: con una foto subida, la dirección la maneja la foto (subirFoto/quitarFoto).
+        if ($producto->imagen_path !== null) {
+            unset($data['imagen_url']);
+        }
 
         $antes = $producto->getAttributes();
         $estabaActivo = $producto->activo;

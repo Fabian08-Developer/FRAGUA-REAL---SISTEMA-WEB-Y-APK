@@ -5,7 +5,7 @@
 // NO tienen tratamiento propio — son una Promocion más con vigencia_inicio/vigencia_fin,
 // igual que un combo con su propia vigencia. Ver CatalogoController y PromocionController.
 import { computed, onMounted, ref, watch } from 'vue'
-import { Boxes, Layers, Pencil, Percent, Plus, Tags } from 'lucide-vue-next'
+import { Boxes, Image as ImageIcon, Layers, Pencil, Percent, Plus, Tags } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -231,7 +231,53 @@ const nuevaVariante = ref({ nombre: '', precio: 0 })
 const nuevoExtraEspecifico = ref({ nombre: '', precio: 0 })
 const errorVariantesExtras = ref('')
 
+// ---- Fase 7, tarea 3 (RF-M04-004, HU-M04-002): foto del producto ----
+const TIPOS_FOTO = ['image/jpeg', 'image/png', 'image/webp']
+const fotoNueva = ref<File | null>(null)
+const fotoVistaPrevia = ref('')
+const quitarFotoActual = ref(false)
+const errorFoto = ref('')
+const fotoMostrada = computed(
+  () => fotoVistaPrevia.value || (!quitarFotoActual.value ? (productoEditando.value?.imagen_url ?? '') : ''),
+)
+
+function limpiarFoto() {
+  if (fotoVistaPrevia.value) URL.revokeObjectURL(fotoVistaPrevia.value)
+  fotoNueva.value = null
+  fotoVistaPrevia.value = ''
+  quitarFotoActual.value = false
+  errorFoto.value = ''
+}
+
+function elegirFoto(evento: Event) {
+  const entrada = evento.target as HTMLInputElement
+  const archivo = entrada.files?.[0] ?? null
+  entrada.value = ''
+  if (!archivo) return
+  errorFoto.value = ''
+  if (!TIPOS_FOTO.includes(archivo.type)) {
+    errorFoto.value = 'La foto debe ser JPG, PNG o WebP.'
+    return
+  }
+  if (archivo.size > 5 * 1024 * 1024) {
+    errorFoto.value = 'La foto es muy pesada (máximo 5 MB).'
+    return
+  }
+  if (fotoVistaPrevia.value) URL.revokeObjectURL(fotoVistaPrevia.value)
+  fotoNueva.value = archivo
+  fotoVistaPrevia.value = URL.createObjectURL(archivo)
+  quitarFotoActual.value = false
+}
+
+function quitarFoto() {
+  if (fotoVistaPrevia.value) URL.revokeObjectURL(fotoVistaPrevia.value)
+  fotoNueva.value = null
+  fotoVistaPrevia.value = ''
+  quitarFotoActual.value = !!productoEditando.value?.imagen_url
+}
+
 function abrirNuevoProducto() {
+  limpiarFoto()
   productoEditando.value = null
   formProducto.value = {
     categoria_id: categorias.value.find((c) => c.activo)?.id ?? 0,
@@ -252,6 +298,7 @@ function abrirNuevoProducto() {
 }
 
 function abrirEditarProducto(producto: Producto) {
+  limpiarFoto()
   productoEditando.value = producto
   formProducto.value = {
     categoria_id: producto.categoria_id,
@@ -292,18 +339,31 @@ async function confirmarProducto() {
     const payload = {
       ...formProducto.value,
       descripcion: formProducto.value.descripcion || undefined,
-      imagen_url: formProducto.value.imagen_url || undefined,
+      // Fase 7, tarea 3: la foto se sube aparte (subirFoto); la dirección ya no se escribe a mano.
+      imagen_url: undefined,
       precio_base: Number(formProducto.value.precio_base),
     }
     avisoCatalogo.value = ''
+    let productoId: number
     if (productoEditando.value) {
       const { data } = await catalogoService.actualizarProducto(productoEditando.value.id, payload)
+      productoId = data.id
       if (data.combos_desactivados?.length) {
         avisoCatalogo.value = `Al dar de baja "${data.nombre}" se desactivaron: ${data.combos_desactivados.join(', ')}. Para volver a ofrecerlos, edítalos y reemplaza ese producto.`
       }
     } else {
-      await catalogoService.crearProducto(payload)
+      const { data } = await catalogoService.crearProducto(payload)
+      productoId = data.id
     }
+    // La foto, después de guardar el producto. Si falla, el producto ya quedó guardado.
+    try {
+      if (fotoNueva.value) await catalogoService.subirFoto(productoId, fotoNueva.value)
+      else if (quitarFotoActual.value) await catalogoService.quitarFoto(productoId)
+    } catch (e) {
+      const campos = erroresDeValidacion(e)
+      avisoCatalogo.value = `El producto se guardó, pero la foto no: ${campos.foto ?? mensajeDeError(e, 'inténtalo de nuevo.')}`
+    }
+    limpiarFoto()
     modalProductoAbierto.value = false
     await cargar()
   } catch (e) {
@@ -914,6 +974,13 @@ onMounted(cargar)
           class="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
         >
           <div class="min-w-0">
+            <img
+              v-if="producto.imagen_url"
+              :src="producto.imagen_url"
+              alt=""
+              loading="lazy"
+              class="float-left mr-3 size-14 rounded-lg object-cover"
+            />
             <p class="flex flex-wrap items-center gap-2 text-[15px] font-semibold text-ink">
               {{ producto.nombre }}
               <span class="badge bg-gray-100 text-gray-500 ring-gray-500/20">
@@ -1144,11 +1211,35 @@ onMounted(cargar)
           </label>
         </div>
 
-        <label class="block">
-          <span class="field-label">URL de imagen (opcional)</span>
-          <input v-model="formProducto.imagen_url" type="text" class="field" />
-          <span v-if="erroresProducto.imagen_url" class="mt-1 block text-xs text-red-600">{{ erroresProducto.imagen_url }}</span>
-        </label>
+        <!-- Fase 7, tarea 3 (RF-M04-004, HU-M04-002): la foto se sube; el servidor la ajusta. -->
+        <div>
+          <p class="field-label">Foto (opcional)</p>
+          <div class="flex items-center gap-4">
+            <div class="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-gray-50 text-gray-300">
+              <img v-if="fotoMostrada" :src="fotoMostrada" alt="Foto del producto" class="size-full object-cover" />
+              <ImageIcon v-else :size="28" />
+            </div>
+            <div class="min-w-0 space-y-2">
+              <div class="flex flex-wrap gap-2">
+                <label class="inline-flex min-h-10 cursor-pointer items-center rounded-xl border border-gray-200 px-3 text-sm font-semibold text-ink transition hover:border-brand-400 hover:bg-brand-50">
+                  {{ fotoMostrada ? 'Cambiar foto' : 'Elegir foto' }}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="elegirFoto" />
+                </label>
+                <button
+                  v-if="fotoMostrada"
+                  type="button"
+                  class="inline-flex min-h-10 items-center rounded-xl px-3 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                  @click="quitarFoto"
+                >
+                  Quitar foto
+                </button>
+              </div>
+              <p class="text-xs text-gray-400">JPG, PNG o WebP, de al menos 200 × 200 px y hasta 5 MB. Se ajusta sola para que el menú cargue rápido. Se guarda al guardar el producto.</p>
+              <p v-if="quitarFotoActual" class="text-xs text-amber-700">La foto se quitará al guardar.</p>
+            </div>
+          </div>
+          <span v-if="errorFoto" class="mt-1 block text-xs text-red-600">{{ errorFoto }}</span>
+        </div>
 
         <div class="flex flex-wrap gap-6">
           <label class="flex items-center gap-2">

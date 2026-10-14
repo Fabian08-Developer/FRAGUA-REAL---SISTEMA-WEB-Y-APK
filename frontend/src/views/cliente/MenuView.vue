@@ -297,9 +297,11 @@ function formatoPrecio(valor: number) {
               @click="elegirProducto(producto)"
             >
               <div
-                class="mb-3 flex aspect-[4/3] items-center justify-center rounded-xl bg-gradient-to-br from-[#efe8db] to-[#e0d6c2] text-brand-700/60"
+                class="mb-3 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#efe8db] to-[#e0d6c2] text-brand-700/60"
               >
-                <component :is="iconoPara(producto.nombre)" :size="36" :stroke-width="1.5" />
+                <!-- Fase 7, tarea 3 (RF-M04-004): la foto del producto si la tiene. -->
+                <img v-if="producto.imagen_url" :src="producto.imagen_url" :alt="producto.nombre" loading="lazy" class="size-full object-cover" />
+                <component :is="iconoPara(producto.nombre)" v-else :size="36" :stroke-width="1.5" />
               </div>
               <p class="font-display text-lg text-ink">
                 {{ producto.nombre }}
@@ -366,9 +368,15 @@ function formatoPrecio(valor: number) {
                muchas variantes/extras — el botón "Agregar" de abajo nunca se mueve. -->
           <div class="min-h-0 flex-1 overflow-y-auto px-5 lg:overflow-visible">
             <div
-              class="flex aspect-[4/3] items-center justify-center rounded-xl bg-gradient-to-br from-[#efe8db] to-[#e0d6c2] text-brand-700/60"
+              class="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#efe8db] to-[#e0d6c2] text-brand-700/60"
             >
-              <component :is="iconoPara(comboSeleccionado?.nombre ?? productoSeleccionado?.nombre ?? '')" :size="56" :stroke-width="1.5" />
+              <img
+                v-if="productoSeleccionado?.imagen_url"
+                :src="productoSeleccionado.imagen_url"
+                :alt="productoSeleccionado.nombre"
+                class="size-full object-cover"
+              />
+              <component :is="iconoPara(comboSeleccionado?.nombre ?? productoSeleccionado?.nombre ?? '')" v-else :size="56" :stroke-width="1.5" />
             </div>
             <p class="mt-4 font-display text-2xl text-ink">{{ comboSeleccionado?.nombre ?? productoSeleccionado?.nombre }}</p>
             <p v-if="productoSeleccionado?.descripcion" class="mt-2 text-[13px] leading-relaxed text-[#696158]">

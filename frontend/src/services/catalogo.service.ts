@@ -76,6 +76,15 @@ export const catalogoService = {
   actualizarProducto(id: number, payload: CrearProductoPayload) {
     return api.put<Producto>(`/productos/${id}`, payload)
   },
+  // Fase 7, tarea 3 (RF-M04-004): foto del producto (JPG, PNG o WebP); el servidor la reduce.
+  subirFoto(id: number, foto: File) {
+    const datos = new FormData()
+    datos.append('foto', foto)
+    return api.post<Producto>(`/productos/${id}/foto`, datos)
+  },
+  quitarFoto(id: number) {
+    return api.delete<Producto>(`/productos/${id}/foto`)
+  },
   toggleDisponible(id: number, disponible: boolean) {
     return api.post<Producto>(`/productos/${id}/disponibilidad`, { disponible })
   },

@@ -1157,6 +1157,34 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
     - Pruebas: `ComprasGastosMeseroAutorizadoTest` (4).
     - El mapa del salón (RF-M05-022, opcional) quedó para el futuro por decisión del 13/10/2026.
 
+48. **Fase 7, tarea 3 (13/10/2026): fotos de los productos (M04).** RF-M04-004, HU-M04-002,
+    RNF-M04-002. Antes el Administrador solo podía pegar una dirección de imagen, y el Menú, el QR y
+    Nuevo pedido no la mostraban (solo el Inicio).
+    - Migración `2026_10_21_000002_agregar_foto_a_productos`: `productos.imagen_path` (oculta en
+      las respuestas).
+    - `FotoProductoService`:
+      - guarda la foto en el disco privado (`storage/app/private/productos`);
+      - si PHP tiene GD, la reduce a 900 px por el lado más largo y la pasa a WebP (o JPEG);
+      - al cambiarla o quitarla, borra el archivo anterior;
+      - deja el cambio en Auditoría («Cambio de foto de producto»).
+    - `imagen_url` queda como `/api/productos/{id}/foto?v=…`. La versión cambia con cada foto.
+    - Rutas:
+      - `POST` y `DELETE /productos/{id}/foto`: solo Administrador. Acepta JPG, PNG o WebP, de 200
+        × 200 px como mínimo y hasta 5 MB (`FRAGUA_REAL_FOTO_PRODUCTO_MAX_KB`).
+      - `GET /productos/{id}/foto`: pública, porque el menú la ve sin sesión. Lleva caché larga
+        (`public, max-age=31536000, immutable`). `CabecerasSeguridad` deja esa caché solo en esta
+        ruta; todo lo demás de la API sigue con `no-store`.
+    - Editar el producto ya no pisa la dirección de una foto subida.
+    - Pantallas:
+      - Catálogo > producto: «Elegir foto», vista previa, «Quitar foto», y una miniatura en la
+        lista. La foto se sube al guardar el producto; si falla, el producto queda guardado y lo
+        avisa.
+      - El Menú, el QR de mesa (lista y ventana del producto) y Nuevo pedido muestran la foto. Sin
+        foto sigue el ícono.
+    - «Revisión antes de producción» avisa si falta GD (`apt install php-gd`).
+    - En el VPS, `storage/app/private/productos` entra en las copias de seguridad.
+    - Pruebas: `FotoProductoTest` (3).
+
 ## Qué falta a propósito
 
 Cada uno de los puntos abiertos ya está documentado en los documentos oficiales de módulo (no son

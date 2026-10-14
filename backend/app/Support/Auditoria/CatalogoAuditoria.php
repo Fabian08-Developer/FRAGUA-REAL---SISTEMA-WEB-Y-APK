@@ -85,6 +85,7 @@ final class CatalogoAuditoria
         'editar_categoria' => ['Edición de categoría', 'catalogo'],
         'crear_producto' => ['Creación de producto', 'catalogo'],
         'editar_producto' => ['Edición de producto', 'catalogo'],
+        'cambiar_foto_producto' => ['Cambio de foto de producto', 'catalogo'],
         'crear_variante' => ['Creación de variante', 'catalogo'],
         'editar_variante' => ['Edición de variante', 'catalogo'],
         'crear_extra' => ['Creación de extra', 'catalogo'],

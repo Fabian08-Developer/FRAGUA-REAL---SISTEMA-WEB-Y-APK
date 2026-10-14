@@ -37,6 +37,8 @@ permitía editar los valores, pero no había dónde hacerlo).
       con contraseña de prueba. Cambiar esa contraseña en Mi perfil y volver a revisar: ese punto
       pasa a verde. Nunca aparecen llaves ni contraseñas. Con el Mesero, `/api/sistema/revision-produccion`
       responde 403.
+- [ ] "Fotos de productos livianas" sale en verde si PHP tiene la extensión GD; sin ella, en
+      amarillo con la instrucción para instalarla (Fase 7).
 - [ ] En el servidor, `php artisan fragua:revisar-produccion` muestra la misma lista y termina en
       error mientras haya puntos en rojo.
 - [ ] Seguridad de la API: en las herramientas del navegador (pestaña Red), cualquier respuesta de
@@ -118,6 +120,13 @@ RF-M01-017/024/025, HU-M01-015/020, RNF-TRANS-022/023, RN-USR-12/13.
 - [ ] Precio en cero o un nombre de producto o categoría repetido: mensaje claro bajo el campo.
 - [ ] Cambiar el precio de un producto queda en la auditoría con el valor anterior y el nuevo (RF-M04-022).
 - [ ] Combos: crear con vigencia; se oculta si un componente está agotado (RN-M04-11).
+- [ ] Fase 7, tarea 3 (RF-M04-004, HU-M04-002): editar la Hamburguesa Clásica > "Elegir foto"
+      (una foto grande del celular): se ve la vista previa y, al guardar, la miniatura en la lista.
+      La foto sale en el Menú, el QR, el Inicio y Nuevo pedido del Mesero, y carga rápido (en la
+      pestaña Red pesa mucho menos que la original). "Cambiar foto" la reemplaza. "Quitar foto" la
+      borra y vuelve el ícono. Un PDF o una foto de menos de 200 × 200 px se rechaza con un mensaje
+      claro. Auditoría muestra "Cambio de foto de producto".
+- [ ] Un producto nuevo con foto: se crea y la foto queda en el mismo guardado.
 - [ ] Fase 7, tarea 1 (RF-M04-013/014): un combo con un solo producto (1 unidad) no se guarda
       ("Un combo lleva al menos dos productos"); con 2 del mismo producto, sí. Al armarlo y en la
       lista se ve "Por separado $… · ahorro $… (n %)"; si el precio del combo es igual o mayor que

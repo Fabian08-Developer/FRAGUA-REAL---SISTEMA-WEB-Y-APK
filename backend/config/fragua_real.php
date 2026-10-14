@@ -52,6 +52,10 @@ return [
     // RF-M03-07, RNF-M03-06: soporte de una compra o gasto — tamaño máximo en KB.
     'soporte_max_kb' => (int) env('FRAGUA_REAL_SOPORTE_MAX_KB', 5120),
 
+    // Fase 7, tarea 3 (RF-M04-004): peso máximo de la foto de un producto al subirla. El servidor
+    // la reduce después (900 px, WebP), así que en el menú pesa mucho menos.
+    'foto_producto_max_kb' => (int) env('FRAGUA_REAL_FOTO_PRODUCTO_MAX_KB', 5120),
+
     // Fase 4, tarea 2 (RF-M05-017/026, RN-M05-07/08/13, decisión D6 del 12/10/2026): valores
     // iniciales de las reservas. El Administrador los cambia en Configuración (tabla
     // `configuraciones`); estos solo se usan si esa fila aún no existe.

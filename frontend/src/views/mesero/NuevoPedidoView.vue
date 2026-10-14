@@ -646,9 +646,11 @@ onMounted(() => {
                 @click="tocarProducto(producto)"
               >
                 <div
-                  class="flex size-16 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-gray-100 to-gray-200/70 text-brand-700/60 sm:mb-3 sm:aspect-[4/3] sm:size-auto sm:w-full"
+                  class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-gray-100 to-gray-200/70 text-brand-700/60 sm:mb-3 sm:aspect-[4/3] sm:size-auto sm:w-full"
                 >
-                  <component :is="iconoPorNombre(producto.nombre)" :size="28" :stroke-width="1.5" />
+                  <!-- Fase 7, tarea 3 (RF-M04-004): la foto del producto si la tiene. -->
+                  <img v-if="producto.imagen_url" :src="producto.imagen_url" :alt="producto.nombre" loading="lazy" class="size-full object-cover" />
+                  <component :is="iconoPorNombre(producto.nombre)" v-else :size="28" :stroke-width="1.5" />
                 </div>
                 <div class="min-w-0 flex-1 sm:flex-none">
                   <p class="font-display text-[17px] font-medium leading-snug text-ink sm:text-lg">

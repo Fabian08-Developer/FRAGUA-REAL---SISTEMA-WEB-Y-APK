@@ -58,6 +58,12 @@ class RevisionProduccionService
 
         $r[] = $this->pasarela();
 
+        // Fase 7, tarea 3 (RNF-M04-002): sin GD las fotos de productos se guardan sin reducir y el
+        // menú carga más lento en el celular. No impide abrir: es un aviso.
+        $gd = extension_loaded('gd') && function_exists('imagecreatefromstring');
+        $r[] = $this->item('fotos', $gd ? 'ok' : 'aviso', 'Fotos de productos livianas',
+            $gd ? 'La extensión GD de PHP está instalada: las fotos se reducen al subirlas.' : 'Falta la extensión GD de PHP (php-gd): las fotos se guardan tal como se suben. Instálala con apt install php-gd.');
+
         $origenes = (array) config('cors.allowed_origins', []);
         $abierto = in_array('*', $origenes, true);
         $r[] = $this->item('cors', $abierto ? 'error' : 'ok', 'Orígenes permitidos para la API',

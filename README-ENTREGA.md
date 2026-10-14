@@ -208,9 +208,9 @@ uno. Quedó esta lista, en orden:
 2. **«Usuario autorizado» de Compras y gastos** (RNF-TRANS-012, RF-M03-32, HU-M03-01 a 03).
    Hecha el 13/10/2026, `README-BACKEND.md`, punto 47. Revisa la decisión D7: un Mesero con permiso
    registra, adjunta el recibo y ve solo lo suyo.
-3. **Fotos de los productos** (RF-M04-004, HU-M04-002, RNF-M04-002). Hoy el Administrador solo
-   puede pegar una dirección de imagen y el Menú no la muestra. La tarea es subir la foto desde
-   Catálogo y verla en el Menú, el QR de mesa, el Inicio y Nuevo pedido.
+3. **Fotos de los productos** (RF-M04-004, HU-M04-002, RNF-M04-002). Hecha el 13/10/2026,
+   `README-BACKEND.md`, punto 48. La foto se sube desde Catálogo y se ve en el Menú, el QR de mesa,
+   el Inicio y Nuevo pedido.
 4. **Estado de la caja para el Mesero** (RF-M06-023, HU-M06-009). El Mesero solo se entera de
    que la caja está cerrada cuando intenta cobrar.
 5. **Reportes de un mes completo a buena velocidad** (RNF-M08-001). Medir con datos de un mes y
@@ -522,7 +522,15 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   Corregir, anular y el cierre del día siguen siendo del Administrador. Un día ya cerrado tampoco
   lo registra el Mesero. Un gasto en efectivo se descuenta de la caja del día. Dar o quitar el
   permiso queda en Auditoría.
-- En el servidor: `php artisan migrate` (una migración nueva, `2026_10_21_000001`).
+- En Catálogo, cada producto tiene «Elegir foto» (JPG, PNG o WebP). El servidor la achica para que
+  el menú cargue rápido en el celular. La foto se ve en el Menú, el QR de mesa, el Inicio y Nuevo
+  pedido, y como miniatura en la lista de productos. «Quitar foto» la borra. Cada cambio queda en
+  Auditoría.
+- En el servidor:
+  - `php artisan migrate`: dos migraciones nuevas, `2026_10_21_000001` y `000002`;
+  - la extensión GD de PHP (`sudo apt install php-gd`; la «Revisión antes de producción» avisa si
+    falta);
+  - incluir `storage/app/private/productos` en las copias de seguridad.
 
 ## Cambios de comportamiento de la Fase 4 (desde el 12/10/2026)
 

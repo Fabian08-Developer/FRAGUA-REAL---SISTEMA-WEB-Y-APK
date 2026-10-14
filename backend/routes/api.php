@@ -44,6 +44,8 @@ Route::middleware('throttle:10,1')->group(function () {
 Route::get('/categorias', [CatalogoController::class, 'categorias']);
 Route::get('/productos', [CatalogoController::class, 'productos']);
 Route::get('/productos/{producto}/promociones', [CatalogoController::class, 'promocionesDeProducto']);
+// Fase 7, tarea 3 (RF-M04-004): la foto del producto, pública (la ve el menú sin sesión).
+Route::get('/productos/{producto}/foto', [CatalogoController::class, 'verFoto'])->middleware('throttle:600,1')->name('productos.foto');
 Route::get('/combos', [CatalogoController::class, 'combos']);
 Route::get('/mesas', [MesaController::class, 'index']);
 // RF-M02-L-025: resolver la mesa de un QR escaneado (pedido por QR, sin cuenta).
@@ -235,6 +237,9 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::put('/categorias/{categoria}', [CatalogoController::class, 'updateCategoria']);
         Route::post('/productos', [CatalogoController::class, 'storeProducto']);
         Route::put('/productos/{producto}', [CatalogoController::class, 'updateProducto']);
+        // Fase 7, tarea 3 (RF-M04-004, HU-M04-002): subir o quitar la foto del producto.
+        Route::post('/productos/{producto}/foto', [CatalogoController::class, 'subirFoto']);
+        Route::delete('/productos/{producto}/foto', [CatalogoController::class, 'quitarFoto']);
 
         // Catálogo (M04) parte 2: variantes, extras, combos y promociones.
         Route::post('/variantes', [CatalogoController::class, 'storeVariante']);

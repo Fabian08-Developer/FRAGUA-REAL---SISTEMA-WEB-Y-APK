@@ -33,7 +33,11 @@ class CabecerasSeguridad
         $cabeceras->set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
         $cabeceras->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
         $cabeceras->set('Cross-Origin-Resource-Policy', 'same-site');
-        if (! $cabeceras->has('Cache-Control') || ! str_contains((string) $cabeceras->get('Cache-Control'), 'no-store')) {
+        // Fase 7, tarea 3: las fotos de productos son públicas y llevan versión en la dirección
+        // (?v=…), así que pueden guardarse en caché; todo lo demás, no.
+        $esFotoPublica = $request->routeIs('productos.foto')
+            && str_contains((string) $cabeceras->get('Cache-Control'), 'public');
+        if (! $esFotoPublica && (! $cabeceras->has('Cache-Control') || ! str_contains((string) $cabeceras->get('Cache-Control'), 'no-store'))) {
             $cabeceras->set('Cache-Control', 'no-store, private');
         }
         $cabeceras->remove('X-Powered-By');

@@ -56,6 +56,9 @@ Al preparar la lista se revisó el código pantalla por pantalla y aparecieron c
 ## 2. Menú (M04 — RF-M04-016 a 020, RF-M04-031/035, RN-M04-05/08/11/16)
 
 - [ ] Las categorías salen como pestañas. Cada una muestra sus productos con "Desde $…".
+- [ ] Fase 7: un producto con foto (Administrador > Catálogo) la muestra en su tarjeta y en "Tu
+      elección". Sin foto, sale el ícono. En el teléfono las fotos cargan rápido y no deforman la
+      tarjeta.
 - [ ] Un producto agotado o de una categoría desactivada no aparece. Con el Mesero, en Menú, agota la Gaseosa: al recargar, el Cliente ya no la ve.
 - [ ] Con el Mesero, agota los dos tamaños de la Hamburguesa Clásica: al recargar, la Clásica y el
       Combo Clásico ya no aparecen (Fase 7). Vuelve a dejarlos disponibles.
@@ -152,6 +155,7 @@ Con el Administrador: Mesas > Mesa 3 > QR. Abre el enlace del QR en el teléfono
 
 - [ ] La página es simple: logo, "Mesa 3" arriba, sin menú del sitio ni inicio de sesión.
 - [ ] Un QR viejo (regenerado en Mesas) o inventado muestra "No pudimos abrir tu mesa" y "Este código QR ya no es válido. Pide ayuda a un mesero."
+- [ ] Los productos con foto la muestran en la lista y en la ventana del producto (Fase 7).
 - [ ] "¿Qué te provoca?" muestra las categorías. Tocar el + de un producto abre la ventana con:
   - tamaño, extras y la nota "¿Algo que quitar o pedir especial?";
   - la cantidad;

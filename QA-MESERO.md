@@ -104,6 +104,7 @@ Al preparar la lista se revisó el código de cada pantalla. Se corrigieron dos 
   - Un teléfono de menos de 7 dígitos se rechaza.
   - El total suma el domicilio vigente.
 - [ ] **Recogida**: pide nombre y teléfono, con el correo opcional ("le avisamos cuando esté listo"). Un correo mal escrito no deja continuar. No suma domicilio.
+- [ ] Los productos con foto la muestran en su tarjeta (Fase 7); sin foto, el ícono.
 - [ ] "Buscar producto en todo el menú" encuentra sin importar tildes ni mayúsculas ("clasica" encuentra "Clásica"). Sin resultados: "Ningún producto disponible coincide con la búsqueda.".
 - [ ] Un producto con tamaños pide la "Presentación". Un tamaño agotado no aparece. Con todos sus
       tamaños agotados (en Menú), el producto ya no sale en Nuevo pedido (Fase 7).

@@ -409,9 +409,11 @@ onMounted(async () => {
               class="flex items-center gap-4 rounded-2xl border border-[#e2dbcf] bg-white p-3"
             >
               <div
-                class="flex size-16 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#efe8db] to-[#e0d6c2] text-brand-700/60"
+                class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#efe8db] to-[#e0d6c2] text-brand-700/60"
               >
-                <component :is="iconoPara(producto.nombre)" :size="28" :stroke-width="1.5" />
+                <!-- Fase 7, tarea 3 (RF-M04-004): la foto del producto si la tiene. -->
+                <img v-if="producto.imagen_url" :src="producto.imagen_url" :alt="producto.nombre" loading="lazy" class="size-full object-cover" />
+                <component :is="iconoPara(producto.nombre)" v-else :size="28" :stroke-width="1.5" />
               </div>
               <div class="min-w-0 flex-1">
                 <p class="font-display text-base text-ink">{{ producto.nombre }}</p>
@@ -464,6 +466,12 @@ onMounted(async () => {
       @update:model-value="cerrarModal"
     >
       <div v-if="modalAbierto" class="space-y-5">
+        <img
+          v-if="productoAbierto?.imagen_url"
+          :src="productoAbierto.imagen_url"
+          :alt="productoAbierto.nombre"
+          class="aspect-[4/3] w-full rounded-xl object-cover"
+        />
         <p v-if="productoAbierto?.descripcion" class="text-sm text-[#6c655c]">{{ productoAbierto.descripcion }}</p>
 
         <div v-if="comboAbierto">
