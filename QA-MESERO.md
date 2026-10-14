@@ -190,7 +190,16 @@ Al preparar la lista se revisó el código de cada pantalla. Se corrigieron dos 
 
 ## 8. Cobrar (M06 — RF-M06-003 a 005/009 a 011, RN-M06-02 a 06, RF-M02-L-019/020)
 
-- [ ] **Sin caja abierta** (el Administrador todavía no la abre), cobrar dice "No hay un turno de caja abierto para registrar el cobro.", sin el código de la regla (corregido en esta revisión).
+- [ ] **Estado de la caja** (Fase 7, tarea 4 — RF-M06-023, HU-M06-009):
+      - sin abrir, la franja amarilla dice "La caja de hoy no está abierta" y los botones "Cobrar" y
+        "Cobrar mesa" están apagados;
+      - cuando el Administrador la abre, al volver a entrar a Cobrar la franja pasa a verde con
+        "Caja abierta desde las … · la abrió …" y el efectivo esperado;
+      - después de un cobro en efectivo, el efectivo esperado sube en ese valor;
+      - con la caja cerrada, la franja dice "ya se cerró".
+- [ ] Si de todas formas se intenta cobrar sin caja (por ejemplo, con otra pestaña abierta desde
+      antes), el mensaje dice "No hay un turno de caja abierto para registrar el cobro.", sin el
+      código de la regla.
 - [ ] **Pagos en línea por revisar** (modo manual): cada pago muestra el pedido, Nequi o Bancolombia y el monto.
   - "Aprobar pago" deja confirmar el pedido. "Rechazar" deja que el cliente lo reintente.
   - Con Wompi dice "En proceso en Wompi · se confirma solo", con "Aprobar a mano" y "Rechazar a mano" de respaldo.

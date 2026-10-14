@@ -126,6 +126,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     });
 
     Route::middleware('role:administrador,mesero')->group(function () {
+        // Fase 7, tarea 4 (RF-M06-023, HU-M06-009): estado de la caja de hoy para Cobrar.
+        Route::get('/caja/estado', [CajaController::class, 'estado']);
         // Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32): compras y gastos para el Administrador y el
         // Mesero con permiso; el controlador y StoreCompraGastoRequest lo revisan, y el Mesero
         // solo ve lo suyo. Fase 2, tarea 4: categorías por tipo y soporte (RF-M03-07, RNF-M03-11).

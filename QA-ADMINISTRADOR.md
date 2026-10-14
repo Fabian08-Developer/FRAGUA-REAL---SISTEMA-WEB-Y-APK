@@ -232,6 +232,8 @@ Requiere la cola corriendo y un `MAIL_MAILER` que envíe (con `log` los correos 
 ## 6. Caja (M06)
 - [ ] Abrir turno (un solo turno por día, RN-M06-03); intentar abrir otro → rechazado.
 - [ ] Sin turno abierto, la pantalla dice "sin turno" y el Mesero no puede cobrar (bug del 01/10).
+      En Mesero > Cobrar, la franja amarilla lo dice; al abrir el turno, pasa a verde con el
+      efectivo esperado (Fase 7, tarea 4).
 - [ ] Un depósito de reserva en efectivo sube el efectivo esperado del día; el detalle del turno
       lo lista en "Depósitos de reserva". Cancelar esa reserva (devolver el depósito) lo resta.
 - [ ] El día de la visita, el abono del depósito no vuelve a sumar al esperado: solo suma lo que

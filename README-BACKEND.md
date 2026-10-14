@@ -1185,6 +1185,25 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
     - En el VPS, `storage/app/private/productos` entra en las copias de seguridad.
     - Pruebas: `FotoProductoTest` (3).
 
+49. **Fase 7, tarea 4 (13/10/2026): el Mesero ve el estado de la caja (M06).** RF-M06-023,
+    HU-M06-009 («quiero saber si la caja está abierta y cuánto efectivo se espera»). Sin migración.
+    Antes el Mesero solo se enteraba de que la caja estaba cerrada cuando un cobro le fallaba.
+    - `GET /caja/estado`, para el Administrador y el Mesero, de solo lectura. Devuelve:
+      - el estado de la caja de hoy en hora de Colombia (`sin_abrir`, `abierta` o `cerrada`);
+      - quién la abrió y a qué hora, o quién la cerró;
+      - con la caja abierta, el efectivo esperado.
+      
+      El detalle del turno (`/caja/turno-actual`, los pagos, el arqueo) sigue siendo solo del
+      Administrador.
+    - Mesero > Cobrar muestra arriba una franja según el estado:
+      - verde: «Caja abierta desde las … · la abrió … · Efectivo esperado $…»;
+      - amarilla, sin abrir: «no se puede cobrar hasta que el Administrador la abra»;
+      - amarilla, cerrada: «ya se cerró».
+      
+      Sin caja abierta, los botones de cobro se apagan; el servidor igual lo valida (RN-M06-02).
+      La franja se actualiza después de cada cobro.
+    - Pruebas: `CajaEstadoMeseroTest` (2).
+
 ## Qué falta a propósito
 
 Cada uno de los puntos abiertos ya está documentado en los documentos oficiales de módulo (no son

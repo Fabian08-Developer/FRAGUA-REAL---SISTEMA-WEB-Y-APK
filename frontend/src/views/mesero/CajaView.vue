@@ -16,6 +16,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import CuentaMesaModal from '@/components/pedidos/CuentaMesaModal.vue'
 import { pedidoService } from '@/services/pedido.service'
+import { cajaService, type EstadoCaja } from '@/services/caja.service'
 import { pagoService } from '@/services/pago.service'
 import { mensajeDeError } from '@/services/errors'
 import { metodoPasarela } from '@/utils/pasarela'
@@ -73,7 +74,27 @@ const pagosEnLineaPendientes = computed(() =>
   ),
 )
 
+// ---- Fase 7, tarea 4 (RF-M06-023, HU-M06-009): estado de la caja de hoy ----
+// El Mesero ve si la caja está abierta y el efectivo que debería haber. Sin caja abierta no se
+// puede cobrar (RN-M06-02): los botones de cobro se apagan y se explica a quién acudir.
+const caja = ref<EstadoCaja | null>(null)
+const cajaAbierta = computed(() => caja.value === null || caja.value.estado === 'abierta')
+
+async function cargarCaja() {
+  try {
+    const { data } = await cajaService.estado()
+    caja.value = data
+  } catch {
+    caja.value = null // si no se puede consultar, el servidor igual valida al cobrar
+  }
+}
+
+function horaCorta(valor: string | null) {
+  return valor ? new Date(valor).toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: 'numeric', minute: '2-digit' }) : ''
+}
+
 async function cargar() {
+  void cargarCaja()
   cargando.value = true
   error.value = ''
   try {
@@ -162,6 +183,7 @@ async function confirmarCobro() {
     if (data.estado === 'finalizado') aviso.value = `Cobro registrado. ${titularPedido(data)} quedó finalizado.`
     else if (saldoPendiente(data) === 0 && falta) aviso.value = `Pago completo. ${falta} Hazlo en Pedidos.`
     else aviso.value = 'Cobro registrado.'
+    void cargarCaja()
   } catch (e) {
     // Si no hay turno de caja abierto, el backend responde con ese motivo exacto
     // (RN-M06-03) — el Mesero no puede abrirlo, así que solo puede avisarle al
@@ -215,6 +237,32 @@ onMounted(cargar)
       titulo="Cobrar"
       descripcion="Pedidos pendientes de pago — local, domicilio y recogida. El cobro se registra siempre acá, sin importar el canal."
     />
+
+    <!-- Fase 7, tarea 4 (RF-M06-023, HU-M06-009): estado de la caja de hoy. -->
+    <div
+      v-if="caja"
+      class="mt-4 flex flex-col gap-1 rounded-xl px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+      :class="caja.estado === 'abierta' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'"
+      role="status"
+    >
+      <p v-if="caja.estado === 'abierta'">
+        <span class="font-semibold">Caja abierta</span>
+        <template v-if="caja.abierta_at"> desde las {{ horaCorta(caja.abierta_at) }}</template>
+        <template v-if="caja.abierta_por"> · la abrió {{ caja.abierta_por }}</template>
+      </p>
+      <p v-else-if="caja.estado === 'sin_abrir'">
+        <span class="font-semibold">La caja de hoy no está abierta.</span> No se puede cobrar hasta que el Administrador
+        la abra.
+      </p>
+      <p v-else>
+        <span class="font-semibold">La caja de hoy ya se cerró</span>
+        <template v-if="caja.cerrada_at"> a las {{ horaCorta(caja.cerrada_at) }}</template>.
+        Un cobro nuevo ya no entra a la caja: habla con el Administrador.
+      </p>
+      <p v-if="caja.estado === 'abierta' && caja.efectivo_esperado !== null" class="font-semibold">
+        Efectivo esperado: {{ formatoPrecio(caja.efectivo_esperado) }}
+      </p>
+    </div>
 
     <p v-if="error" class="mt-4 alert-error">{{ error }}</p>
     <div v-if="aviso" class="mt-4 flex flex-col gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800 sm:flex-row sm:items-center sm:justify-between">
@@ -290,7 +338,7 @@ onMounted(cargar)
               </p>
               <p class="mt-1 font-display text-xl font-medium text-ink">{{ formatoPrecio(mesa.saldo) }}</p>
             </div>
-            <BaseButton variant="primary" class="shrink-0" @click="cuentaDe = mesa.id">Cobrar mesa</BaseButton>
+            <BaseButton variant="primary" class="shrink-0" :disabled="!cajaAbierta" @click="cuentaDe = mesa.id">Cobrar mesa</BaseButton>
           </li>
         </ul>
       </section>
@@ -349,7 +397,7 @@ onMounted(cargar)
             <p v-else-if="esperaEntrega(pedido)" class="text-xs text-gray-500 sm:max-w-44 sm:text-right">
               Se cobra al confirmar la entrega, cuando el pedido esté en preparación.
             </p>
-            <BaseButton v-else variant="primary" class="w-full sm:w-auto" @click="abrirCobro(pedido)">
+            <BaseButton v-else variant="primary" class="w-full sm:w-auto" :disabled="!cajaAbierta" @click="abrirCobro(pedido)">
               <CircleDollarSign :size="17" />
               Cobrar {{ formatoPrecio(saldoPendiente(pedido)) }}
             </BaseButton>

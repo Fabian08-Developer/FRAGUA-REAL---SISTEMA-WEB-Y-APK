@@ -71,6 +71,28 @@ class CajaController extends Controller
         ]));
     }
 
+    // Fase 7, tarea 4 (RF-M06-023, HU-M06-009): «quiero saber si la caja está abierta y cuánto
+    // efectivo se espera». Para el Mesero y el Administrador: el estado de la caja de hoy (sin
+    // abrir, abierta o cerrada), quién la abrió y, si está abierta, el efectivo esperado. Antes el
+    // Mesero solo se enteraba de que estaba cerrada cuando el cobro le fallaba. Solo lectura; el
+    // detalle del turno (pagos, gastos, arqueo) sigue siendo del Administrador.
+    public function estado()
+    {
+        $hoy = now('America/Bogota')->toDateString();
+        $turno = $this->cajaService->turnoDeFecha($hoy)?->load(['abiertoPorUsuario:id,nombre', 'cerradoPorUsuario:id,nombre']);
+        $abierta = $turno?->estado === 'abierta';
+
+        return response()->json([
+            'fecha' => $hoy,
+            'estado' => $turno === null ? 'sin_abrir' : ($abierta ? 'abierta' : 'cerrada'),
+            'abierta_at' => $turno?->abierto_at,
+            'abierta_por' => $turno?->abiertoPorUsuario?->nombre,
+            'cerrada_at' => $abierta ? null : $turno?->cerrado_at,
+            'cerrada_por' => $abierta ? null : $turno?->cerradoPorUsuario?->nombre,
+            'efectivo_esperado' => $abierta ? (float) $turno->efectivo_esperado : null,
+        ]);
+    }
+
     public function turnoActual(Request $request)
     {
         $this->authorize('viewAny', CajaTurno::class);

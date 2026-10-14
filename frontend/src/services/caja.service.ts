@@ -13,7 +13,21 @@ export interface CajaTurnosPaginados {
   total: number
 }
 
+// Fase 7, tarea 4 (RF-M06-023, HU-M06-009): estado de la caja de hoy, para el Mesero y el Administrador.
+export interface EstadoCaja {
+  fecha: string
+  estado: 'sin_abrir' | 'abierta' | 'cerrada'
+  abierta_at: string | null
+  abierta_por: string | null
+  cerrada_at: string | null
+  cerrada_por: string | null
+  efectivo_esperado: number | null
+}
+
 export const cajaService = {
+  estado() {
+    return api.get<EstadoCaja>('/caja/estado')
+  },
   index(page = 1) {
     return api.get<CajaTurnosPaginados>('/caja/turnos', { params: { page } })
   },
