@@ -1,20 +1,185 @@
-# Backend — Services, Controllers, Policies (aplica el Documento Técnico de Arquitectura)
+# Backend — Fragua Real Burger
 
-Este paquete complementa `README.md` (base de datos) con la capa que describe el
-Documento Técnico de Arquitectura: `app/Services`, `app/Policies`,
-`app/Http/Controllers/Api`, `app/Http/Requests/Api`, `app/Http/Middleware`,
-`app/Providers/AuthServiceProvider.php`, `routes/api.php` y `config/fragua_real.php`.
+API REST en Laravel 13 que usa la aplicación web (`frontend/`). Este documento explica cómo está
+armado el backend hoy y guarda el historial de los 50 cambios técnicos que lo llevaron a ese estado.
 
-> **Nota (06/10/2026):** este documento nació como paquete para copiar a un proyecto
-> `laravel new`. Hoy el repositorio es un monorepo y `backend/` ya es el proyecto Laravel
-> completo (migraciones, modelos, Services, Controllers, rutas); las instrucciones de
-> instalación vigentes están en `README-ENTREGA.md`. La sección de registro de middleware
-> y Policies al final se conserva como referencia.
+- Instalación y puesta en producción: [`README-ENTREGA.md`](README-ENTREGA.md).
+- Tablas, relaciones y migraciones: [`BASE-DE-DATOS.md`](BASE-DE-DATOS.md).
+- Todos los endpoints con su rol: [`API.md`](API.md).
 
-## Correcciones aplicadas frente al documento de arquitectura
+## Contenido
 
-La revisión previa del documento encontró varias inconsistencias entre lo que describía y
-lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así:
+- [Cómo está armado](#cómo-está-armado)
+- [Módulos y dónde vive cada uno](#módulos-y-dónde-vive-cada-uno)
+- [Roles, autorización y seguridad](#roles-autorización-y-seguridad)
+- [Tareas programadas, cola y comandos](#tareas-programadas-cola-y-comandos)
+- [Configuración (.env)](#configuración-env)
+- [Archivos que guarda el sistema](#archivos-que-guarda-el-sistema)
+- [Pruebas automáticas](#pruebas-automáticas)
+- [Qué falta a propósito](#qué-falta-a-propósito)
+- [Historial de cambios (puntos 1 a 50)](#historial-de-cambios)
+
+## Cómo está armado
+
+Cada petición pasa por las mismas capas:
+
+1. **Ruta** (`routes/api.php`): 149 endpoints bajo `/api`, agrupados por nivel de acceso con los
+   middleware `auth:sanctum`, `activo` y `role:...`, y límites de peticiones en las rutas públicas.
+2. **Form Request** (`app/Http/Requests/Api`, 38 clases): valida los datos y devuelve los mensajes
+   en español (`lang/es/validation.php`).
+3. **Controller** (`app/Http/Controllers/Api`, 18 clases): delgado; autoriza con la Policy cuando la
+   regla depende del registro y delega en un Service.
+4. **Policy** (`app/Policies`, 4 clases): reglas sobre un registro puntual, por ejemplo que solo el
+   Mesero cobre (ADR-004).
+5. **Service** (`app/Services`, 25 clases): las reglas de negocio, dentro de transacciones. Una regla
+   que no se cumple lanza `RuntimeException` o `InvalidArgumentException`, que `bootstrap/app.php`
+   convierte en un 422 con el mensaje en español.
+6. **Model** (`app/Models`, 26 modelos): un modelo por tabla, con los nombres de columna en español
+   tal como están en la base.
+
+Apoyos: `app/Support` (pasarela de pago, periodos de reportes, reimpresiones, pie de página de los
+PDF, política de reservas, nombre de usuario, catálogo de acciones de auditoría), `app/Jobs` (envío de
+avisos y latido de la cola), `app/Notifications` (los correos) y `resources/views` (plantillas de los
+PDF y tickets: comprobante, comanda, cierre diario y reportes).
+
+Las respuestas son JSON. Los errores también: 401 sin sesión, 403 sin permiso, 404, 422 con los
+mensajes de validación o de la regla de negocio, y 429 por exceso de intentos.
+
+## Módulos y dónde vive cada uno
+
+| Módulo | Controllers | Services | Qué resuelve |
+|---|---|---|---|
+| M01 Usuarios | `AuthController`, `UsuarioController`, `AuditoriaController` | `SesionService`, `AuditoriaService`, `AuditoriaConsultaService` | Registro de Clientes, inicio de sesión con correo o usuario, recuperación de contraseña, sesiones con vencimiento, cuentas del personal, permisos, auditoría |
+| M02 Pedidos locales | `PedidoController`, `ComandaController`, `MesaController` (cuenta y cobro de la mesa) | `PedidoService`, `ComandaService`, `MesaCuentaService` | Pedidos de mesa y por QR, edición con historial, descuentos, comandas de cocina, cuenta acumulada de la mesa |
+| M03 Compras y cierre | `CompraGastoController` | `CompraGastoService`, `CierreDiarioService` | Compras y gastos con soporte, Mesero autorizado, cierre diario con desglose, ajustes posteriores y PDF |
+| M04 Catálogo | `CatalogoController`, `PromocionController` | `CatalogoService`, `ComboService`, `PromocionService`, `FotoProductoService` | Categorías, productos, presentaciones, extras, combos, promociones, agotados y fotos |
+| M05 Mesas y reservas | `MesaController`, `ReservaController`, `ReservaPublicaController` | `ReservaService`, `AbonoDepositoService`, `ReservaAutomaticaService`, `AvisoReservaService` | Mesas y QR, reservas con depósito, abono a la cuenta, no-show automático, recordatorios y avisos |
+| M06 Caja y ventas | `CajaController`, `PagoController`, `ComprobanteController`, `PasarelaController` | `CajaService`, `PagoService`, `ComprobanteService`, `PasarelaPagoService` | Turnos de caja, cobros, pago mixto, anulaciones, comprobantes, pagos en línea con Wompi |
+| M07 Domicilios y recogida | `PedidoController` (la misma tabla de pedidos, ADR-001) | `PedidoService`, `AvisoPedidoService` | Domicilios y recogidas web y por teléfono, entrega y recogida confirmadas, «listo para recoger» |
+| M08 Reportes | `ReporteController`, `DashboardController` | `ReporteService`, `ReporteExportService` | Los 6 reportes, comparación con el periodo anterior, exportación a PDF y Excel |
+| Transversal | `ConfiguracionController` | `EstadoSistemaService`, `RevisionProduccionService` | Valores editables, estado del programador y la cola, revisión antes de producción |
+
+## Roles, autorización y seguridad
+
+- **Autenticación**: Laravel Sanctum con tokens personales (`Authorization: Bearer`). El frontend
+  guarda el token en `localStorage` (decisión del 13/10/2026). Cada sesión guarda su IP y su
+  dispositivo y vence tras 7 días sin uso o a los 30 días (`SesionService`, configurable en `.env`).
+- **Middleware** (registrados en `bootstrap/app.php`):
+  - `role:administrador,mesero` (`EnsureUserHasRole`) deja pasar solo esos roles;
+  - `activo` (`EnsureUserIsActive`) responde 403 a una cuenta desactivada en cualquier ruta con sesión;
+  - `CabecerasSeguridad`, global, pone en toda respuesta de `/api` las cabeceras de seguridad
+    (`nosniff`, `X-Frame-Options`, CSP, `Referrer-Policy` y `Cache-Control: no-store`; la foto
+    pública de un producto lleva caché larga).
+- **Policies**: `PedidoPolicy`, `PagoPolicy`, `CajaTurnoPolicy` y `ReservaPolicy`. Laravel las
+  encuentra solas por el nombre del modelo. `app/Providers/AuthServiceProvider.php` todavía existe,
+  pero no está en `bootstrap/providers.php` y no hace falta.
+- **CORS**: `config/cors.php` deja llamar la API solo desde `FRONTEND_URL` y los orígenes de
+  `CORS_ORIGENES`.
+- **Datos que no salen**: el enlace secreto del invitado y la respuesta completa de Wompi están
+  ocultos en las respuestas; el enlace de seguimiento no trae datos de contacto ni del personal.
+- **Auditoría**: `AuditoriaService::registrar()` guarda cada acción crítica con IP y navegador; la
+  base de datos no deja cambiar ni borrar ese historial (ADR-010 en `BASE-DE-DATOS.md`).
+- **Revisión antes de producción**: `php artisan fragua:revisar-produccion` (y Configuración >
+  «Revisión antes de producción») revisa depuración, HTTPS, cuentas de prueba, correo, cola,
+  pasarela, CORS y la extensión GD.
+
+## Tareas programadas, cola y comandos
+
+En el servidor, cron corre `php artisan schedule:run` cada minuto y Supervisor mantiene
+`php artisan queue:work`. Los archivos listos están en `backend/deploy/`.
+
+| Comando | Cuándo | Qué hace |
+|---|---|---|
+| `reservas:procesar` | Cada minuto | No-show automático al vencer la tolerancia, mesa Reservada desde la ventana previa y recordatorios por correo |
+| `pasarela:conciliar` | Cada 5 minutos | Pregunta a Wompi por los pagos pendientes, por si un evento se perdió |
+| `fragua:latido` | Cada minuto | Deja el latido del programador y encola el de la cola (Configuración > Tareas automáticas) |
+| `sesiones:limpiar` | 3:30 a. m., hora de Colombia | Borra las sesiones vencidas |
+| `fragua:revisar-produccion` | A mano, después de cada despliegue | Revisión de seguridad; sale con código 1 si hay algo grave |
+| `reportes:medir [--dias=30]` | A mano | Mide cuánto tarda cada reporte con los datos reales y marca «LENTO» lo que pase de 2 s |
+
+La cola envía los correos (avisos de reserva, «listo para recoger», comprobante) con reintentos. Si un
+correo falla, el pedido o la reserva siguen normal y el aviso queda como fallido para reintentarlo.
+
+## Configuración (.env)
+
+Además de las variables estándar de Laravel (`APP_*`, `DB_*`, `MAIL_*`, `QUEUE_CONNECTION`,
+`CACHE_STORE`), el sistema usa estas. Las que tienen valor por defecto viven en
+`config/fragua_real.php` o `config/services.php`.
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `FRONTEND_URL` | `http://localhost:5173` | Dirección pública del sitio: enlaces de los correos, retorno de Wompi y CORS |
+| `CORS_ORIGENES` | vacío | Orígenes extra que pueden llamar la API, separados por coma |
+| `FRAGUA_REAL_NOMBRE`, `_NIT`, `_DIRECCION`, `_TELEFONO` | datos del local; NIT vacío | Encabezado del comprobante (sin NIT no lo imprime) |
+| `FRAGUA_REAL_SESION_INACTIVIDAD_MINUTOS` | 10080 (7 días) | Una sesión sin uso se cierra sola |
+| `FRAGUA_REAL_SESION_DURACION_MAXIMA_MINUTOS` | 43200 (30 días) | Duración máxima de una sesión |
+| `FRAGUA_REAL_SOPORTE_MAX_KB` | 5120 | Tamaño máximo del soporte de una compra o un gasto |
+| `FRAGUA_REAL_FOTO_PRODUCTO_MAX_KB` | 5120 | Tamaño máximo de la foto de un producto |
+| `FRAGUA_REAL_DURACION_RESERVA_MINUTOS` | 120 | Cuánto ocupa una reserva su mesa: dos reservas de la misma mesa no se cruzan |
+| `FRAGUA_REAL_VALOR_DOMICILIO`, `FRAGUA_REAL_DEPOSITO_RESERVA` | 2000 y 20000 | Respaldo si la tabla `configuraciones` no tiene el valor |
+| `FRAGUA_REAL_RESERVA_TOLERANCIA_MINUTOS`, `_RECORDATORIO_MINUTOS`, `_VENTANA_MINUTOS` | 15, 120 y 60 | Respaldo de los tiempos de reserva (se editan en Configuración) |
+| `PASARELA_PROVEEDOR` | `manual` | `wompi` activa la confirmación automática; `manual` deja la aprobación a mano |
+| `PASARELA_MINUTOS_CHECKOUT` | 30 | Tiempo para terminar un pago en Wompi |
+| `PASARELA_EVENTOS_MAX_HORAS` | 72 | Un evento de Wompi más viejo no se aplica |
+| `WOMPI_AMBIENTE` | `sandbox` | `sandbox` o `produccion` |
+| `WOMPI_LLAVE_PUBLICA`, `_PRIVADA`, `_SECRETO_EVENTOS`, `_SECRETO_INTEGRIDAD` | vacías | Llaves de Wompi > Desarrolladores |
+
+El valor del domicilio, el depósito de reserva y los tiempos de las reservas se cambian en la
+aplicación (Administrador > Configuración, tabla `configuraciones`); las variables de arriba son solo
+el respaldo.
+
+## Archivos que guarda el sistema
+
+Todo va en el disco privado `storage/app/private` y se entrega solo a quien tiene permiso. Hay que
+incluirlo en las copias de seguridad.
+
+| Carpeta | Qué guarda | Quién lo ve |
+|---|---|---|
+| `soportes-compras-gastos/` | Fotos y PDF de facturas y recibos | El Administrador; el Mesero autorizado, solo los suyos |
+| `productos/` | Fotos de productos reducidas a 900 px en WebP | Todos (la ruta de la foto es pública) |
+| `reportes/` | Reportes exportados en PDF y Excel | El Administrador |
+
+Los comprobantes, las comandas y el cierre en PDF no se guardan como archivo: se dibujan cada vez a
+partir de la copia guardada en la base, así una reimpresión dice exactamente lo mismo.
+
+## Pruebas automáticas
+
+`backend/tests/Feature` tiene 44 archivos y 320 pruebas; `tests/Unit` tiene la de ejemplo de Laravel.
+En total son 321.
+
+```bash
+php artisan test                    # SQLite en memoria (3 pruebas se saltan: usan funciones de PostgreSQL)
+php artisan test --filter=Caja      # solo las que coinciden
+```
+
+Para correrlas contra PostgreSQL, como en producción, se apunta a una base de prueba con las variables
+`DB_CONNECTION=pgsql`, `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD` al lanzar `php artisan test`; ahí
+pasan las 321. Cada prueba cita el requisito que cubre. `DiaCompletoTest` recorre un día completo de
+operación por la API con los tres roles.
+
+## Qué falta a propósito
+
+| Tema | Estado | Referencia |
+|---|---|---|
+| Avisos por SMS | Los avisos salen por correo; el SMS espera proveedor y presupuesto. Cada aviso ya guarda su canal | Decisión D3; M05 §16, RF-M07-R-012 |
+| Cuenta comercial de Wompi | La confirmación automática funciona en el sandbox; falta la cuenta de producción y sus llaves | Decisión D4; punto 41 |
+| Impresión sin una persona de por medio | Comandas y comprobantes se imprimen desde el navegador; sin nadie que mire hace falta un agente local junto a la impresora | Decisión D5; punto 42 |
+| Mapa simple del salón | Opcional en el documento; queda para una versión futura | RF-M05-022 (13/10/2026) |
+| Exportación asíncrona de reportes | Se genera al momento: un reporte de un mes tarda menos de medio segundo | M08 §15; punto 50 |
+| Caché de reportes de periodos cerrados | No hizo falta: se recalcula siempre para no mostrar cifras viejas | M08 §15; punto 50 |
+| Factura electrónica, inventario, roles de Cocina y Domiciliario, GPS | Fuera del alcance de los documentos oficiales | Idea de Negocio y M00 |
+
+## Historial de cambios
+
+Lo que sigue es el registro, en orden, de cada corrección y cada tarea del plan, con los requisitos
+que cubre, los archivos que tocó y sus pruebas. Es historia: cuando un punto posterior cambia algo de
+uno anterior, vale el posterior (por ejemplo, el punto 39 reemplaza la exportación simple del punto 9,
+y el punto 50 resuelve la caché que antes figuraba como pendiente). Los puntos 1 a 14 son de la etapa
+anterior al plan (septiembre y comienzos de octubre de 2026); del 15 en adelante, una fase o tarea del
+plan cada uno.
+
+Los puntos 1 a 6 corrigen el Documento Técnico de Arquitectura original, que tenía
+inconsistencias con lo que existía o era correcto en Laravel:
 
 1. **`PagoPolicy` faltante.** El flujo de la sección 3 ("Administrador cobra un pedido
    Local") usaba `PagoPolicy::cobrar()` sin que existiera. Se creó — pero con un ajuste
@@ -1250,73 +1415,3 @@ lo que existía o era técnicamente correcto en Laravel. Quedaron resueltas así
     - Pruebas: `ReportesRendimientoTest` (3). Revisan los índices, el resultado operativo con días
       sin cierre (un pedido de las 11:30 p. m. cuenta en su día de Colombia) y el comando. Las dos
       últimas corren solo en PostgreSQL.
-
-## Qué falta a propósito
-
-Cada uno de los puntos abiertos ya está documentado en los documentos oficiales de módulo (no son
-brechas de documentación, solo de implementación técnica):
-
-- **Tabla `configuraciones`**: RESUELTO (28/09/2026). RF-M07-030 y RN-M05-08/13 exigen que el
-  Administrador edite estos valores "en cualquier momento"; ahora viven en la tabla
-  `configuraciones` (`ConfiguracionController`, `GET/PUT /configuraciones`, solo Administrador) y
-  `GET /configuracion` (público) los lee de ahí. `config/fragua_real.php` quedó solo como valor de
-  respaldo. El valor inicial del depósito de reserva es $20.000 COP
-  (confirmado el 06/10/2026 y documentado en RN-M05-14).
-- **Pasarela de pago real (Nequi/Bancolombia)**: RESUELTO (13/10/2026, punto 41) con Wompi (D4), que
-  cubre Nequi y el botón Bancolombia con un solo contrato. Falta solo lo que no es código: la cuenta
-  comercial de producción y sus llaves. Mientras tanto se prueba con las llaves del sandbox, y la
-  aprobación manual sigue de respaldo.
-- **Impresión 100 % automática en la impresora POS**: pendiente por decisión (D5, 13/10/2026). Las
-  comandas existen, con su estado de impresión, y se imprimen desde el navegador del Mesero
-  (punto 42). Sin una persona de por medio, hace falta un agente local junto a la impresora,
-  porque un servidor en la nube no ve la impresora del local. Queda para después de V1.
-- **Alta de Administrador/Mesero**: RESUELTO. `UsuarioController` (solo Administrador) lista, crea
-  cuentas de Mesero/Administrador, las activa/desactiva y revoca sus sesiones (RF-M01-001).
-  `AuthController::register()` solo expone el autorregistro de Cliente (RF-M01-014).
-- **Exportación real de reportes (M08)**: RESUELTO (13/10/2026, punto 39). Antes: documentado como pendiente en
-  `M08_Reportes_e_Informes_Fragua_Real.docx` sección 16 ("Definir el formato exacto y la
-  plantilla visual de los archivos exportados"), sobre la base de RF-M08-011/012.
-  `ReporteExportService` genera un Excel como CSV real (`fputcsv`, Excel lo abre
-  nativamente — falta una librería como `phpoffice/phpspreadsheet` para un `.xlsx` con
-  formato) y un PDF real de una sola página sin dependencias externas (un reporte más largo
-  se trunca — falta paginación real y una librería como `dompdf`).
-- **Caché de reportes de periodos ya cerrados**: NO HIZO FALTA (13/10/2026, punto 50). Era una
-  recomendación de arquitectura de `M08...docx` sección 15. Con los índices, un mes con «Comparar»
-  tarda menos de medio segundo sobre un año de historia. Se prefirió recalcular siempre, para que un
-  reporte nunca muestre cifras viejas. El resultado operativo ya se arma con los cierres diarios,
-  como pide esa misma sección. Los archivos exportados quedan guardados desde el punto 39.
-- **Generación asíncrona de exportaciones**: recomendación de arquitectura explícita en
-  `M08...docx` sección 15; hoy `/reportes/exportar` genera el archivo de forma síncrona.
-- **`DomicilioController` dedicado**: no hace falta — M07 vive dentro de `PedidoController`
-  gracias a la tabla `pedidos` unificada (ADR-001). No es una brecha.
-
-## Registrar el middleware `role` y las Policies
-
-Este paquete no incluye `bootstrap/app.php` (Laravel 11+) ni `app/Http/Kernel.php`
-(Laravel 10) porque no existen todavía en un proyecto que apenas se va a crear con
-`laravel new`. Al copiar estos archivos a tu proyecto, registra el alias del middleware:
-
-**Laravel 11+ (`bootstrap/app.php`):**
-```php
-->withMiddleware(function (Middleware $middleware) {
-    $middleware->alias([
-        'role' => \App\Http\Middleware\EnsureUserHasRole::class,
-    ]);
-})
-```
-
-**Laravel 10 (`app/Http/Kernel.php`):**
-```php
-protected $middlewareAliases = [
-    // ...
-    'role' => \App\Http\Middleware\EnsureUserHasRole::class,
-];
-```
-
-`AuthServiceProvider` ya viene con las 3 Policies registradas — solo confirma que
-`bootstrap/providers.php` (Laravel 11+) o `config/app.php` (Laravel 10) lo incluya.
-
-No olvides instalar y publicar Sanctum (`composer require laravel/sanctum`,
-`php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"`) y agregar
-`Laravel\Sanctum\HasApiTokens` al modelo `User` si el paquete de base de datos que ya tienes
-no lo trae.

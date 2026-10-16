@@ -1,68 +1,73 @@
 # Frontend — Fragua Real Burger
 
-SPA independiente (no Blade, no Inertia) que consume el backend Laravel como
-API. Stack: Vue 3 + TypeScript + Vite, Vue Router 4, Pinia, Tailwind CSS,
-Lucide Icons (`lucide-vue-next`), Axios, autenticación con Laravel Sanctum
-por **token** (no por cookie/SPA — ver `services/api.ts`).
+Aplicación web (SPA) en Vue 3 con TypeScript y Vite que usa la API de Laravel de `../backend`. Tiene
+tres zonas, una por rol: la web pública del Cliente, el panel del Mesero y el del Administrador.
 
-## Instalación
+**Tecnología**: Vue 3 (`<script setup>`), TypeScript, Vite 6, Vue Router 4, Pinia, Tailwind CSS 3
+(paleta de marca `brand`, `ink` y `cream`; títulos en Playfair Display y texto en DM Sans, desde Google Fonts), íconos Lucide,
+Axios, `qrcode` y `jspdf` para el QR imprimible de las mesas.
+
+## Correrlo
 
 ```bash
 npm install
-cp .env.example .env
-npm run dev
+cp .env.example .env    # VITE_API_BASE_URL=/api
+npm run dev             # http://localhost:5173
 ```
 
-Por defecto Vite sirve en `http://localhost:5173` y hace proxy de `/api`
-hacia `http://localhost:8000` (donde corre `php artisan serve` del backend en
-`../backend`). Ajusta `vite.config.ts` si tu backend corre en otro puerto, o
-cambia `VITE_API_BASE_URL` en `.env` para apuntar a una URL absoluta.
+En desarrollo, Vite pasa `/api` a `http://localhost:8000` (ver `vite.config.ts`), donde corre
+`php artisan serve`.
 
-## Estructura de carpetas
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Revisa los tipos (`vue-tsc`) y compila a `dist/`, que es lo que sirve Nginx |
+| `npm run type-check` | Solo revisa los tipos |
 
-```
-src/
-  assets/         Estilos globales (main.css con las directivas de Tailwind)
-  components/
-    common/       Componentes reutilizables (botones, modales, inputs, nav)
-  composables/    Lógica reutilizable con Composition API (useAuth, etc.)
-  layouts/        Layouts por tipo de usuario/zona
-  router/         Definición de rutas y guards de navegación por rol
-  services/       Cliente HTTP (Axios) y llamadas a la API por módulo
-  stores/         Estado global con Pinia (auth, carrito, etc.)
-  types/          Interfaces TypeScript que reflejan los modelos del backend
-  views/
-    auth/         Login, registro, recuperación de contraseña
-    admin/        Vistas exclusivas del Administrador (M01, M03-M06, M08)
-    mesero/       Vistas del Mesero (M02, M05, M06)
-    cliente/      Vistas del Cliente (M02, M04, M05, M07)
-```
+## Sesión
 
-## Convención de módulos → vistas
+El inicio de sesión devuelve un token de Sanctum que se guarda en `localStorage` (`stores/auth.ts`) y
+viaja en cada petición (`services/api.ts`). Si la API responde 401 (sesión vencida o
+cerrada por el Administrador), se borra el token y la aplicación pide entrar de nuevo. El router (`router/index.ts`) protege cada zona por rol; la pestaña Gastos del Mesero
+además pide el permiso `puede_registrar_gastos`.
 
-Cada vista referencia en un comentario a qué módulo de la documentación
-oficial (M00–M08) pertenece, igual que se hizo en el backend, para que sea
-fácil cruzar una vista con sus RF/HU/RN. Ver la carpeta "Documentacion Fragua
-Real" del usuario para el detalle de cada módulo.
+## Estructura de `src/`
 
-| Vista | Módulo | Rol |
+| Carpeta | Contenido |
+|---|---|
+| `views/cliente/` | Menú, Carrito, Checkout, Mis pedidos, Perfil, Reservar, Pedido por QR de mesa, Seguimiento del invitado, Reserva por enlace y retorno del pago |
+| `views/mesero/` | Pedidos, Nuevo pedido, Mesas, Cobrar, Menú (agotados) y Gastos |
+| `views/admin/` | Tablero, Pedidos, Catálogo, Mesas, Reservas, Caja, Compras y gastos, Reportes, Usuarios, Auditoría y Configuración |
+| `views/auth/` | Iniciar sesión, Registro, Recuperar y Restablecer contraseña |
+| `views/` | Inicio y página no encontrada |
+| `layouts/` | Un layout por zona: Cliente, Mesero, Administrador y acceso |
+| `components/common/` | Botones, campos, modales, encabezado, barra lateral, QR de mesa, sesiones |
+| `components/pedidos/` | Editar, historial, descuento, cuenta de la mesa, comanda, comprobante, datos de entrega, listo para recoger |
+| `components/caja/`, `compras/`, `configuracion/` | Pagos por revisar, cierre diario, tareas automáticas y revisión antes de producción |
+| `services/` | Una llamada a la API por módulo (`pedido.service.ts`, `caja.service.ts`…) y el manejo de errores en español (`errors.ts`) |
+| `stores/` | `auth.ts` (sesión) y `carrito.ts` (carrito con productos y combos) |
+| `composables/` | `useAuth` y `useCotizacion` (total con promociones antes de pedir) |
+| `utils/` | Comandas, comprobantes, combos, extras, promociones, pasarela, auditoría, redirección segura |
+| `types/models.ts` | Tipos que reflejan las respuestas del backend |
+| `assets/` | Estilos de Tailwind, mascota, foto del local y fotos de platos |
+
+Las vistas del Administrador y del Mesero que comparten pantalla (Reservas y la de agotados) usan el
+mismo componente con permisos distintos.
+
+## Rutas
+
+| Ruta | Pantalla | Quién |
 |---|---|---|
-| `views/auth/*` | M01 | Público / todos |
-| `views/admin/UsuariosView.vue` | M01 | Administrador |
-| `views/admin/PedidosView.vue`, `views/mesero/PedidosView.vue` | M02 | Administrador, Mesero |
-| `views/admin/ComprasGastosView.vue` | M03 | Administrador |
-| `views/admin/CatalogoView.vue`, `views/cliente/MenuView.vue` | M04 | Administrador, Cliente |
-| `views/admin/MesasView.vue`, `views/mesero/MesasView.vue`, `views/admin/ReservasView.vue`, `views/cliente/ReservaView.vue` | M05 | Administrador, Mesero, Cliente |
-| `views/admin/CajaView.vue`, `views/mesero/CajaView.vue` | M06 | Administrador, Mesero |
-| `views/cliente/CheckoutView.vue` | M07 | Cliente |
-| `views/admin/ReportesView.vue` | M08 | Administrador |
+| `/`, `/menu`, `/carrito`, `/checkout`, `/reservar` | Web pública | Todos |
+| `/mesa/:qr_code` | Pedido desde la mesa | Todos, sin cuenta |
+| `/seguimiento/:token`, `/reserva/:token`, `/pago/retorno/:referencia` | Enlaces privados | Quien tenga el enlace |
+| `/pedidos` | Mis pedidos y reservas | Cliente |
+| `/perfil` | Perfil y sesiones | Cualquier rol con sesión |
+| `/login`, `/registro`, `/recuperar-password`, `/restablecer-password` | Acceso | Sin sesión |
+| `/mesero/...` | Pedidos, nuevo pedido, mesas, caja, reservas, menú, gastos | Mesero |
+| `/admin/...` | Tablero y las 11 pantallas del Administrador | Administrador |
 
-## Pendiente (a propósito, fuera de esta entrega)
+## Documentación
 
-- Paleta de marca real y tipografía (hoy `tailwind.config.js` trae un
-  placeholder de color `brand`) — reemplazar cuando el diseño de Figma esté
-  disponible.
-- Componentes base (`components/common/`) y las vistas mismas quedaron como
-  esqueleto navegable (layout + título + comentario del módulo/RF que
-  implementan); el contenido real de cada una se construye módulo por
-  módulo.
+El catálogo de pantallas con lo que cubre cada una está en la carpeta «Documentacion Fragua Real»; el
+resto, en la raíz del repositorio (`README.md`).

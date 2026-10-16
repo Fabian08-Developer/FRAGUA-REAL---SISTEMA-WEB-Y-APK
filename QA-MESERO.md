@@ -6,7 +6,8 @@ Esta lista cubre a mano todo lo que hace el Mesero en un turno:
 - la cocina (comandas);
 - las mesas y las reservas;
 - el menú del día;
-- los cobros.
+- los cobros y el estado de la caja;
+- con permiso, las compras y gastos.
 
 Es la pareja de `QA-ADMINISTRADOR.md` y `QA-CLIENTE.md`, con el mismo formato: marca cada casilla al probarla y anota la fecha. Cada sección cita el requisito oficial en el que se apoya.
 
@@ -126,7 +127,7 @@ Al preparar la lista se revisó el código de cada pantalla. Se corrigieron dos 
 - [ ] Doble toque en "Crear pedido" crea un solo pedido.
 - [ ] Una mesa Libre pasa a Ocupada con el primer pedido.
 
-## 4. Comandas de cocina (M02 — RN-PED-06/09/17 a 19, RF-M02-T-004 a 007, HU-M02-016/017; detalle en QA-ADMINISTRADOR 9c)
+## 4. Comandas de cocina (M02 — RN-PED-06/09/17 a 19, RF-M02-T-004 a 007, HU-M02-016/017; detalle en QA-ADMINISTRADOR 9b)
 
 - [ ] Confirmar un pedido abre la comanda de 80 mm en otra pestaña:
   - pedido, mesa o canal, hora y líneas;

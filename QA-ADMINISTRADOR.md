@@ -1,16 +1,16 @@
 # QA del Administrador — lista de pruebas por pantalla
 
-Cierra el hueco que `README-ENTREGA.md` reconoce: las pantallas del Administrador se probaron
-de forma puntual, no en una pasada completa. Marca cada casilla al probarla y anota la fecha.
-Antes de empezar: backend y frontend corriendo, base de datos con `php artisan migrate --seed`
-y sesión iniciada como `admin@fraguareal.com`. Para los puntos que cruzan roles, ten abierta
-otra ventana con el Mesero.
+Revisión manual, pantalla por pantalla, de todo lo que ve y controla el Administrador. Marca cada
+casilla al probarla y anota la fecha. Cada punto cita el requisito oficial en el que se apoya.
 
-Cada punto cita el requisito oficial en el que se apoya.
+Antes de empezar: backend y frontend corriendo (o el sistema ya en el servidor), base de datos con
+`php artisan migrate --seed` y sesión iniciada como `admin@fraguareal.com`. Para los puntos que cruzan
+roles, ten abierta otra ventana con el Mesero.
 
-Listas hermanas (revisión por rol, 13/10/2026): `QA-CLIENTE.md` (Cliente con cuenta, invitado y
-QR de mesa) y `QA-MESERO.md` (todo el turno del Mesero). Lo que cruza roles se prueba en
-detalle en la lista de quien lo hace; aquí queda lo que ve y controla el Administrador.
+Listas hermanas: `QA-CLIENTE.md` (Cliente con cuenta, invitado y QR de mesa) y `QA-MESERO.md` (todo el
+turno del Mesero). Lo que cruza roles se prueba en detalle en la lista de quien lo hace; aquí queda lo
+que ve y controla el Administrador. La prueba de un día completo, con las cifras que deben salir, está
+en `PRUEBA-DIA-COMPLETO.md`.
 
 ## 0. Configuración (RF-M07-030, RF-M05-028)
 
@@ -481,7 +481,7 @@ Requiere la cola corriendo y un `MAIL_MAILER` que envíe (con `log` el correo qu
 - [ ] Con el Mesero: "Nuevo pedido" → Recogida pide el correo opcional; con un correo mal escrito
       no deja continuar.
 
-### 9c. Comandas de cocina (Fase 6, tarea 2 — RN-PED-06/09/17 a 19, RF-M02-T-004 a 007, HU-M02-016/017)
+### 9b. Comandas de cocina (Fase 6, tarea 2 — RN-PED-06/09/17 a 19, RF-M02-T-004 a 007, HU-M02-016/017)
 Antes de probar: `php artisan migrate`. Permitir las ventanas emergentes del sitio en el navegador.
 - [ ] Con el Mesero, un pedido local con 2 Clásicas "sin cebolla" y un combo: "Confirmar pedido"
       abre en otra pestaña la comanda de 80 mm (pedido, mesa, hora, líneas, lo que trae el combo,
@@ -508,7 +508,7 @@ Antes de probar: `php artisan migrate`. Permitir las ventanas emergentes del sit
       `--kiosk-printing` sale sin el cuadro de impresión.
 - [ ] Un Cliente no puede abrir `/api/comandas/pendientes` ni el ticket de una comanda (403).
 
-## 9b. Invitado (sin cuenta)
+### 9c. Invitado (sin cuenta)
 Resumen; la lista completa del invitado está en `QA-CLIENTE.md` (secciones 4 a 8).
 - [ ] Pedir una recogida sin iniciar sesión: el Checkout muestra el enlace de seguimiento.
 - [ ] El enlace muestra el pedido "Recibido"; al confirmarlo el Mesero, en máximo 30 segundos pasa a

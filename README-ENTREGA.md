@@ -1,53 +1,64 @@
-# Fragua Real Burger — Documento de entrega
+# Fragua Real Burger — Entrega y puesta en marcha
 
-Cierre de la semana 2 del cronograma (tarea 30: "sistema completo listo para
-entrega"). Este documento resume qué se construyó, cómo correrlo, qué se
-verificó en el QA final de cierre y qué queda a propósito fuera de alcance.
-No repite el detalle técnico de `README.md` (base de datos) y
-`README-BACKEND.md` (Services/Policies/Controllers, con el historial completo
-de correcciones) — enlaza a ellos para eso.
+Este documento es para quien instala, despliega o recibe el sistema: cómo correrlo, cómo ponerlo en el
+servidor, qué decidió el negocio, qué queda pendiente y qué cambió en cada fase. Para saber qué es el
+sistema y dónde está cada documento, empieza por [`README.md`](README.md); la arquitectura del
+backend está en [`README-BACKEND.md`](README-BACKEND.md), la base de datos en
+[`BASE-DE-DATOS.md`](BASE-DE-DATOS.md) y los endpoints en [`API.md`](API.md).
+
+**Estado al 13/10/2026**: plan de implementación completo (Fases 0 a 7), 321 pruebas automáticas que
+pasan en SQLite y PostgreSQL. Falta solo lo que no es código: la cuenta comercial de Wompi, el
+proveedor de SMS y el agente local de impresión (ver «Qué falta a propósito»).
+
+## Contenido
+
+- [Qué es](#qué-es)
+- [Correrlo en el equipo de desarrollo](#correrlo-en-el-equipo-de-desarrollo)
+- [Ponerlo en el servidor (VPS)](#ponerlo-en-el-servidor-vps)
+- [Después de cada despliegue](#después-de-cada-despliegue)
+- [Decisiones del negocio](#decisiones-del-negocio)
+- [Qué falta a propósito](#qué-falta-a-propósito)
+- [Cambios de comportamiento por fase](#cambios-de-comportamiento-por-fase)
+- [Datos de prueba en la base de desarrollo](#datos-de-prueba-en-la-base-de-desarrollo)
 
 ## Qué es
 
-Sistema de restaurante de una sede (sin multi-tenant) para Fragua Real
-Burger: pedidos locales (mesa con QR), a domicilio y para recoger; reservas
-con depósito obligatorio; caja y cobros; catálogo de productos/combos/
-promociones; compras y gastos con cierre diario; reportes; y gestión de
-usuarios. Cubre los 9 módulos (M00–M08) de los documentos oficiales de
-requisitos, con tres roles: **Cliente** (web pública, con o sin cuenta),
-**Mesero** y **Administrador**.
+Sistema de restaurante de una sede (sin multi-tenant) para Fragua Real Burger: pedidos locales (en la
+mesa o por QR), a domicilio y para recoger; reservas con depósito obligatorio; caja y cobros; catálogo
+de productos, combos y promociones; compras y gastos con cierre diario; reportes; y gestión de
+usuarios con auditoría. Cubre los 9 módulos (M00 a M08) de los documentos oficiales de requisitos, con
+tres roles: **Cliente** (web pública, con o sin cuenta), **Mesero** y **Administrador**.
 
-## Stack
+- **Backend**: PHP 8.3, Laravel 13, Sanctum (token), PostgreSQL, dompdf, PhpSpreadsheet.
+- **Frontend**: Vue 3 con TypeScript, Vite, Pinia, Tailwind.
 
-- **Backend**: Laravel 13 + Sanctum (autenticación por token, no por cookie),
-  PostgreSQL.
-- **Frontend**: Vue 3 + TypeScript (`<script setup>`) + Tailwind, servido por
-  Vite (puerto 5173) con proxy a la API Laravel (puerto 8000).
-- Detalle completo de modelos/migraciones en `README.md`; de
-  Services/Policies/Controllers y el historial de correcciones de
-  documentación y código en `README-BACKEND.md`.
+## Correrlo en el equipo de desarrollo
 
-## Cómo correrlo
+Requisitos: PHP 8.3 con `pdo_pgsql`, `mbstring`, `xml`, `gd` y `fileinfo`; Composer; PostgreSQL;
+Node.js 20 o superior.
 
 ```bash
 # Backend
 cd backend
 composer install
-# Desde la Fase 5 (13/10/2026) el backend usa barryvdh/laravel-dompdf para los PDF. La primera vez
-# después de actualizar: composer update barryvdh/laravel-dompdf --with-all-dependencies
-# y, desde la tarea 3 (Excel .xlsx): composer update phpoffice/phpspreadsheet --with-all-dependencies
-# .env ya configurado (PostgreSQL + SMTP real para recuperación de contraseña)
-php artisan migrate --seed
-php artisan serve
+cp .env.example .env            # poner DB_DATABASE, DB_USERNAME y DB_PASSWORD de PostgreSQL
+php artisan key:generate
+php artisan migrate --seed      # tablas y datos de prueba
+php artisan serve               # API en http://localhost:8000
 
 # Frontend (otra terminal)
 cd frontend
 npm install
-npm run dev
+cp .env.example .env            # VITE_API_BASE_URL=/api
+npm run dev                     # sitio en http://localhost:5173
 ```
 
-Frontend en `http://localhost:5173`, API en `http://localhost:8000` (proxy
-`/api` → backend, ver `frontend/vite.config.ts`).
+Vite pasa `/api` al backend (ver `frontend/vite.config.ts`), así que no hace falta configurar CORS en
+desarrollo. Para probar las tareas automáticas en el equipo, en dos terminales más:
+`php artisan schedule:work` y `php artisan queue:work`.
+
+Con `MAIL_MAILER=log` los correos no salen: quedan en `storage/logs/laravel.log`. Con
+`PASARELA_PROVEEDOR=manual` los pagos en línea quedan en revisión y los aprueba el personal.
 
 ### Cuentas de prueba (seeder)
 
@@ -57,281 +68,312 @@ Frontend en `http://localhost:5173`, API en `http://localhost:8000` (proxy
 | Mesero | mesero@fraguareal.com | mesero | password |
 | Cliente | cliente@fraguareal.com | cliente | password |
 
-El usuario (Fase 3) solo existe en una base sembrada después del 12/10/2026; en una base
-anterior se entra con el correo o se le pone desde Usuarios.
+El nombre de usuario solo existe en una base sembrada después del 12/10/2026; en una base anterior se
+entra con el correo o se le pone uno desde Usuarios. El Cliente también puede pedir y reservar como
+invitado, sin cuenta.
 
-El Cliente también puede navegar y pedir como invitado, sin cuenta.
+## Ponerlo en el servidor (VPS)
 
-## Programador y cola en el VPS (Fase 4)
+El sistema corre en un VPS de Hostinger (decisión D2) con Nginx, PHP-FPM, PostgreSQL, cron y
+Supervisor. Los archivos de ejemplo están en `backend/deploy/` y suponen Ubuntu 24.04, el código en
+`/var/www/fragua-real`, el dominio `fraguareal.co` y el usuario `www-data`; ajústalos si en el servidor
+son otros.
 
-Desde la Fase 4 el sistema hace tareas solo (no-show, recordatorios, avisos por correo, limpieza
-de sesiones). Para eso, en el VPS de Hostinger tienen que correr dos procesos además de Nginx y
-PHP-FPM. Los archivos listos están en `backend/deploy/` (ajustar la ruta
-`/var/www/fragua-real/backend` y el usuario `www-data` si en el servidor son otros):
+**Primero el código**: lo primero que se hace en el VPS es clonar el repositorio; después se instala y
+se configura todo alrededor, con los archivos de `backend/deploy/` ya en el servidor.
+
+**Un solo dueño**: desde el paso 4, todo `/var/www/fragua-real` es de `www-data` (el usuario de PHP-FPM,
+la cola y el cron) y todos los comandos del proyecto (`git`, `composer`, `npm`, `php artisan`) se corren
+como él con `sudo -u www-data -H`. Así nunca queda un archivo de caché o de log que PHP no pueda
+escribir. Nunca correr `php artisan` como root.
+
+### 1. Clonar el repositorio
+
+```bash
+sudo apt update && sudo apt install -y git
+sudo git clone https://github.com/Fabian08-Developer/FRAGUA-REAL---SISTEMA-WEB-Y-APK.git /var/www/fragua-real
+```
+
+Se clona con `sudo` porque `/var/www` es de root; en el paso 4 la carpeta pasa a ser de `www-data`.
+
+### 2. Paquetes, acceso y firewall
+
+```bash
+sudo apt upgrade -y
+sudo apt install -y nginx postgresql supervisor certbot composer unzip fail2ban ufw \
+  php8.3-fpm php8.3-cli php8.3-pgsql php8.3-mbstring php8.3-xml php8.3-gd php8.3-curl php8.3-zip php8.3-intl php8.3-bcmath
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs
+```
+
+- PHP 8.3 con FPM y las extensiones `pgsql`, `mbstring`, `xml`, `gd` (fotos de productos; la revisión
+  antes de producción avisa si falta), `curl`, `zip`, `intl` y `bcmath`.
+- Certbot sin el complemento de Nginx (paso 6). `fail2ban` bloquea las IP que prueban contraseñas por
+  SSH.
+- Node.js 20 o superior para compilar el sitio (desde NodeSource: el `nodejs` de apt en Ubuntu 24.04
+  es el 18).
+
+Subir el límite de archivos (soportes de compras y fotos de productos de hasta 5 MB; Nginx ya trae
+`client_max_body_size 8m`):
+
+```bash
+sudo sed -i 's/^upload_max_filesize.*/upload_max_filesize = 6M/; s/^post_max_size.*/post_max_size = 8M/' /etc/php/8.3/fpm/php.ini
+sudo systemctl restart php8.3-fpm
+```
+
+Acceso y firewall:
+
+```bash
+sudo adduser fragua && sudo usermod -aG sudo fragua    # usuario propio para entrar; no trabajar como root
+# Desde tu equipo: ssh-copy-id fragua@<ip-del-vps>, y comprobar que entra con la llave.
+sudo ufw allow OpenSSH
+sudo ufw allow 'Nginx Full'          # 80 y 443
+sudo ufw enable
+```
+
+En `/etc/ssh/sshd_config`: `PermitRootLogin no` y `PasswordAuthentication no` (solo después de
+comprobar que la llave funciona), y `sudo systemctl restart ssh`. PostgreSQL (5432) no se abre: solo lo
+usa Laravel desde el mismo servidor. Si Hostinger tiene firewall propio en su panel, dejar ahí también
+solo 22, 80 y 443.
+
+### 3. Base de datos
+
+Un usuario y una base propios, nunca el usuario `postgres` en el `.env`:
+
+```bash
+sudo -u postgres psql -c "CREATE USER fragua WITH PASSWORD '<contraseña larga y nueva>';"
+sudo -u postgres psql -c "CREATE DATABASE fragua_real OWNER fragua;"
+```
+
+PostgreSQL en Ubuntu solo escucha en `localhost`: dejarlo así.
+
+### 4. Permisos y dependencias
+
+```bash
+sudo mkdir -p /var/www/.cache /var/www/.config /var/www/.npm
+sudo chown -R www-data:www-data /var/www/fragua-real /var/www/.cache /var/www/.config /var/www/.npm
+
+cd /var/www/fragua-real/backend
+sudo -u www-data -H composer install --no-dev --optimize-autoloader
+cd ../frontend
+sudo -u www-data -H npm ci && sudo -u www-data -H npm run build   # Nginx sirve frontend/dist
+
+# Solo PHP escribe en storage y bootstrap/cache; el resto no lo puede tocar nadie más.
+cd /var/www/fragua-real
+sudo chmod -R o-rwx backend/storage backend/bootstrap/cache
+sudo chmod -R ug+rwX backend/storage backend/bootstrap/cache
+```
+
+(`/var/www/.cache`, `.config` y `.npm` son las carpetas de caché de Composer y npm para `www-data`.)
+Desde aquí, `git pull` también se corre como `www-data` (ver «Después de cada despliegue»); como root,
+Git lo rechaza por ser de otro dueño.
+
+### 5. Archivo `.env` del backend, tablas y datos iniciales
+
+```bash
+cd /var/www/fragua-real/backend
+sudo -u www-data cp .env.example .env
+sudo chmod 640 .env
+sudo -u www-data php artisan key:generate     # APP_KEY nueva, propia de este servidor
+```
+
+En el `.env` poner:
+
+- `APP_NAME="Fragua Real Burger"`, `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL` y
+  `FRONTEND_URL` con `https://` y el dominio;
+- `APP_LOCALE=es` (ya viene así en `.env.example`; con `en`, los errores de los formularios salen en
+  inglés);
+- `LOG_STACK=daily` y `LOG_LEVEL=warning`: un archivo de log por día y se borran solos los de más de
+  14 días (`LOG_DAILY_DAYS`). Con `single`, `laravel.log` crece sin fin;
+- los datos de PostgreSQL del paso 3 (`DB_DATABASE=fragua_real`, `DB_USERNAME=fragua`, `DB_PASSWORD`);
+- `QUEUE_CONNECTION=database` y `CACHE_STORE=database`;
+- correo real: `MAIL_MAILER=smtp` con su servidor, usuario y contraseña, y `MAIL_FROM_ADDRESS`;
+- `CORS_ORIGENES` vacío (sitio y API en el mismo dominio);
+- `FRAGUA_REAL_NIT` cuando lo tengan, para que salga en el comprobante;
+- Wompi, cuando esté la cuenta (paso 9).
+
+Ninguna contraseña ni llave de este `.env` se copia de otro archivo ni se sube al repositorio.
+
+Después, **una sola vez**, crear las tablas y cargar los datos iniciales (catálogo, mesas,
+configuración y las cuentas del Administrador, el Mesero y el Cliente de demostración):
+
+```bash
+sudo -u www-data php artisan migrate --force
+sudo -u www-data php artisan db:seed --force
+sudo -u www-data php artisan config:cache && sudo -u www-data php artisan route:cache
+```
+
+Las tres cuentas sembradas tienen la contraseña `password`: entrar como `admin` de inmediato y, desde
+Usuarios, cambiar la del Administrador y la del Mesero (o crear las cuentas reales) y desactivar la del
+Cliente de demostración. `db:seed` no se vuelve a correr en producción.
+
+### 6. Nginx y HTTPS
+
+`nginx-fragua-real.conf` no carga sin el certificado (el bloque de https lo exige), así que va en dos
+tiempos. No usar `certbot --nginx`: reescribe la configuración.
+
+1. **Sacar el certificado** con la configuración inicial, que solo atiende el puerto 80:
+
+   ```bash
+   cd /var/www/fragua-real/backend/deploy
+   sudo mkdir -p /var/www/certbot
+   sudo cp nginx-fragua-real-inicial.conf /etc/nginx/sites-available/fragua-real
+   sudo ln -s /etc/nginx/sites-available/fragua-real /etc/nginx/sites-enabled/fragua-real
+   sudo rm -f /etc/nginx/sites-enabled/default
+   sudo nginx -t && sudo systemctl reload nginx
+   sudo certbot certonly --webroot -w /var/www/certbot -d fraguareal.co -d www.fraguareal.co \
+        --deploy-hook "systemctl reload nginx"
+   ```
+
+   El dominio (y `www`) ya debe apuntar a la IP del VPS.
+2. **Poner la configuración completa**:
+
+   ```bash
+   sudo cp nginx-fragua-real.conf /etc/nginx/sites-available/fragua-real
+   sudo nginx -t && sudo systemctl reload nginx
+   sudo certbot renew --dry-run      # comprueba que la renovación automática va a funcionar
+   ```
+
+Cambiar el dominio, las rutas y la versión de PHP-FPM en los dos archivos si no son estos. La
+configuración completa trae https obligatorio, HSTS, la política de contenido (CSP) y las demás
+cabeceras, y deja abierta por http solo la carpeta con la que Let's Encrypt renueva el certificado.
+
+La sesión del navegador se guarda en `localStorage` (decisión del 13/10/2026). Por eso la CSP solo deja
+ejecutar el código del propio sitio: no agregar scripts de terceros (analítica, chats) sin revisar antes
+la CSP.
+
+### 7. Programador de tareas, cola y logs
+
+El sistema hace tareas solo: no-show y recordatorios de reservas, avisos por correo, conciliación de
+pagos, limpieza de sesiones y la copia de seguridad diaria (paso 8).
 
 1. **Programador (cron)**: copiar `backend/deploy/cron-fragua-real` a `/etc/cron.d/fragua-real`
-   (dueño root, permisos 644). Ejecuta `php artisan schedule:run` cada minuto.
-2. **Trabajador de la cola (Supervisor)**: `sudo apt install supervisor`, copiar
-   `backend/deploy/supervisor-fragua-real-cola.conf` a `/etc/supervisor/conf.d/` y correr
-   `sudo supervisorctl reread && sudo supervisorctl update`. Ejecuta
+   (dueño root, permisos 644). Ejecuta `php artisan schedule:run` cada minuto y el respaldo a las 3:00.
+2. **Trabajador de la cola (Supervisor)**: copiar `backend/deploy/supervisor-fragua-real-cola.conf` a
+   `/etc/supervisor/conf.d/` y correr `sudo supervisorctl reread && sudo supervisorctl update`. Ejecuta
    `php artisan queue:work database` y lo reinicia si se cae.
-3. En el `.env` del servidor: `QUEUE_CONNECTION=database` y `CACHE_STORE=database` (las tablas
-   las crea `php artisan migrate`), un `MAIL_MAILER` que envíe de verdad (SMTP) y
-   `FRONTEND_URL` con la dirección pública del sitio (los correos de reserva llevan un enlace
-   a esa dirección).
-4. Después de cada despliegue del código: `php artisan migrate --force`,
-   `php artisan config:cache` y `php artisan queue:restart` (Supervisor levanta el trabajador
-   con el código nuevo).
+3. **Rotación del log de la cola**: copiar `backend/deploy/logrotate-fragua-real` a
+   `/etc/logrotate.d/fragua-real` (dueño root, permisos 644). Supervisor escribe en
+   `storage/logs/cola.log` y nunca lo corta; los logs de Laravel ya rotan solos con `LOG_STACK=daily`.
 
-Comprobación: Administrador > Configuración > **Tareas automáticas** muestra si el programador y
-la cola están activos (cada uno deja un latido cada minuto), los trabajos pendientes y fallidos,
-y si el correo sale de verdad. En el equipo de desarrollo se puede probar con
-`php artisan schedule:work` y `php artisan queue:work` en dos terminales.
+Comprobación: Administrador > Configuración > **Tareas automáticas** muestra si el programador y la
+cola están activos (cada uno deja un latido cada minuto), los trabajos pendientes y fallidos, y si el
+correo sale de verdad.
 
-## Pasarela de pago Wompi (Fase 6)
+### 8. Copias de seguridad
 
-Decisión D4 del 13/10/2026: los pagos en línea (pedidos y depósitos de reserva) van por Wompi y se
-confirman solos. Mientras no estén las llaves, el sistema sigue en **aprobación manual**: el pago
-queda en revisión y lo aprueba el Mesero o el Administrador, como antes.
+`backend/deploy/respaldo-fragua-real.sh` guarda cada día en `/var/backups/fragua-real` la base de datos
+(`base-<fecha>.dump`) y `backend/storage/app/private` (`archivos-<fecha>.tar.gz`: soportes de compras,
+fotos de productos y reportes exportados), y borra los de más de 14 días. El cron del paso 7 ya lo
+corre a las 3:00; probarlo a mano una vez:
 
-1. En Wompi > Desarrolladores, copiar las cuatro llaves del ambiente (sandbox para probar,
-   producción cuando la cuenta comercial esté aprobada) al `.env` del servidor:
-   `WOMPI_LLAVE_PUBLICA` (pub_…), `WOMPI_LLAVE_PRIVADA` (prv_…), `WOMPI_SECRETO_EVENTOS`
-   (…events…), `WOMPI_SECRETO_INTEGRIDAD` (…integrity…), y `WOMPI_AMBIENTE=sandbox` o `produccion`.
-2. Poner `PASARELA_PROVEEDOR=wompi` y `FRONTEND_URL` con la dirección pública del sitio (Wompi
-   devuelve al cliente a `FRONTEND_URL/pago/retorno/...`).
+```bash
+sudo bash /var/www/fragua-real/backend/deploy/respaldo-fragua-real.sh && sudo ls -lh /var/backups/fragua-real
+```
+
+Un respaldo que solo está en el VPS se pierde con el VPS: copiar esa carpeta a otro lugar (otro
+servidor, un almacenamiento en la nube con `rclone`, o el equipo del negocio con `rsync`/`scp`) al menos
+una vez por semana. Activar también, si el plan de Hostinger lo trae, las copias automáticas del VPS.
+
+Para restaurar (sobre una base vacía o reemplazando la actual):
+
+```bash
+sudo -u postgres pg_restore --clean --if-exists --no-owner --role=fragua -d fragua_real /var/backups/fragua-real/base-<fecha>.dump
+sudo tar -xzf /var/backups/fragua-real/archivos-<fecha>.tar.gz -C /var/www/fragua-real/backend/storage/app
+sudo chown -R www-data:www-data /var/www/fragua-real/backend/storage/app/private
+```
+
+### 9. Pasarela de pago Wompi
+
+Decisión D4: los pagos en línea (pedidos y depósitos de reserva) van por Wompi y se confirman solos.
+Mientras no estén las llaves, el sistema sigue en **aprobación manual**: el pago queda en revisión y lo
+aprueba el Mesero o el Administrador.
+
+1. En Wompi > Desarrolladores, copiar las cuatro llaves del ambiente (sandbox para probar, producción
+   cuando la cuenta comercial esté aprobada) al `.env`: `WOMPI_LLAVE_PUBLICA` (pub_…),
+   `WOMPI_LLAVE_PRIVADA` (prv_…), `WOMPI_SECRETO_EVENTOS` (…events…), `WOMPI_SECRETO_INTEGRIDAD`
+   (…integrity…), y `WOMPI_AMBIENTE=sandbox` o `produccion`.
+2. Poner `PASARELA_PROVEEDOR=wompi`. Wompi devuelve al cliente a `FRONTEND_URL/pago/retorno/...`.
 3. En Wompi > Desarrolladores > **URL de eventos**, poner `https://<dominio>/api/pasarela/wompi/eventos`
-   (la misma que muestra Administrador > Caja > "Pagos en línea").
-4. `php artisan config:cache`. El cron ya corre `pasarela:conciliar` cada 5 minutos por si un aviso
-   de Wompi se pierde.
+   (la misma que muestra Administrador > Caja > «Pagos en línea»).
+4. `sudo -u www-data php artisan config:cache`. El programador corre `pasarela:conciliar` cada 5 minutos
+   por si un aviso de Wompi se pierde.
 
-Comprobación: Administrador > Caja > "Pagos en línea" dice "Wompi activo (pruebas)". En sandbox se
-paga con los datos de prueba de Wompi (Nequi de prueba aprobado o rechazado); el pedido o la reserva
-debe confirmarse solo y aparecer en Caja como "Confirmado por Wompi".
+Comprobación: Administrador > Caja > «Pagos en línea» dice «Wompi activo (pruebas)». En el sandbox se
+paga con los datos de prueba de Wompi (Nequi aprobado o rechazado); el pedido o la reserva deben
+confirmarse solos y aparecer en Caja como «Confirmado por Wompi».
 
-## Antes de abrir al público (seguridad)
+### 10. Antes de abrir al público
 
-Endurecimiento del 13/10/2026 (`README-BACKEND.md`, punto 43). En el VPS, después de cada despliegue:
+1. Confirmar que las cuentas sembradas ya no usan `password` (paso 5): cambiadas o desactivadas.
+2. Correr `sudo -u www-data php artisan fragua:revisar-produccion`: no debe quedar ningún `[ERROR]`. Lo
+   mismo se ve en Administrador > Configuración > «Revisión antes de producción».
+3. Revisar dependencias:
+   - `composer audit` en `backend` (el 13/10/2026 no encontró nada);
+   - `npm audit --omit=dev` en `frontend` debe dar 0: eso es lo que llega al navegador;
+   - el `npm audit` completo del 13/10/2026 mostró 8 alertas, todas en herramientas de compilación que
+     no van en `dist` (Tailwind 3 y sus dependencias, source-map-js). Se corrige lo seguro con
+     `npm audit fix`, **sin** `--force`: `--force` instala Tailwind 4, que rompería los estilos.
+4. Comprobar que el respaldo del paso 8 se generó y que ya hay una copia fuera del VPS.
+5. Recorrer a mano, con el sistema ya en el servidor, `PRUEBA-DIA-COMPLETO.md` y las tres listas por
+   rol: `QA-CLIENTE.md` (desde un teléfono, como lo usará el cliente), `QA-MESERO.md` (en la tableta o
+   el teléfono del Mesero) y `QA-ADMINISTRADOR.md`.
+6. Cuando ya haya historia real, `sudo -u www-data php artisan reportes:medir`: todos los reportes
+   deben decir «OK».
 
-1. Nginx: copiar `backend/deploy/nginx-fragua-real.conf` a `/etc/nginx/sites-available/fragua-real`,
-   ajustar dominio, rutas y la versión de PHP-FPM, enlazarlo en `sites-enabled`, sacar el certificado
-   con `sudo certbot --nginx -d <dominio>` y probar con `sudo nginx -t && sudo systemctl reload nginx`.
-   Trae https obligatorio, HSTS, la política de contenido (CSP) y demás cabeceras.
-2. En el `.env`:
-   - `APP_ENV=production` y `APP_DEBUG=false`;
-   - `APP_URL` y `FRONTEND_URL` con `https://`;
-   - `LOG_LEVEL=warning`;
-   - SMTP real;
-   - `QUEUE_CONNECTION=database`;
-   - llaves de Wompi de producción con `WOMPI_AMBIENTE=produccion`;
-   - `CORS_ORIGENES` vacío;
-   - `APP_LOCALE=es` (ya viene así en `.env.example` desde el 13/10/2026; con `en`, los errores de
-     los formularios salen en inglés).
-3. Cambiar la contraseña de las cuentas sembradas (admin, mesero y cliente con `password`) o
-   desactivarlas.
-4. `composer install --no-dev --optimize-autoloader`, `php artisan config:cache` y
-   `php artisan route:cache`.
-5. Correr `php artisan fragua:revisar-produccion`. No debe quedar ningún `[ERROR]`. Lo mismo se ve
-   en Administrador > Configuración > "Revisión antes de producción".
-6. Revisar dependencias:
-   - `composer audit` en `backend`: el 13/10/2026 no encontró nada.
-   - En `frontend`, `npm audit --omit=dev` debe dar 0. Eso es lo que llega al navegador.
-   - El `npm audit` completo del 13/10/2026 mostró 8 alertas, todas en herramientas de compilación
-     que solo corren en el equipo de desarrollo y no van en `dist`: Tailwind 3 y lo que usa
-     (chokidar, braces, micromatch, fast-glob, postcss-nested, postcss-selector-parser) y
-     source-map-js.
-   - Se corrige lo seguro con `npm audit fix`, sin `--force`, y se vuelve a correr `npm run build`.
-   - No usar `npm audit fix --force`: instala Tailwind 4, que cambia la configuración y rompería
-     los estilos. Pasar a Tailwind 4 sería una tarea aparte.
-7. Recorrer a mano, con el sistema ya en el servidor, `PRUEBA-DIA-COMPLETO.md` y las tres listas
-   por rol: `QA-CLIENTE.md` (desde un teléfono, como lo usará el cliente), `QA-MESERO.md` (en la
-   tableta o el teléfono del Mesero) y `QA-ADMINISTRADOR.md`.
+## Después de cada despliegue
 
-La sesión del navegador se guarda en `localStorage` (decisión del 13/10/2026). Por eso la CSP de
-Nginx solo deja ejecutar el código del propio sitio: no agregar scripts de terceros (analítica,
-chats) sin revisar antes la CSP.
+```bash
+cd /var/www/fragua-real
+sudo -u www-data -H git pull
+cd backend
+sudo -u www-data -H composer install --no-dev --optimize-autoloader
+sudo -u www-data php artisan migrate --force
+sudo -u www-data php artisan config:cache && sudo -u www-data php artisan route:cache
+sudo -u www-data php artisan queue:restart        # Supervisor levanta el trabajador con el código nuevo
+sudo -u www-data php artisan fragua:revisar-produccion
+cd ../frontend && sudo -u www-data -H npm ci && sudo -u www-data -H npm run build
+```
 
-## QA final — estado por rol
+Si cambió algún archivo de `backend/deploy/`, volver a copiarlo a su lugar (pasos 6 y 7).
 
-Verificado en vivo contra los servidores de desarrollo del usuario
-(no solo revisión de código):
+## Decisiones del negocio
 
-- **Cliente**: home, menú, carrito (invitado y con cuenta), checkout de
-  domicilio, formulario de reserva, registro, login, perfil, historial de
-  pedidos. Sin hallazgos.
-- **Mesero**: listado de pedidos y confirmación, mesas, cobro de un pedido
-  (efectivo) de punta a punta — incluido el bug de caja de abajo, que
-  bloqueaba el cobro hasta corregirlo.
-- **Administrador**: apertura/cierre de turno de caja, historial de turnos.
-  Catálogo, Usuarios, Mesas, Reservas, Dashboard, Compras y Gastos, y
-  Reportes se construyeron y probaron puntualmente en sesiones anteriores
-  (ver `README-BACKEND.md`); no se repitió una pasada sistemática de todos
-  ellos en este cierre.
-- **Recuperación de contraseña por correo real** (RF-M01-012/013): probada
-  de punta a punta con una cuenta real — el correo llega y el enlace
-  precarga el formulario de restablecimiento.
+| # | Decisión | Qué se decidió | Fecha |
+|---|---|---|---|
+| D1 | Fecha de entrega | Sin fecha fija; dejó de frenar porque el plan se terminó completo | — |
+| D2 | Dónde corre el sistema | VPS de Hostinger con HTTPS, cron y Supervisor | 12/10/2026 |
+| D3 | Proveedor de SMS | Correo en V1; el SMS queda para cuando haya proveedor y presupuesto | 12/10/2026 |
+| D4 | Pasarela de pago | Wompi (Nequi y botón Bancolombia), desarrollado contra el sandbox; la aprobación manual queda de respaldo | 13/10/2026 |
+| D5 | Impresora POS | Comandas y comprobantes de 80 mm desde el navegador del Mesero; el agente local, después de V1 | 13/10/2026 |
+| D6 | Tiempos de las reservas | No-show a los 15 min, recordatorio 2 h antes, mesa Reservada 1 h antes; editables en Configuración | 12/10/2026 |
+| D7 | Reglas contables | Abono del depósito como pago de tipo depósito; correcciones como ajustes sin reescribir el cierre; un Mesero con permiso registra compras y gastos (revisada en la Fase 7) | 12/10 y 13/10/2026 |
 
-## Revisión por rol (13/10/2026)
-
-Tres listas para revisar a mano, una por rol, con casillas para marcar y la fecha:
-
-- `QA-CLIENTE.md`: Cliente con cuenta, invitado y QR de mesa; 12 secciones.
-- `QA-MESERO.md`: el turno completo del Mesero; 10 secciones.
-- `QA-ADMINISTRADOR.md`: se repasó y ahora remite a las otras dos.
-
-Al escribirlas se cruzó cada pantalla con el código y los requisitos. Lo que apareció quedó
-corregido, con pruebas (`README-BACKEND.md`, punto 45):
-
-- El Cliente ya puede pedir **combos** en el Menú web y por el QR de mesa; antes solo el Mesero
-  los vendía. Cada combo dice lo que incluye y acepta una nota para la cocina.
-- Un Cliente ya no puede cancelar desde "Mis pedidos" una reserva con el depósito pagado en
-  **efectivo**: ese dinero se devuelve en el local.
-- El **enlace de seguimiento** ya no trae el teléfono ni el correo del cliente, ni quién del
-  personal hizo cada paso.
-- La lista de **pedidos del Mesero se actualiza sola** cada 20 segundos y avisa cuando llega un
-  pedido nuevo de la web o del QR.
-- Los **mensajes** ya no muestran códigos de reglas ("(RN-M06-03)") ni textos de Laravel en
-  inglés, y sin internet lo dicen. `.env.example` trae `APP_LOCALE=es`.
-- Después de crear la cuenta o iniciar sesión desde el Checkout, el Cliente **vuelve a su
-  pedido**; los enlaces armados para sacarlo del sitio no funcionan.
-
-Antes de probar en el equipo hay que compilar el frontend (`npm run build` en `frontend`). El
-backend no trae migraciones nuevas.
-
-## Fase 7 — cerrar lo que quedó a medias (desde el 13/10/2026)
-
-Con el plan terminado, se revisaron de nuevo los requisitos de M00 a M08 contra el código, uno por
-uno. Quedó esta lista, en orden:
-
-1. **Reglas del catálogo** (RF-M04-009, 013, 014; RN-M04-04). Hecha el 13/10/2026,
-   `README-BACKEND.md`, punto 46.
-2. **«Usuario autorizado» de Compras y gastos** (RNF-TRANS-012, RF-M03-32, HU-M03-01 a 03).
-   Hecha el 13/10/2026, `README-BACKEND.md`, punto 47. Revisa la decisión D7: un Mesero con permiso
-   registra, adjunta el recibo y ve solo lo suyo.
-3. **Fotos de los productos** (RF-M04-004, HU-M04-002, RNF-M04-002). Hecha el 13/10/2026,
-   `README-BACKEND.md`, punto 48. La foto se sube desde Catálogo y se ve en el Menú, el QR de mesa,
-   el Inicio y Nuevo pedido.
-4. **Estado de la caja para el Mesero** (RF-M06-023, HU-M06-009). Hecha el 13/10/2026,
-   `README-BACKEND.md`, punto 49. Cobrar muestra si la caja está abierta y el efectivo esperado.
-5. **Reportes de un mes completo a buena velocidad** (RNF-M08-001). Hecha el 13/10/2026,
-   `README-BACKEND.md`, punto 50. Se midió con un año de historia de prueba. Con índices nuevos, un
-   mes con «Comparar» tarda menos de medio segundo; antes «Ventas por producto» pasaba de 2 minutos.
-   La caché no hizo falta.
-
-Con esto la Fase 7 queda completa.
-
-El **mapa simple del salón** (RF-M05-022, opcional según el documento) queda para el futuro
-(decisión del 13/10/2026).
-
-Fuera del código siguen:
-- el SMS (D3);
-- la cuenta comercial de Wompi;
-- el agente de impresión junto a la impresora POS (D5).
-
-## Bug real encontrado y corregido en este cierre
-
-`GET /caja/turno-actual` devolvía el JSON `{}` en vez de `null` cuando no
-había turno abierto hoy. Causa: en esta instalación (Laravel 13 + PHP 8.3),
-`response()->json(null)` no serializa al `null` esperado — serializa al
-literal `"{}"` (se aisló con una ruta de prueba sin Controller ni Service de
-por medio). Como `{}` es "truthy" en JavaScript, la pantalla de Caja del
-Administrador mostraba "Abierta" sin que existiera ningún turno para hoy, lo
-que a su vez bloqueaba al Mesero para cobrar (la validación de que debe
-existir un turno abierto — RN-M06-03 — rechazaba el cobro correctamente,
-porque en la base de datos realmente no había turno de hoy).
-
-Corregido en `CajaController::turnoActual()`: cuando no hay turno, construye
-la respuesta HTTP a mano en vez de dejar que `response()->json()` serialice
-un `null` de nivel superior. Verificado en vivo: el Administrador ve
-correctamente "sin turno abierto hoy", pudo abrir uno, y el Mesero completó
-el cobro pendiente. Detalle completo en `README-BACKEND.md`, punto 13.
+Otras decisiones: la sesión del navegador queda en `localStorage` (13/10/2026); el depósito de reserva
+inicial es $20.000 (06/10/2026, RN-M05-14); toda reimpresión sale marcada y queda en Auditoría
+(13/10/2026); el mapa del salón queda para el futuro (13/10/2026).
 
 ## Qué falta a propósito
 
-Actualizado 06/10/2026 respecto a lo documentado en `README-BACKEND.md` ("Qué falta
-a propósito"): pasarela de pago real (Nequi/Bancolombia, webhook pendiente),
-exportación de reportes con formato real (hoy CSV/PDF simples), caché y
-generación asíncrona de exportaciones de reportes. Cada punto cita su RF/RN
-o sección oficial exacta — no son brechas de documentación, son alcance
-técnico fuera de este backend de referencia.
+- **Cuenta comercial de Wompi**: la confirmación automática ya funciona con el sandbox; faltan la
+  cuenta de producción y sus llaves.
+- **SMS** (D3): los avisos de reserva y de «listo para recoger» salen por correo y cada uno guarda su
+  canal, listo para sumar el SMS cuando haya proveedor.
+- **Impresión sin una persona de por medio** (D5): un servidor en la nube no ve la impresora del local;
+  hace falta un agente pequeño junto a ella. Mientras tanto, el equipo de la cocina puede abrir e
+  imprimir solas las comandas con Chrome en modo de impresión automática (ver Fase 6).
+- **Mapa simple del salón** (RF-M05-022, opcional): para una versión futura.
+- **Fuera del alcance** de los documentos oficiales: factura electrónica (el comprobante lo dice),
+  inventario y recetas, roles de Cocina y Domiciliario, GPS y reportes por canal.
+- Cliente > Mis pedidos muestra los 20 pedidos más recientes, sin paginación.
 
-La tabla `configuraciones` (valor de domicilio y depósito de reserva, editables por el
-Administrador) ya está implementada desde el 28/09/2026; el valor inicial del
-depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
+## Cambios de comportamiento por fase
 
-## Pendientes conocidos al 10/10/2026
+Lo que cambió para quien usa el sistema, fase por fase. Sirve para saber qué probar después de
+actualizar y para explicar el cambio a quien opera el local. El detalle técnico de cada punto está en
+`README-BACKEND.md`.
 
-- Las cuentas de prueba (`password`) deben desactivarse o cambiarse antes de producción; la
-  revisión antes de producción lo detecta (ver "Antes de abrir al público").
-- En el VPS, PHP y Nginx deben aceptar archivos de hasta 8 MB para los soportes de compras
-  (ver `README-BACKEND.md`, punto 25), y `storage/app/private` debe entrar en las copias de
-  seguridad.
-- La revisión del 09/10/2026 encontró funciones documentadas que el sistema aún no tiene
-  (282 de 582 requisitos hechos; al 13/10/2026 van 514 de 579 verificables, 89 %). Están ordenadas en el documento "Plan de implementación —
-  Fragua Real Burger" y en la hoja "Plan de implementación" del Cronograma. La Fase 0
-  (errores y seguridad) está terminada; ver `README-BACKEND.md`, punto 15. La Fase 1 está en
-  curso: las tareas 1 (editar pedidos con historial), 2 (domicilios y recogidas por teléfono) y
-  3 (cuenta y cobro por mesa) y 4 (reservas del Mesero) están hechas; ver los puntos 16 a 19.
-  Con las tareas 5 (agotado y búsqueda) y 6 (cancelación y nombres de mesa) la Fase 1 quedó
-  completa el 11/10/2026; ver los puntos 20 y 21. La Fase 2 empezó con la tarea 1
-  (promociones aplicadas al pedido y descuento manual) y la tarea 2 (el depósito de la reserva
-  se abona a la cuenta de la visita), la tarea 3 (el mismo catálogo en todos los canales) y la
-  tarea 4 (compras y gastos completos). Con la tarea 5 (cierre diario completo) la Fase 2 quedó
-  completa el 12/10/2026; ver los puntos 22 a 26. La Fase 3 empezó con la tarea 1 (consulta
-  de auditoría y eventos de seguridad), la tarea 2 (editar usuario y cambiar su rol), la tarea 3
-  (iniciar sesión con correo o nombre de usuario) y la tarea 4 (sesiones abiertas con su origen y
-  vencimiento); la Fase 3 quedó completa el 12/10/2026. Ver los puntos 27 a 30.
-- Política de sesiones con valores iniciales: una sesión se cierra sola tras 7 días sin uso y, como
-  máximo, a los 30 días. Se cambian en el `.env` del servidor
-  (`FRAGUA_REAL_SESION_INACTIVIDAD_MINUTOS`, `FRAGUA_REAL_SESION_DURACION_MAXIMA_MINUTOS`). La
-  limpieza diaria de sesiones vencidas (`sesiones:limpiar`) necesita el cron de Laravel en el VPS
-  (Fase 4).
-- La Fase 4 empezó con la tarea 1 (cola y programador en marcha), la tarea 2 (tiempos de las
-  reservas configurables), la tarea 3 (no-show automático, mesa Reservada a tiempo y
-  recordatorio), la tarea 4 (avisos de reserva por correo y cancelación por enlace) y la tarea 5
-  (aviso «listo para recoger»): ver "Programador y cola en el VPS" y `README-BACKEND.md`,
-  puntos 31 a 35. La Fase 4 quedó completa el 13/10/2026 salvo el canal SMS, que se aplazó por
-  la decisión D3 hasta elegir proveedor.
-- La Fase 5 empezó el 13/10/2026 con la tarea 1 (comprobante de pago): ver `README-BACKEND.md`,
-  punto 36, con la reimpresión controlada que pediste el mismo día (punto 37) y con la tarea 2
-  (cierre diario impreso y en PDF, punto 38) y la tarea 3 (exportación real de reportes, punto 39),
-  que trae otra dependencia de Composer: `composer update phpoffice/phpspreadsheet
-  --with-all-dependencies`. Con la tarea 4 (uso de mesas con pedidos locales, punto 40) la Fase 5
-  quedó completa el 13/10/2026. Trae una dependencia nueva de Composer (`barryvdh/laravel-dompdf`): después de
-  actualizar el código hay que correr `composer update barryvdh/laravel-dompdf
-  --with-all-dependencies` en `backend` (actualiza `composer.lock`; en el VPS, `composer install`
-  con ese lock). Para que el comprobante muestre el NIT, ponerlo en `FRAGUA_REAL_NIT`. Decisiones del 12/10/2026: el sistema corre en un VPS de
-  Hostinger (D2); los avisos al cliente van por correo en V1 y el SMS queda para después (D3);
-  reservas con no-show a los 15 min, recordatorio 2 h antes y mesa Reservada 1 h antes,
-  editables en Configuración (D6). Decisiones del 13/10/2026: pasarela Wompi, desarrollada contra
-  el sandbox y con la aprobación manual de respaldo (D4), y comandas impresas desde el navegador
-  del Mesero en V1 (D5).
-- La Fase 6 empezó el 13/10/2026 con la tarea 1 (pasarela Wompi con confirmación automática):
-  ver "Pasarela de pago Wompi" arriba y `README-BACKEND.md`, punto 41. Falta la cuenta comercial
-  de producción; mientras tanto se prueba con las llaves del sandbox. Con la tarea 2 (comandas de
-  cocina impresas desde el navegador, punto 42) la Fase 6 quedó completa el 13/10/2026. Después
-  se hizo el endurecimiento de seguridad (punto 43, "Antes de abrir al público") y la prueba de un
-  día completo de operación (punto 44): automatizada en `DiaCompletoTest`, y para recorrerla a mano
-  con `PRUEBA-DIA-COMPLETO.md`. Por último, las listas de revisión manual por rol (punto 45):
-  `QA-CLIENTE.md`, `QA-MESERO.md` y `QA-ADMINISTRADOR.md`, con lo que se corrigió al escribirlas
-  (ver "Revisión por rol" más abajo). Con esto el plan de implementación quedó completo el
-  13/10/2026.
-- Las pantallas cambiadas en las Fases 0, 1 y 2 (Mesero > Pedidos, Nuevo pedido y Cobrar,
-  Administrador > Pedidos, Caja, Catálogo y Reportes, Menú, Carrito, QR de mesa, Checkout, Mis
-  pedidos y Seguimiento) no se compilaron en la sesión donde se hicieron: correr
-  `npm run build` en `frontend` antes de probarlas.
-- El modal del QR de mesa (Administrador > Mesas) cargaba las librerías de QR y PDF desde un
-  CDN (esm.sh), lo que hacía fallar `npm run build` (2 errores TS2307 de `vue-tsc`) y dejaba el
-  QR dependiendo de un servidor externo. Corregido el 12/10/2026: `qrcode` y `jspdf` (4.2.1 o
-  superior, sin las vulnerabilidades de las versiones anteriores) son dependencias del
-  proyecto y `@types/qrcode` de desarrollo; después de actualizar hay que correr
-  `npm install` en `frontend` antes de `npm run build`. El nombre de la mesa se escapa al
-  imprimir el QR.
-- Después de actualizar el código hay que correr `php artisan migrate` (4 migraciones nuevas
-  del 09/10/2026, 6 de la Fase 1, 5 de la Fase 2, 3 de la Fase 3, 4 de la Fase 4, 4 de la Fase 5 y
-  2 de la Fase 6, ninguna borra datos).
 
-## Cambios de comportamiento de la Fase 0 (09/10/2026)
+### Fase 0: corrección de errores y seguridad (09/10/2026)
 
 - Un pedido ya no se finaliza solo con el pago: tiene que estar en preparación y, si es
   domicilio o recogida, el Mesero confirma la entrega o la recogida (botones en Mesero >
@@ -344,7 +386,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   Administrador y queda como ajuste extraordinario.
 - Una cuenta desactivada pierde sus sesiones y no entra a ninguna pantalla.
 
-## Cambios de comportamiento de la Fase 1 (10/10/2026)
+### Fase 1: operación completa del Mesero (10 y 11/10/2026)
 
 - El Mesero y el Administrador editan un pedido PENDIENTE (agregar, cambiar cantidad u
   observaciones, quitar) con el botón "Editar pedido". Un pedido CONFIRMADO también se edita,
@@ -359,7 +401,6 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
 - Mesero > Mesas muestra cuánto lleva la cuenta de cada mesa ocupada y cuánto debe; "Ver
   cuenta" muestra todos sus pedidos. En Mesero > Cobrar, los pedidos de mesa aparecen agrupados
   por mesa y se cobran juntos con "Cobrar mesa" (también por partes, para pagos mixtos).
-- El depósito de una reserva se descuenta de la cuenta de la mesa desde la Fase 2 (ver abajo).
 - El Mesero tiene su pestaña Reservas: registra reservas por teléfono, su depósito en efectivo,
   tarjeta o transferencia, y confirma la llegada del cliente. El Administrador tiene el mismo
   botón "Nueva reserva". Al elegir fecha y hora solo se ofrecen las mesas libres a esa hora, y
@@ -373,10 +414,9 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   pendiente. El Administrador puede cambiar el nombre de una mesa sin que cambie su QR.
 - El invitado recibe al terminar el Checkout un enlace privado (/seguimiento/...) para ver el
   estado de su pedido, pagarlo en línea o cancelarlo mientras esté pendiente.
-- Una mesa sigue quedando «Reservada» desde que se confirma el depósito, aunque la reserva sea
-  para otro día; cuándo marcarla se resuelve en la fase de automatización de reservas.
 
-## Cambios de comportamiento de la Fase 2 (11/10/2026)
+
+### Fase 2: dinero, catálogo y cierre diario (11 y 12/10/2026)
 
 - Las promociones automáticas que el Administrador crea en Catálogo ya se aplican solas a los
   pedidos de los tres canales, dentro de su fecha, horario y días. Varias vigentes se suman. Un
@@ -420,7 +460,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   Administrador y un motivo. El cierre no cambia: la corrección se ve debajo, con los valores
   actualizados.
 
-## Cambios de comportamiento de la Fase 3 (desde el 12/10/2026)
+### Fase 3: usuarios y auditoría (12/10/2026)
 
 - Nueva pantalla Administrador > Auditoría: quién hizo cada acción crítica, cuándo, sobre qué
   registro, desde qué IP y con qué navegador, con filtros por fechas, usuario, grupo, acción,
@@ -444,7 +484,36 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   Consecuencia: un usuario con historial no se puede borrar de la base de datos (se desactiva,
   como siempre).
 
-## Cambios de comportamiento de la Fase 5 (desde el 13/10/2026)
+### Fase 4: tareas programadas y avisos (12 y 13/10/2026)
+
+- Configuración tiene la tarjeta "Tareas automáticas": dice si el programador de tareas y la cola
+  de avisos están corriendo en el servidor, cuántos trabajos hay pendientes o fallidos y si el
+  correo sale de verdad o solo se registra.
+- Configuración tiene "Tiempos de las reservas": tolerancia antes del no-show (15 min),
+  anticipación del recordatorio (2 h) y desde cuándo la mesa se ve Reservada (1 h). Se usan desde
+  la tarea 3 de la Fase 4. En Reservar mesa, el Cliente ve cuántos minutos se le espera.
+- Las reservas se manejan solas (con el programador corriendo): la mesa se ve Reservada solo
+  desde 1 h antes (antes quedaba Reservada desde que se pagaba el depósito, aunque fuera para otro
+  día); si el cliente no llega en 15 min, la reserva pasa sola a "No asistió" y el depósito se
+  retiene; y 2 h antes le llega un correo de recordatorio. "Marcar no-show" a mano solo aparece
+  cuando ya pasó la tolerancia.
+- Cada reserva avisa al cliente por correo cuando se confirma el depósito, cuando se cancela
+  (dice si el depósito se devuelve) y cuando se marca "No asistió", además del recordatorio.
+  Cada correo trae un enlace para ver la reserva y cancelarla sin cuenta, mientras no haya
+  llegado su hora; si el depósito se pagó en efectivo, el enlace pide llamar o pasar por el
+  local. En Reservas, cada reserva muestra sus avisos ("enviado", "en cola" o "falló" con el
+  motivo) y un botón "Reintentar" para los que fallaron. Si el correo falla, la reserva sigue
+  normal. Los avisos por SMS quedan para después (decisión D3).
+- Las recogidas tienen el botón "Listo para recoger" (Mesero y Administrador): el pedido sigue en
+  Preparando, sus líneas quedan preparadas y el cliente recibe un correo con lo que falta por
+  pagar y el enlace de su pedido. El invitado puede dejar un correo opcional en el Checkout (y el
+  Mesero al registrar una recogida por teléfono); sin correo, la pantalla pide llamarlo. Mis
+  pedidos y el seguimiento muestran "Listo para recoger".
+- Se crearon las tablas que el `.env` ya esperaba (`jobs`, `failed_jobs`, `cache`,
+  `cache_locks`, `sessions`…). Sin ellas, con `CACHE_STORE=database`, el límite de intentos del
+  inicio de sesión y el programador fallaban en el servidor.
+
+### Fase 5: comprobantes, cierres y exportaciones (13/10/2026)
 
 - Todo pedido pagado por completo tiene su comprobante de pago con número consecutivo (FR-000001,
   FR-000002…): ticket de 80 mm para imprimir en los pedidos del local y PDF en domicilio y
@@ -473,7 +542,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   completadas): por mesa, visitas, ventas, minutos promedio y reservas, y las mesas que no se
   usaron aparecen como "Sin uso en el periodo".
 
-## Cambios de comportamiento de la Fase 6 (desde el 13/10/2026)
+### Fase 6: pasarela de pago y comandas (13/10/2026)
 
 - Con Wompi activo, el Cliente que elige pagar en línea (en el Checkout, en el seguimiento, en Mis
   pedidos, al reservar o desde el enlace de su reserva) pasa a la página de pago de Wompi y vuelve a
@@ -510,7 +579,22 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   automática (`--kiosk-printing`) con la impresora de 80 mm como predeterminada. Así salen solas.
   La impresión sin nadie que mire (un agente local junto a la impresora) queda para después de V1.
 
-## Cambios de comportamiento de la Fase 7 (desde el 13/10/2026)
+### Revisión manual por rol (13/10/2026)
+
+Al escribir `QA-CLIENTE.md` y `QA-MESERO.md` se cruzó cada pantalla con el código y se corrigió:
+
+- El Cliente ya puede pedir **combos** en el Menú web y por el QR de mesa; cada combo dice lo que
+  incluye y acepta una nota para la cocina.
+- Un Cliente ya no puede cancelar desde «Mis pedidos» una reserva con el depósito pagado en
+  **efectivo**: ese dinero se devuelve en el local.
+- El **enlace de seguimiento** ya no trae el teléfono ni el correo del cliente, ni quién del personal
+  hizo cada paso.
+- La lista de **pedidos del Mesero se actualiza sola** cada 20 segundos y avisa cuando llega un pedido
+  nuevo de la web o del QR.
+- Los **mensajes** ya no muestran códigos de reglas ni textos en inglés, y sin internet lo dicen.
+- Después de crear la cuenta o iniciar sesión desde el Checkout, el Cliente **vuelve a su pedido**.
+
+### Fase 7: lo que quedó a medias (13/10/2026)
 
 - Un producto con presentaciones (por ejemplo, Personal y Familiar) se pide siempre con una de
   ellas. Si todas están apagadas o agotadas, el producto deja de ofrecerse en el Menú, el QR y
@@ -534,7 +618,7 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
   esperado. Si no está abierta, o ya se cerró, lo dice y apaga los botones de cobro.
 - Los reportes de un mes (o más) cargan rápido aunque la base ya tenga mucha historia. Las cifras
   son las mismas de antes.
-- En el servidor:
+- En el servidor (además de lo de «Ponerlo en el servidor»):
   - `php artisan migrate`: tres migraciones nuevas, `2026_10_21_000001` y `000002` y
     `2026_10_22_000001` (solo índices, no cambia datos);
   - cuando ya haya historia, `php artisan reportes:medir` dice cuánto tarda cada reporte del último
@@ -543,44 +627,14 @@ depósito de reserva es $20.000 COP (confirmado el 06/10/2026, RN-M05-14).
     falta);
   - incluir `storage/app/private/productos` en las copias de seguridad.
 
-## Cambios de comportamiento de la Fase 4 (desde el 12/10/2026)
+## Datos de prueba en la base de desarrollo
 
-- Configuración tiene la tarjeta "Tareas automáticas": dice si el programador de tareas y la cola
-  de avisos están corriendo en el servidor, cuántos trabajos hay pendientes o fallidos y si el
-  correo sale de verdad o solo se registra.
-- Configuración tiene "Tiempos de las reservas": tolerancia antes del no-show (15 min),
-  anticipación del recordatorio (2 h) y desde cuándo la mesa se ve Reservada (1 h). Se usan desde
-  la tarea 3 de la Fase 4. En Reservar mesa, el Cliente ve cuántos minutos se le espera.
-- Las reservas se manejan solas (con el programador corriendo): la mesa se ve Reservada solo
-  desde 1 h antes (antes quedaba Reservada desde que se pagaba el depósito, aunque fuera para otro
-  día); si el cliente no llega en 15 min, la reserva pasa sola a "No asistió" y el depósito se
-  retiene; y 2 h antes le llega un correo de recordatorio. "Marcar no-show" a mano solo aparece
-  cuando ya pasó la tolerancia.
-- Cada reserva avisa al cliente por correo cuando se confirma el depósito, cuando se cancela
-  (dice si el depósito se devuelve) y cuando se marca "No asistió", además del recordatorio.
-  Cada correo trae un enlace para ver la reserva y cancelarla sin cuenta, mientras no haya
-  llegado su hora; si el depósito se pagó en efectivo, el enlace pide llamar o pasar por el
-  local. En Reservas, cada reserva muestra sus avisos ("enviado", "en cola" o "falló" con el
-  motivo) y un botón "Reintentar" para los que fallaron. Si el correo falla, la reserva sigue
-  normal. Los avisos por SMS quedan para después (decisión D3).
-- Las recogidas tienen el botón "Listo para recoger" (Mesero y Administrador): el pedido sigue en
-  Preparando, sus líneas quedan preparadas y el cliente recibe un correo con lo que falta por
-  pagar y el enlace de su pedido. El invitado puede dejar un correo opcional en el Checkout (y el
-  Mesero al registrar una recogida por teléfono); sin correo, la pantalla pide llamarlo. Mis
-  pedidos y el seguimiento muestran "Listo para recoger".
-- Se crearon las tablas que el `.env` ya esperaba (`jobs`, `failed_jobs`, `cache`,
-  `cache_locks`, `sessions`…). Sin ellas, con `CACHE_STORE=database`, el límite de intentos del
-  inicio de sesión y el programador fallaban en el servidor.
+Quedaron de las sesiones de prueba en la base del equipo de desarrollo. No son errores, pero hay que
+limpiarlos (o empezar con una base nueva y `php artisan migrate --seed`) antes de usar el sistema con
+datos reales:
 
-## Artefactos de prueba dejados en la base de datos
-
-Quedaron de las distintas sesiones de QA — no son bugs, pero conviene
-limpiarlos (o resetear la base de datos con el seeder) antes de usar el
-sistema con datos reales:
-
-- Un turno de caja del 29/09/2026 que quedó abierto sin cerrar (no afecta la
-  regla de "un turno por día", que se evalúa por fecha).
-- Dos cuentas Cliente de prueba creadas durante el QA de recuperación de
-  contraseña y registro (`qa.cliente.cierre@fraguareal.test` y la cuenta de
-  prueba de SMTP, ya desactivada).
-- Pedidos de prueba (#2 a #20) con sus cobros ya registrados.
+- un turno de caja del 29/09/2026 que quedó abierto (no afecta la regla de un turno por día, que se
+  evalúa por fecha);
+- dos cuentas Cliente de prueba (`qa.cliente.cierre@fraguareal.test` y la de prueba de SMTP, ya
+  desactivada);
+- pedidos de prueba (#2 a #20) con sus cobros.

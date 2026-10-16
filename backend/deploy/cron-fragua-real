@@ -3,3 +3,7 @@
 # ajustar la ruta y el usuario si no son estos. Corre cada minuto; Laravel decide qué toca.
 SHELL=/bin/bash
 * * * * * www-data cd /var/www/fragua-real/backend && php artisan schedule:run >> /dev/null 2>&1
+
+# Despliegue (15/10/2026): copia de seguridad diaria a las 3:00 (hora del servidor) de la base y de
+# storage/app/private. Corre como root porque usa el usuario postgres. Ver respaldo-fragua-real.sh.
+0 3 * * * root bash /var/www/fragua-real/backend/deploy/respaldo-fragua-real.sh >> /var/log/fragua-real-respaldo.log 2>&1

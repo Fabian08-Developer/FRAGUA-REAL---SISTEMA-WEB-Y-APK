@@ -1,0 +1,14 @@
+# Despliegue (15/10/2026) — Rotación del log del trabajador de la cola (Supervisor escribe en
+# storage/logs/cola.log y nunca lo corta). Los logs de Laravel se rotan solos con LOG_STACK=daily.
+# Copiar a /etc/logrotate.d/fragua-real (dueño root, permisos 644). Probar: sudo logrotate -d /etc/logrotate.d/fragua-real
+/var/www/fragua-real/backend/storage/logs/cola.log {
+    weekly
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    # Supervisor mantiene el archivo abierto: se copia y se vacía en vez de moverlo.
+    copytruncate
+    su www-data www-data
+}
