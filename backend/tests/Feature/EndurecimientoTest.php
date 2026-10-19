@@ -84,6 +84,28 @@ class EndurecimientoTest extends TestCase
         $this->artisan('fragua:revisar-produccion')->assertExitCode(0);
     }
 
+    // CORREGIDO (16/10/2026): con LOG_CHANNEL=stack y LOG_STACK=daily, la revisión leía el nivel del
+    // «stack» (que no tiene) y avisaba «LOG_LEVEL=debug» aunque el .env dijera warning.
+    public function test_el_nivel_de_log_se_lee_de_los_canales_del_stack(): void
+    {
+        $admin = User::create(['role' => 'administrador', 'nombre' => 'Ana Admin', 'email' => 'jefe@local.co', 'password' => bcrypt('Una-Clave-Larga-2026'), 'activo' => true]);
+        Sanctum::actingAs($admin);
+        $this->produccionBien();
+        $log = fn () => collect($this->getJson('/api/sistema/revision-produccion')->json('items'))->firstWhere('clave', 'log');
+
+        config([
+            'logging.default' => 'stack',
+            'logging.channels.stack' => ['driver' => 'stack', 'channels' => ['daily']],
+            'logging.channels.daily.level' => 'warning',
+        ]);
+        $this->assertSame('ok', $log()['nivel']);
+        $this->assertSame('LOG_LEVEL=warning (canal daily).', $log()['detalle']);
+
+        config(['logging.channels.daily.level' => 'debug']);
+        $this->assertSame('aviso', $log()['nivel']);
+        $this->assertStringContainsString('canal daily', $log()['detalle']);
+    }
+
     public function test_wompi_en_pruebas_es_un_aviso_y_sin_llaves_un_error(): void
     {
         $admin = User::create(['role' => 'administrador', 'nombre' => 'Ana Admin', 'email' => 'jefe@local.co', 'password' => bcrypt('Una-Clave-Larga-2026'), 'activo' => true]);

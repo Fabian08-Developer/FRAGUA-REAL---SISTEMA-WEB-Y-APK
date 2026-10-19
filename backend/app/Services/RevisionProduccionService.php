@@ -52,9 +52,15 @@ class RevisionProduccionService
         $r[] = $this->item('cola', $cola === 'sync' ? 'aviso' : 'ok', 'Cola de trabajos',
             $cola === 'sync' ? 'QUEUE_CONNECTION=sync: los correos se envían durante la petición y la vuelven lenta. Usa database con el trabajador de Supervisor.' : "QUEUE_CONNECTION={$cola}.");
 
-        $nivelLog = (string) config('logging.channels.'.config('logging.default').'.level', 'debug');
-        $r[] = $this->item('log', $nivelLog === 'debug' ? 'aviso' : 'ok', 'Registro de errores sin detalles de más',
-            $nivelLog === 'debug' ? 'LOG_LEVEL=debug guarda demasiado detalle. En producción usa warning o error.' : "LOG_LEVEL={$nivelLog}.");
+        // CORREGIDO (16/10/2026): antes se leía el nivel del canal por defecto («stack»), que no tiene
+        // nivel propio, así que siempre daba «debug» y avisaba aunque el .env dijera LOG_LEVEL=warning.
+        // Ahora se mira el nivel de los canales que de verdad escriben (los del stack, como «daily»).
+        $niveles = $this->nivelesDeLog((string) config('logging.default'));
+        $conDebug = array_keys(array_filter($niveles, fn ($nivel) => $nivel === 'debug'));
+        $r[] = $this->item('log', $conDebug ? 'aviso' : 'ok', 'Registro de errores sin detalles de más',
+            $conDebug
+                ? 'LOG_LEVEL=debug guarda demasiado detalle (canal '.implode(', ', $conDebug).'). En producción usa warning o error.'
+                : 'LOG_LEVEL='.implode(', ', array_unique($niveles)).' (canal '.implode(', ', array_keys($niveles)).').');
 
         $r[] = $this->pasarela();
 
@@ -70,6 +76,26 @@ class RevisionProduccionService
             $abierto ? 'CORS permite cualquier origen ("*"). Deja solo FRONTEND_URL y lo que haga falta en CORS_ORIGENES.' : 'Solo: '.implode(', ', $origenes).'.');
 
         return $r;
+    }
+
+    /**
+     * Nivel de cada canal de log que escribe, siguiendo los «stack» hasta sus canales reales.
+     *
+     * @return array<string, string> canal => nivel
+     */
+    private function nivelesDeLog(string $canal, int $profundidad = 0): array
+    {
+        $config = (array) config("logging.channels.{$canal}", []);
+        if (($config['driver'] ?? null) === 'stack' && $profundidad < 3) {
+            $niveles = [];
+            foreach ((array) ($config['channels'] ?? []) as $hijo) {
+                $niveles += $this->nivelesDeLog(trim((string) $hijo), $profundidad + 1);
+            }
+
+            return $niveles;
+        }
+
+        return [$canal => strtolower((string) ($config['level'] ?? 'debug'))];
     }
 
     public function hayErrores(array $items): bool

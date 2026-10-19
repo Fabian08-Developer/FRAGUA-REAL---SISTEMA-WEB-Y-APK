@@ -5,11 +5,12 @@
 // NO tienen tratamiento propio — son una Promocion más con vigencia_inicio/vigencia_fin,
 // igual que un combo con su propia vigencia. Ver CatalogoController y PromocionController.
 import { computed, onMounted, ref, watch } from 'vue'
-import { Boxes, Image as ImageIcon, Layers, Pencil, Percent, Plus, Tags } from 'lucide-vue-next'
+import { Boxes, Download, FileSpreadsheet, Image as ImageIcon, Layers, Pencil, Percent, Plus, Tags, Upload } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
-import { catalogoService } from '@/services/catalogo.service'
+import { catalogoService, type VistaPreviaImportacion } from '@/services/catalogo.service'
+import { guardarArchivo, mensajeDeBlob } from '@/utils/documentos'
 import { promocionService } from '@/services/promocion.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import type { Categoria, Producto, Combo, Extra, Promocion } from '@/types/models'
@@ -213,9 +214,13 @@ const procesandoDisponibilidad = ref<number | null>(null)
 interface VarianteEdicion {
   id?: number
   nombre: string
+  // Mejora (16/10/2026): lo que trae la presentación y su foto propia.
+  descripcion: string
+  imagen_url: string | null
   precio: number
   activa: boolean
   guardando?: boolean
+  subiendoFoto?: boolean
 }
 interface ExtraEdicion {
   id?: number
@@ -316,6 +321,8 @@ function abrirEditarProducto(producto: Producto) {
   variantesEdicion.value = (producto.variantes ?? []).map((v) => ({
     id: v.id,
     nombre: v.nombre,
+    descripcion: v.descripcion ?? '',
+    imagen_url: v.imagen_url ?? null,
     precio: Number(v.precio),
     activa: v.activa,
   }))
@@ -392,6 +399,208 @@ async function alternarDisponible(producto: Producto) {
   }
 }
 
+// ---- Mejora (16/10/2026): importación masiva de productos ----
+// 1) descargar la plantilla; 2) subir el archivo y ver qué haría cada fila (no guarda nada);
+// 3) importar: todo o nada, y solo si no hay errores.
+const modalImportarAbierto = ref(false)
+const archivoImportacion = ref<File | null>(null)
+const actualizarExistentes = ref(true)
+const vistaImportacion = ref<VistaPreviaImportacion | null>(null)
+const errorImportacion = ref('')
+const analizando = ref(false)
+const importando = ref(false)
+const descargandoPlantilla = ref(false)
+const ACCIONES_IMPORTACION = {
+  crear: { texto: 'Nuevo', clase: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' },
+  actualizar: { texto: 'Se actualiza', clase: 'bg-sky-50 text-sky-700 ring-sky-600/20' },
+  sin_cambios: { texto: 'Sin cambios', clase: 'bg-gray-100 text-gray-500 ring-gray-500/20' },
+  error: { texto: 'Error', clase: 'bg-red-50 text-red-700 ring-red-600/20' },
+} as const
+
+function abrirImportar() {
+  archivoImportacion.value = null
+  vistaImportacion.value = null
+  errorImportacion.value = ''
+  actualizarExistentes.value = true
+  modalImportarAbierto.value = true
+}
+
+async function descargarPlantilla() {
+  descargandoPlantilla.value = true
+  errorImportacion.value = ''
+  try {
+    const { data } = await catalogoService.plantillaImportacion()
+    guardarArchivo(data, 'plantilla-productos-fragua-real.xlsx')
+  } catch (e) {
+    errorImportacion.value = await mensajeDeBlob(e, 'No pudimos descargar la plantilla.')
+  } finally {
+    descargandoPlantilla.value = false
+  }
+}
+
+async function analizarImportacion() {
+  if (!archivoImportacion.value) return
+  analizando.value = true
+  errorImportacion.value = ''
+  vistaImportacion.value = null
+  try {
+    const { data } = await catalogoService.vistaPreviaImportacion(archivoImportacion.value, actualizarExistentes.value)
+    vistaImportacion.value = data
+  } catch (e) {
+    errorImportacion.value = erroresDeValidacion(e).archivo ?? mensajeDeError(e, 'No pudimos leer el archivo.')
+  } finally {
+    analizando.value = false
+  }
+}
+
+function elegirArchivoImportacion(evento: Event) {
+  const entrada = evento.target as HTMLInputElement
+  archivoImportacion.value = entrada.files?.[0] ?? null
+  entrada.value = ''
+  analizarImportacion()
+}
+
+watch(actualizarExistentes, () => {
+  if (archivoImportacion.value) analizarImportacion()
+})
+
+async function confirmarImportacion() {
+  if (!archivoImportacion.value || !vistaImportacion.value || vistaImportacion.value.resumen.errores) return
+  importando.value = true
+  errorImportacion.value = ''
+  try {
+    const { data } = await catalogoService.importarProductos(archivoImportacion.value, actualizarExistentes.value)
+    const partes = [
+      data.resumen.crear ? `${data.resumen.crear} producto(s) nuevo(s)` : '',
+      data.resumen.actualizar ? `${data.resumen.actualizar} actualizado(s)` : '',
+      data.categorias_nuevas.length ? `categorías nuevas: ${data.categorias_nuevas.join(', ')}` : '',
+    ].filter(Boolean)
+    avisoCatalogo.value = `Importación lista: ${partes.join(' · ') || 'no había cambios'}.`
+    modalImportarAbierto.value = false
+    await cargar()
+  } catch (e) {
+    errorImportacion.value = mensajeDeError(e, 'No pudimos importar los productos.')
+  } finally {
+    importando.value = false
+  }
+}
+
+// ---- Mejora (16/10/2026): atajo «Poner en oferta» ----
+// Precio de oferta o porcentaje, hasta qué día y a qué presentación. Por dentro es una promoción
+// automática de producto; un producto tiene una sola oferta a la vez (poner otra la reemplaza).
+const productoOferta = ref<Producto | null>(null)
+const modalOfertaAbierto = ref(false)
+const formOferta = ref<{ modo: 'precio' | 'porcentaje'; precio_oferta: number | null; porcentaje: number | null; variante_id: number | null; hasta: string }>({
+  modo: 'precio',
+  precio_oferta: null,
+  porcentaje: null,
+  variante_id: null,
+  hasta: '',
+})
+const erroresOferta = ref<Record<string, string>>({})
+const errorOferta = ref('')
+const guardandoOferta = ref(false)
+
+const hoyNegocio = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date())
+
+const presentacionesOferta = computed(() => (productoOferta.value?.variantes ?? []).filter((v) => v.activa))
+// Precio normal de lo que se rebaja (la presentación elegida o el producto).
+const precioNormalOferta = computed(() => {
+  const p = productoOferta.value
+  if (!p) return 0
+  const v = presentacionesOferta.value.find((x) => x.id === formOferta.value.variante_id)
+  return Number(v?.precio ?? p.precio_base)
+})
+const resumenOferta = computed(() => {
+  const f = formOferta.value
+  if (f.modo === 'precio' && f.precio_oferta && f.precio_oferta < precioNormalOferta.value) {
+    const ahorro = precioNormalOferta.value - f.precio_oferta
+    return `Antes ${formatoMoneda(precioNormalOferta.value)}, ahora ${formatoMoneda(f.precio_oferta)} (ahorro ${formatoMoneda(ahorro)}).`
+  }
+  if (f.modo === 'porcentaje' && f.porcentaje && f.porcentaje > 0 && f.porcentaje < 100) {
+    return `${f.porcentaje} % menos${f.variante_id ? '' : ' en todas sus presentaciones'}.`
+  }
+  return ''
+})
+
+// Un precio de oferta es de una presentación (cada una tiene su precio): al pasar a "precio" sin
+// presentación elegida, se toma la primera.
+watch(
+  () => formOferta.value.modo,
+  (modo) => {
+    if (modo === 'precio' && formOferta.value.variante_id === null && presentacionesOferta.value.length) {
+      formOferta.value.variante_id = presentacionesOferta.value[0].id
+    }
+  },
+)
+
+function textoOferta(producto: Producto) {
+  const o = producto.oferta
+  if (!o) return ''
+  const valor = o.tipo_valor === 'porcentaje' ? `−${Number(o.valor)} %` : `−${formatoMoneda(o.valor)}`
+  const fecha = o.hasta ? ` hasta el ${o.hasta.split('-').reverse().join('/')}` : ''
+  return `${valor}${o.variante ? ` en ${o.variante}` : ''}${fecha}`
+}
+
+function abrirOferta(producto: Producto) {
+  productoOferta.value = producto
+  const o = producto.oferta
+  const presentaciones = (producto.variantes ?? []).filter((v) => v.activa)
+  formOferta.value = {
+    modo: o?.tipo_valor === 'porcentaje' ? 'porcentaje' : 'precio',
+    precio_oferta: null,
+    porcentaje: o?.tipo_valor === 'porcentaje' ? Number(o.valor) : null,
+    // Con una sola presentación, esa; con varias, la de la oferta actual o la primera.
+    variante_id: o?.variante_id ?? (presentaciones.length ? presentaciones[0].id : null),
+    hasta: o?.hasta ?? '',
+  }
+  erroresOferta.value = {}
+  errorOferta.value = ''
+  modalOfertaAbierto.value = true
+}
+
+async function confirmarOferta() {
+  if (!productoOferta.value) return
+  guardandoOferta.value = true
+  erroresOferta.value = {}
+  errorOferta.value = ''
+  const f = formOferta.value
+  try {
+    await catalogoService.ponerOferta(productoOferta.value.id, {
+      modo: f.modo,
+      precio_oferta: f.modo === 'precio' ? f.precio_oferta : null,
+      porcentaje: f.modo === 'porcentaje' ? f.porcentaje : null,
+      variante_id: f.variante_id,
+      hasta: f.hasta || null,
+    })
+    avisoCatalogo.value = `"${productoOferta.value.nombre}" quedó en oferta. Ya se ve en el Menú, el QR y el pedido del Mesero.`
+    modalOfertaAbierto.value = false
+    await cargar()
+  } catch (e) {
+    const campos = erroresDeValidacion(e)
+    if (Object.keys(campos).length) erroresOferta.value = campos
+    else errorOferta.value = mensajeDeError(e, 'No pudimos poner la oferta.')
+  } finally {
+    guardandoOferta.value = false
+  }
+}
+
+async function quitarOferta() {
+  if (!productoOferta.value) return
+  guardandoOferta.value = true
+  errorOferta.value = ''
+  try {
+    await catalogoService.quitarOferta(productoOferta.value.id)
+    avisoCatalogo.value = `Se quitó la oferta de "${productoOferta.value.nombre}".`
+    modalOfertaAbierto.value = false
+    await cargar()
+  } catch (e) {
+    errorOferta.value = mensajeDeError(e, 'No pudimos quitar la oferta.')
+  } finally {
+    guardandoOferta.value = false
+  }
+}
+
 async function guardarVariante(v: VarianteEdicion) {
   if (!productoEditando.value || !v.id) return
   v.guardando = true
@@ -400,6 +609,7 @@ async function guardarVariante(v: VarianteEdicion) {
     await catalogoService.actualizarVariante(v.id, {
       producto_id: productoEditando.value.id,
       nombre: v.nombre,
+      descripcion: v.descripcion.trim() || null,
       precio: Number(v.precio),
       activa: v.activa,
     })
@@ -410,10 +620,61 @@ async function guardarVariante(v: VarianteEdicion) {
   }
 }
 
+// Mejora (16/10/2026): la foto de la presentación se sube al elegirla (la presentación ya existe).
+async function elegirFotoVariante(v: VarianteEdicion, evento: Event) {
+  const entrada = evento.target as HTMLInputElement
+  const archivo = entrada.files?.[0] ?? null
+  entrada.value = ''
+  if (!archivo || !v.id) return
+  errorVariantesExtras.value = ''
+  if (!TIPOS_FOTO.includes(archivo.type)) {
+    errorVariantesExtras.value = 'La foto debe ser JPG, PNG o WebP.'
+    return
+  }
+  if (archivo.size > 5 * 1024 * 1024) {
+    errorVariantesExtras.value = 'La foto es muy pesada (máximo 5 MB).'
+    return
+  }
+  v.subiendoFoto = true
+  try {
+    const { data } = await catalogoService.subirFotoVariante(v.id, archivo)
+    v.imagen_url = data.imagen_url ?? null
+    actualizarVarianteEnLista(v)
+  } catch (e) {
+    errorVariantesExtras.value = erroresDeValidacion(e).foto ?? mensajeDeError(e, 'No pudimos subir la foto.')
+  } finally {
+    v.subiendoFoto = false
+  }
+}
+
+async function quitarFotoVariante(v: VarianteEdicion) {
+  if (!v.id) return
+  v.subiendoFoto = true
+  errorVariantesExtras.value = ''
+  try {
+    await catalogoService.quitarFotoVariante(v.id)
+    v.imagen_url = null
+    actualizarVarianteEnLista(v)
+  } catch (e) {
+    errorVariantesExtras.value = mensajeDeError(e, 'No pudimos quitar la foto.')
+  } finally {
+    v.subiendoFoto = false
+  }
+}
+
+// Refleja la foto nueva en el producto de la lista sin recargar todo el catálogo.
+function actualizarVarianteEnLista(v: VarianteEdicion) {
+  const producto = productos.value.find((p) => p.id === productoEditando.value?.id)
+  const variante = producto?.variantes?.find((x) => x.id === v.id)
+  if (variante) variante.imagen_url = v.imagen_url
+}
+
 async function agregarVariante() {
   if (!productoEditando.value || !nuevaVariante.value.nombre.trim()) return
   const nueva: VarianteEdicion = {
     nombre: nuevaVariante.value.nombre,
+    descripcion: '',
+    imagen_url: null,
     precio: Number(nuevaVariante.value.precio),
     activa: true,
     guardando: true,
@@ -823,6 +1084,10 @@ onMounted(cargar)
         >
           Agotados y disponibilidad
         </router-link>
+        <BaseButton v-if="seccion === 'productos'" variant="secondary" @click="abrirImportar">
+          <FileSpreadsheet :size="17" />
+          Importar
+        </BaseButton>
         <BaseButton v-if="seccion === 'categorias'" variant="primary" @click="abrirNuevaCategoria">
           <Plus :size="17" />
           Nueva categoría
@@ -998,6 +1263,15 @@ onMounted(cargar)
               >
                 {{ producto.disponible ? 'Disponible' : 'Agotado' }}
               </span>
+              <span
+                v-if="producto.oferta"
+                class="badge"
+                :class="producto.oferta.vigente ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' : 'bg-gray-100 text-gray-600 ring-gray-500/20'"
+                :title="producto.oferta.vigente ? 'Oferta activa' : 'Oferta programada o fuera de su horario'"
+              >
+                <Percent :size="11" class="inline-block" />
+                {{ producto.oferta.vigente ? 'En oferta' : 'Oferta programada' }} {{ textoOferta(producto) }}
+              </span>
             </p>
             <p class="mt-1 text-xs text-gray-500">
               {{ formatoMoneda(producto.precio_base) }} ·
@@ -1010,6 +1284,10 @@ onMounted(cargar)
             </p>
           </div>
           <div class="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+            <BaseButton variant="ghost" size="sm" class="col-span-2 sm:col-span-1" @click="abrirOferta(producto)">
+              <Percent :size="14" />
+              {{ producto.oferta ? 'Cambiar oferta' : 'Poner en oferta' }}
+            </BaseButton>
             <BaseButton
               variant="ghost"
               size="sm"
@@ -1073,7 +1351,7 @@ onMounted(cargar)
     <template v-else-if="seccion === 'extras'">
       <div v-if="!extrasGenerales.length" class="mt-10 empty-state">
         <Layers :size="32" class="mx-auto text-gray-300" />
-        <p class="mt-3 text-sm text-gray-500">Todavía no hay extras generales. Se ofrecen con los productos que elijas al editarlos, o con todo el menú si no eliges ninguno.</p>
+        <p class="mt-3 text-sm text-gray-500">Todavía no hay extras generales. Créalos aquí y elige en cada producto (al editarlo) cuáles ofrece. Un extra que no se marca en ningún producto no se ofrece.</p>
       </div>
       <ul v-else class="mt-6 space-y-3">
         <li
@@ -1093,7 +1371,7 @@ onMounted(cargar)
             </p>
             <p class="mt-1 text-xs text-gray-500">
               {{ formatoMoneda(extra.precio) }} ·
-              {{ extra.productos?.length ? `se ofrece con ${extra.productos.map((p) => p.nombre).join(', ')}` : 'se ofrece con todo el menú' }}
+              {{ extra.productos?.length ? `se ofrece con ${extra.productos.map((p) => p.nombre).join(', ')}` : 'no se ofrece con ningún producto: márcalo en los productos que lo llevan' }}
             </p>
           </div>
           <BaseButton variant="ghost" size="sm" class="shrink-0" @click="abrirEditarExtraGeneral(extra)">
@@ -1130,6 +1408,7 @@ onMounted(cargar)
               <span class="badge bg-gray-100 text-gray-500 ring-gray-500/20">
                 {{ ALCANCES_PROMOCION.find((a) => a.v === promocion.alcance)?.t }}
               </span>
+              <span v-if="promocion.es_oferta" class="badge bg-brand-50 text-brand-700 ring-brand-600/20">Oferta de producto</span>
             </p>
             <p class="mt-1 text-xs text-gray-500">
               {{
@@ -1137,6 +1416,7 @@ onMounted(cargar)
                   ? `${Number(promocion.valor)}% de descuento`
                   : `${formatoMoneda(promocion.valor)} de descuento`
               }}
+              <template v-if="promocion.variante"> · solo {{ promocion.variante.nombre }}</template>
               · {{ vigenciaTexto(promocion.vigencia_inicio, promocion.vigencia_fin) }}
             </p>
           </div>
@@ -1261,7 +1541,7 @@ onMounted(cargar)
               {{ extra.nombre }} (+{{ formatoMoneda(extra.precio) }})
             </label>
           </div>
-          <p class="text-xs text-gray-500">Un extra general que no se marca en ningún producto se ofrece con todo el menú.</p>
+          <p class="text-xs text-gray-500">Solo los extras marcados aquí se ofrecen con este producto. Un extra general que no se marca en ningún producto no se ofrece.</p>
           <span v-if="erroresProducto.extras_generales" class="block text-xs text-red-600">{{ erroresProducto.extras_generales }}</span>
         </fieldset>
 
@@ -1270,18 +1550,55 @@ onMounted(cargar)
         <!-- Variantes (M04 parte 2) — solo tiene sentido con el producto ya creado -->
         <div v-if="productoEditando" class="space-y-3 border-t border-gray-200 pt-4">
           <p class="field-label">Variantes (tamaños/presentaciones)</p>
-          <p class="text-xs text-gray-500">Con presentaciones, el cliente y el Mesero eligen una al pedir. Si ninguna queda activa y disponible, el producto deja de ofrecerse.</p>
-          <div v-if="variantesEdicion.length" class="space-y-2">
-            <div v-for="v in variantesEdicion" :key="v.id ?? v.nombre" class="flex flex-wrap items-center gap-2">
-              <input v-model="v.nombre" type="text" placeholder="Nombre" class="min-w-0 flex-1 field-sm" />
-              <input v-model.number="v.precio" type="number" min="0" step="100" placeholder="Precio" class="w-24 field-sm" />
-              <label class="flex items-center gap-1 text-xs text-gray-600">
-                <input v-model="v.activa" type="checkbox" class="h-3.5 w-3.5 accent-brand-600" />
-                Activa
-              </label>
-              <BaseButton variant="ghost" type="button" :disabled="v.guardando" @click="guardarVariante(v)">
-                {{ v.guardando ? '…' : 'Guardar' }}
-              </BaseButton>
+          <p class="text-xs text-gray-500">
+            Con presentaciones, el cliente y el Mesero eligen una al pedir. Si ninguna queda activa y disponible, el producto deja
+            de ofrecerse. Escribe qué trae cada una y, si quieres, súbele su foto: al elegirla, el cliente ve esa foto (sin foto
+            propia, ve la del producto).
+          </p>
+          <div v-if="variantesEdicion.length" class="space-y-3">
+            <div v-for="v in variantesEdicion" :key="v.id ?? v.nombre" class="space-y-2 rounded-xl border border-gray-200 p-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <input v-model="v.nombre" type="text" placeholder="Nombre" class="min-w-0 flex-1 field-sm" />
+                <input v-model.number="v.precio" type="number" min="0" step="100" placeholder="Precio" class="w-24 field-sm" />
+                <label class="flex items-center gap-1 text-xs text-gray-600">
+                  <input v-model="v.activa" type="checkbox" class="h-3.5 w-3.5 accent-brand-600" />
+                  Activa
+                </label>
+              </div>
+              <input
+                v-model="v.descripcion"
+                type="text"
+                maxlength="160"
+                placeholder="Qué trae (ej. doble carne, para 3 o 4 personas)"
+                class="w-full field-sm"
+              />
+              <div class="flex flex-wrap items-center gap-2">
+                <img v-if="v.imagen_url" :src="v.imagen_url" alt="" class="size-12 rounded-lg object-cover" />
+                <span v-else class="flex size-12 items-center justify-center rounded-lg bg-gray-100 text-gray-400">
+                  <ImageIcon :size="18" />
+                </span>
+                <template v-if="v.id">
+                  <label
+                    class="cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50"
+                    :class="v.subiendoFoto ? 'pointer-events-none opacity-50' : ''"
+                  >
+                    {{ v.subiendoFoto ? 'Subiendo…' : v.imagen_url ? 'Cambiar foto' : 'Subir foto' }}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="elegirFotoVariante(v, $event)" />
+                  </label>
+                  <button
+                    v-if="v.imagen_url"
+                    type="button"
+                    class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    :disabled="v.subiendoFoto"
+                    @click="quitarFotoVariante(v)"
+                  >
+                    Quitar foto
+                  </button>
+                </template>
+                <BaseButton variant="ghost" type="button" class="ml-auto" :disabled="v.guardando" @click="guardarVariante(v)">
+                  {{ v.guardando ? '…' : 'Guardar' }}
+                </BaseButton>
+              </div>
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-2">
@@ -1326,6 +1643,194 @@ onMounted(cargar)
           </BaseButton>
         </div>
       </form>
+    </BaseModal>
+
+    <!-- Mejora (16/10/2026): «Poner en oferta» -->
+    <BaseModal v-model="modalOfertaAbierto" :title="productoOferta?.oferta ? 'Cambiar oferta' : 'Poner en oferta'">
+      <form v-if="productoOferta" class="space-y-4" @submit.prevent="confirmarOferta">
+        <p class="text-sm text-gray-600">
+          <span class="font-semibold text-ink">{{ productoOferta.nombre }}</span>
+          <template v-if="productoOferta.oferta">
+            · oferta actual: {{ textoOferta(productoOferta) }}. Guardar la reemplaza.
+          </template>
+        </p>
+
+        <div class="segmented flex">
+          <button
+            type="button"
+            class="segmented-item flex-1"
+            :class="formOferta.modo === 'precio' ? 'is-active' : ''"
+            @click="formOferta.modo = 'precio'"
+          >
+            Precio de oferta
+          </button>
+          <button
+            type="button"
+            class="segmented-item flex-1"
+            :class="formOferta.modo === 'porcentaje' ? 'is-active' : ''"
+            @click="formOferta.modo = 'porcentaje'"
+          >
+            Porcentaje
+          </button>
+        </div>
+
+        <label v-if="presentacionesOferta.length" class="block">
+          <span class="field-label">Presentación</span>
+          <select v-model="formOferta.variante_id" class="field">
+            <option v-if="formOferta.modo === 'porcentaje'" :value="null">Todas las presentaciones</option>
+            <option v-for="v in presentacionesOferta" :key="v.id" :value="v.id">
+              {{ v.nombre }} ({{ formatoMoneda(v.precio) }})
+            </option>
+          </select>
+          <span v-if="erroresOferta.variante_id" class="mt-1 block text-xs text-red-600">{{ erroresOferta.variante_id }}</span>
+        </label>
+
+        <label v-if="formOferta.modo === 'precio'" class="block">
+          <span class="field-label">Precio de oferta (normal {{ formatoMoneda(precioNormalOferta) }})</span>
+          <input v-model.number="formOferta.precio_oferta" type="number" min="100" step="100" class="field" placeholder="Ej. 28000" />
+          <span v-if="erroresOferta.precio_oferta" class="mt-1 block text-xs text-red-600">{{ erroresOferta.precio_oferta }}</span>
+        </label>
+        <label v-else class="block">
+          <span class="field-label">Porcentaje de descuento</span>
+          <input v-model.number="formOferta.porcentaje" type="number" min="1" max="99" step="1" class="field" placeholder="Ej. 15" />
+          <span v-if="erroresOferta.porcentaje" class="mt-1 block text-xs text-red-600">{{ erroresOferta.porcentaje }}</span>
+        </label>
+
+        <label class="block">
+          <span class="field-label">Hasta (opcional)</span>
+          <input v-model="formOferta.hasta" type="date" :min="hoyNegocio()" class="field" />
+          <span class="mt-1 block text-xs text-gray-500">Empieza hoy. Sin fecha, sigue hasta que la quites.</span>
+          <span v-if="erroresOferta.hasta" class="mt-1 block text-xs text-red-600">{{ erroresOferta.hasta }}</span>
+        </label>
+
+        <p v-if="resumenOferta" class="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ resumenOferta }}</p>
+        <p class="text-xs text-gray-500">
+          Se combina con las demás promociones vigentes y un descuento manual la reemplaza. Para horarios o días de la semana,
+          usa Promociones.
+        </p>
+        <p v-if="errorOferta" class="alert-error">{{ errorOferta }}</p>
+
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <BaseButton
+            v-if="productoOferta.oferta"
+            variant="danger-soft"
+            type="button"
+            class="sm:mr-auto"
+            :disabled="guardandoOferta"
+            @click="quitarOferta"
+          >
+            Quitar oferta
+          </BaseButton>
+          <BaseButton variant="ghost" type="button" @click="modalOfertaAbierto = false">Cancelar</BaseButton>
+          <BaseButton variant="primary" type="submit" :disabled="guardandoOferta">
+            {{ guardandoOferta ? 'Guardando…' : 'Poner en oferta' }}
+          </BaseButton>
+        </div>
+      </form>
+    </BaseModal>
+
+    <!-- Mejora (16/10/2026): importación masiva de productos -->
+    <BaseModal v-model="modalImportarAbierto" title="Importar productos">
+      <div class="space-y-5">
+        <!-- 1. Plantilla -->
+        <div class="flex items-start gap-3 rounded-xl bg-gray-50 p-4">
+          <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-brand-400">1</span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-ink">Descarga la plantilla y llénala</p>
+            <p class="mt-0.5 text-xs text-gray-500">
+              Categoría, nombre, descripción, precio, tipo de venta (Alimento, Bebida u Otro), presentaciones
+              (Personal:18000 | Familiar:32000) y si está disponible. Hasta 500 productos por archivo.
+            </p>
+            <BaseButton variant="secondary" size="sm" class="mt-3" :disabled="descargandoPlantilla" @click="descargarPlantilla">
+              <Download :size="14" />
+              {{ descargandoPlantilla ? 'Descargando…' : 'Descargar plantilla (Excel)' }}
+            </BaseButton>
+          </div>
+        </div>
+
+        <!-- 2. Archivo -->
+        <div class="flex items-start gap-3 rounded-xl bg-gray-50 p-4">
+          <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-brand-400">2</span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-ink">Sube el archivo</p>
+            <label class="mt-3 flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white px-4 py-3 text-sm text-gray-600 hover:border-brand-500">
+              <Upload :size="16" class="shrink-0 text-brand-700" />
+              <span class="min-w-0 truncate">{{ archivoImportacion?.name ?? 'Elegir archivo Excel (.xlsx) o CSV' }}</span>
+              <input type="file" accept=".xlsx,.xls,.csv" class="sr-only" @change="elegirArchivoImportacion" />
+            </label>
+            <label class="mt-3 flex items-start gap-2 text-sm text-gray-700">
+              <input v-model="actualizarExistentes" type="checkbox" class="mt-0.5 size-4 accent-brand-600" />
+              <span>
+                Actualizar los productos que ya existen (por nombre)
+                <span class="block text-xs text-gray-500">Sirve para cambiar precios de todo el menú de una vez. Las celdas vacías no borran nada.</span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <p v-if="analizando" class="loading-state !py-4">Revisando el archivo…</p>
+        <p v-if="errorImportacion" class="alert-error">{{ errorImportacion }}</p>
+
+        <!-- 3. Vista previa -->
+        <div v-if="vistaImportacion" class="space-y-3">
+          <div class="grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
+            <div class="rounded-xl bg-emerald-50 p-2.5 text-emerald-800"><p class="text-lg font-semibold">{{ vistaImportacion.resumen.crear }}</p>nuevos</div>
+            <div class="rounded-xl bg-sky-50 p-2.5 text-sky-800"><p class="text-lg font-semibold">{{ vistaImportacion.resumen.actualizar }}</p>se actualizan</div>
+            <div class="rounded-xl bg-gray-100 p-2.5 text-gray-600"><p class="text-lg font-semibold">{{ vistaImportacion.resumen.sin_cambios }}</p>sin cambios</div>
+            <div class="rounded-xl p-2.5" :class="vistaImportacion.resumen.errores ? 'bg-red-50 text-red-700' : 'bg-gray-100 text-gray-600'">
+              <p class="text-lg font-semibold">{{ vistaImportacion.resumen.errores }}</p>con errores
+            </div>
+          </div>
+          <p v-if="vistaImportacion.categorias_nuevas.length" class="text-xs text-gray-600">
+            Se crearán las categorías: <strong>{{ vistaImportacion.categorias_nuevas.join(', ') }}</strong>.
+          </p>
+
+          <ul class="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+            <li
+              v-for="f in vistaImportacion.filas"
+              :key="f.fila"
+              class="rounded-lg border px-3 py-2 text-xs"
+              :class="f.accion === 'error' ? 'border-red-200 bg-red-50/50' : 'border-gray-200 bg-white'"
+            >
+              <p class="flex flex-wrap items-center gap-2">
+                <span class="text-gray-400">Fila {{ f.fila }}</span>
+                <span class="font-semibold text-ink">{{ f.nombre || 'Sin nombre' }}</span>
+                <span class="badge" :class="ACCIONES_IMPORTACION[f.accion].clase">{{ ACCIONES_IMPORTACION[f.accion].texto }}</span>
+              </p>
+              <p v-if="f.accion === 'crear'" class="mt-0.5 text-gray-500">
+                {{ f.categoria }} · {{ formatoMoneda(f.precio_base ?? 0) }}
+                <template v-if="f.presentaciones.length"> · {{ f.presentaciones.map((p) => `${p.nombre} ${formatoMoneda(p.precio)}`).join(', ') }}</template>
+              </p>
+              <p v-else-if="f.accion === 'actualizar'" class="mt-0.5 text-gray-500">Cambia: {{ f.cambios.join(', ') }}</p>
+              <ul v-if="f.errores.length" class="mt-0.5 list-disc pl-4 text-red-700">
+                <li v-for="e in f.errores" :key="e">{{ e }}</li>
+              </ul>
+            </li>
+          </ul>
+
+          <p v-if="vistaImportacion.resumen.errores" class="text-xs text-red-700">
+            Corrige las filas con errores en el archivo y súbelo de nuevo. No se guarda nada mientras haya errores.
+          </p>
+        </div>
+
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <BaseButton variant="ghost" type="button" @click="modalImportarAbierto = false">Cancelar</BaseButton>
+          <BaseButton
+            variant="primary"
+            type="button"
+            :disabled="!vistaImportacion || vistaImportacion.resumen.errores > 0 || importando || analizando || (vistaImportacion.resumen.crear + vistaImportacion.resumen.actualizar) === 0"
+            @click="confirmarImportacion"
+          >
+            {{
+              importando
+                ? 'Importando…'
+                : vistaImportacion
+                  ? `Importar ${vistaImportacion.resumen.crear + vistaImportacion.resumen.actualizar} producto(s)`
+                  : 'Importar'
+            }}
+          </BaseButton>
+        </div>
+      </div>
     </BaseModal>
 
     <!-- Crear/editar combo -->

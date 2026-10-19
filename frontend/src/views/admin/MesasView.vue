@@ -8,6 +8,7 @@ import { Armchair, CalendarClock, LayoutGrid, Pencil, Plus, QrCode } from 'lucid
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import PestanasSalon from '@/components/common/PestanasSalon.vue'
 import QrMesaModal from '@/components/common/QrMesaModal.vue'
 import { mesaService } from '@/services/mesa.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
@@ -191,6 +192,9 @@ onMounted(cargar)
         </BaseButton>
       </template>
     </PageHeader>
+
+    <!-- Corrección (16/10/2026): acceso directo a todas las reservas. -->
+    <PestanasSalon />
 
     <p v-if="error" class="mt-4 alert-error">{{ error }}</p>
 

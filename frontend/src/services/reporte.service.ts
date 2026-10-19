@@ -127,6 +127,8 @@ export interface ResultadoOperativoReporte {
   reporte: {
     resumen: {
       total_ventas: number
+      // Mejora (16/10/2026): depósitos retenidos por no-show, aparte de las ventas.
+      otros_ingresos?: number
       total_compras: number
       total_gastos: number
       resultado_operativo: number

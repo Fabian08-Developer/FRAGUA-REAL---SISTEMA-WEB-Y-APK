@@ -169,6 +169,7 @@ class CrearPedidoSeguridadTest extends TestCase
     public function test_un_extra_general_activo_se_acepta_en_cualquier_producto(): void
     {
         $tocineta = Extra::create(['nombre' => 'Tocineta', 'precio' => 4000, 'alcance' => 'general', 'activo' => true]);
+        $tocineta->productos()->attach($this->producto->id);
 
         $respuesta = $this->postJson('/api/pedidos', $this->recogidaInvitado([$this->linea(['extras_ids' => [$tocineta->id]])]))
             ->assertCreated();

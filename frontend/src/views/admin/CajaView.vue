@@ -5,11 +5,12 @@
 // así que esta vista también cubre abrir/cerrar — si no, no habría ninguna forma de
 // hacerlo desde la app a pesar de que CajaService ya lo soporta del todo.
 import { computed, onMounted, ref } from 'vue'
-import { Banknote, CreditCard, Landmark, Smartphone, Wallet } from 'lucide-vue-next'
+import { Banknote, CreditCard, Landmark, RefreshCw, Smartphone, Wallet } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import PagosPasarelaPorRevisar from '@/components/caja/PagosPasarelaPorRevisar.vue'
+import ResumenTurno from '@/components/caja/ResumenTurno.vue'
 import { cajaService } from '@/services/caja.service'
 import { pagoService } from '@/services/pago.service'
 import { mensajeDeError } from '@/services/errors'
@@ -72,6 +73,26 @@ async function cargarTurnoActual() {
   } finally {
     cargandoActual.value = false
   }
+}
+
+// Mejora (16/10/2026): «Actualizar» trae los cobros nuevos del Mesero sin recargar la página ni
+// mostrar el turno como si se estuviera cargando de cero.
+const actualizando = ref(false)
+async function actualizarResumen() {
+  actualizando.value = true
+  errorActual.value = ''
+  try {
+    const { data } = await cajaService.turnoActual()
+    turnoActual.value = data
+  } catch (e) {
+    errorActual.value = mensajeDeError(e, 'No pudimos actualizar el resumen.')
+  } finally {
+    actualizando.value = false
+  }
+}
+
+function horaCorta(valor: string) {
+  return new Date(valor).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })
 }
 
 const modalAbrirOpen = ref(false)
@@ -313,6 +334,22 @@ onMounted(() => {
       </div>
     </section>
 
+    <!-- Mejora (16/10/2026): resumen del turno abierto: ingresos por método, de dónde sale el
+         efectivo esperado, depósitos del día y anulados. -->
+    <section v-if="!cargandoActual && turnoActual?.resumen" class="card mt-4 p-5 sm:p-6">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="section-title">Resumen del día</h2>
+          <p class="text-xs text-gray-700">Actualizado a las {{ horaCorta(turnoActual.resumen.actualizado_at) }}</p>
+        </div>
+        <BaseButton variant="secondary" size="sm" :disabled="actualizando" @click="actualizarResumen">
+          <RefreshCw :size="14" :class="actualizando ? 'animate-spin' : ''" />
+          {{ actualizando ? 'Actualizando…' : 'Actualizar' }}
+        </BaseButton>
+      </div>
+      <ResumenTurno :resumen="turnoActual.resumen" />
+    </section>
+
     <!-- Historial de turnos -->
     <section class="mt-10">
       <h2 class="section-title">Historial de turnos</h2>
@@ -443,15 +480,8 @@ onMounted(() => {
         <p v-if="turnoDetalle.justificacion_descuadre" class="mt-2 text-xs text-gray-500">
           Justificación: {{ turnoDetalle.justificacion_descuadre }}
         </p>
-        <!-- RN-M06-08: el esperado ya descuenta compras y gastos pagados en efectivo (M03). -->
-        <p v-if="Number(turnoDetalle.gastos_efectivo ?? 0) > 0" class="mt-2 text-xs text-gray-500">
-          El esperado ya descuenta {{ formatoPrecio(Number(turnoDetalle.gastos_efectivo)) }} de compras y gastos pagados en efectivo.
-        </p>
-        <!-- Fase 2, tarea 2 (RN-M06-08): los depósitos de reserva en efectivo entran el día que se reciben. -->
-        <p v-if="Number(turnoDetalle.depositos_efectivo ?? 0) > 0 || Number(turnoDetalle.reembolsos_deposito_efectivo ?? 0) > 0" class="mt-1 text-xs text-gray-500">
-          Incluye {{ formatoPrecio(Number(turnoDetalle.depositos_efectivo ?? 0)) }} de depósitos de reserva recibidos en efectivo<template v-if="Number(turnoDetalle.reembolsos_deposito_efectivo ?? 0) > 0">
-          y descuenta {{ formatoPrecio(Number(turnoDetalle.reembolsos_deposito_efectivo)) }} de depósitos devueltos</template>.
-        </p>
+        <!-- Mejora (16/10/2026): el mismo resumen del turno de hoy (antes, notas sueltas sobre el esperado). -->
+        <ResumenTurno v-if="turnoDetalle.resumen" :resumen="turnoDetalle.resumen" compacto class="mt-5" />
 
         <h3 class="mt-5 text-xs font-semibold uppercase tracking-wide text-gray-400">Pagos</h3>
 
@@ -541,11 +571,16 @@ onMounted(() => {
 
         <!-- Fase 2, tarea 2: depósitos de reserva recibidos o devueltos en este turno. Cuando el cliente
              llega, el depósito se abona a su cuenta sin volver a entrar a la caja. -->
-        <template v-if="turnoDetalle.depositos_reserva?.length || turnoDetalle.depositos_devueltos?.length">
+        <template v-if="turnoDetalle.depositos_reserva?.length || turnoDetalle.depositos_devueltos?.length || turnoDetalle.depositos_en_linea?.length">
           <h3 class="mt-5 text-xs font-semibold uppercase tracking-wide text-gray-400">Depósitos de reserva</h3>
           <ul class="mt-2 space-y-1.5 text-xs text-gray-600">
             <li v-for="r in turnoDetalle.depositos_reserva" :key="`d${r.id}`" class="rounded-lg bg-gray-50 px-3 py-2">
               Recibido {{ formatoPrecio(Number(r.deposito_valor)) }} ({{ METODOS[r.deposito_metodo ?? '']?.texto ?? r.deposito_metodo }}) ·
+              reserva #{{ r.id }} de {{ r.cliente_nombre }}<template v-if="r.mesa">, {{ r.mesa.nombre }}</template>
+            </li>
+            <!-- Mejora (16/10/2026): los pagados en línea ese día, que antes no salían aquí. -->
+            <li v-for="r in turnoDetalle.depositos_en_linea" :key="`l${r.id}`" class="rounded-lg bg-gray-50 px-3 py-2">
+              Recibido {{ formatoPrecio(Number(r.deposito_valor)) }} (en línea<template v-if="r.deposito_pasarela">, {{ r.deposito_pasarela === 'nequi' ? 'Nequi' : 'Bancolombia' }}</template>) ·
               reserva #{{ r.id }} de {{ r.cliente_nombre }}<template v-if="r.mesa">, {{ r.mesa.nombre }}</template>
             </li>
             <li v-for="r in turnoDetalle.depositos_devueltos" :key="`v${r.id}`" class="rounded-lg bg-amber-50 px-3 py-2">

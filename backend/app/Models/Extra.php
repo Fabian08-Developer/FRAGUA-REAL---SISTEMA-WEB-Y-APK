@@ -34,18 +34,23 @@ class Extra extends Model
     /**
      * Si este extra puede acompañar a ese producto (null = línea de combo, sin producto propio).
      * - Específico (RN-M04-05): solo con su propio producto.
-     * - General: con los productos a los que se asoció; si no se asoció a ninguno, con todo el menú.
+     * - General (RF-M04-011, CA-M04-004): solo con los productos a los que el Administrador lo asoció.
+     *
+     * CORREGIDO (16/10/2026, producción): un general sin asociar se ofrecía con todo el menú, y a una
+     * Limonada se le podía pedir "Extra queso". Ahora sigue a M04 al pie de la letra: sin asociar no se
+     * ofrece con ningún producto. La migración 2026_10_23_000001 asoció los generales que había sueltos
+     * a las comidas, para no quitárselos de golpe.
      */
     public function aplicaA(?int $productoId): bool
     {
-        if (! $this->activo) {
+        if (! $this->activo || $productoId === null) {
             return false;
         }
         if (! $this->esGeneral()) {
-            return $productoId !== null && (int) $this->producto_id === $productoId;
+            return (int) $this->producto_id === $productoId;
         }
         $asociados = $this->relationLoaded('productos') ? $this->productos->pluck('id') : $this->productos()->pluck('productos.id');
 
-        return $asociados->isEmpty() || ($productoId !== null && $asociados->contains($productoId));
+        return $asociados->contains($productoId);
     }
 }

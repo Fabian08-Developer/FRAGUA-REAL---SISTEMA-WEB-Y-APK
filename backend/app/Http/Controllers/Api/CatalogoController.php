@@ -17,6 +17,7 @@ use App\Models\Variante;
 use App\Services\CatalogoService;
 use App\Services\ComboService;
 use App\Services\FotoProductoService;
+use App\Services\OfertaService;
 use App\Services\PromocionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -136,12 +137,20 @@ class CatalogoController extends Controller
         // Fase 2, tarea 1 (RF-M04-035): cada producto trae las promociones automáticas de producto o
         // de categoría que le aplican ahora, para mostrar el precio rebajado en el menú, en el QR y
         // al Mesero. Las promociones al total del pedido se ven en el carrito (cotización).
+        // Mejora (16/10/2026): `variante_id` dice si la promoción es de una sola presentación.
         $reglas = $this->promocionService->automaticasVigentes();
         $productos->each(fn (Producto $p) => $p->setAttribute('promociones_vigentes', array_values(array_map(
-            fn ($r) => ['nombre' => $r['nombre'], 'tipo_valor' => $r['tipo_valor'], 'valor' => $r['valor']],
+            fn ($r) => ['nombre' => $r['nombre'], 'tipo_valor' => $r['tipo_valor'], 'valor' => $r['valor'], 'variante_id' => $r['variante_id']],
             array_filter($reglas, fn ($r) => ($r['alcance'] === 'producto' && in_array($p->id, $r['productos'], true))
                 || ($r['alcance'] === 'categoria' && in_array((int) $p->categoria_id, $r['categorias'], true))),
         ))));
+
+        // Mejora (16/10/2026): el personal ve en Catálogo la oferta de cada producto (vigente o próxima),
+        // para quitarla o cambiarla desde ahí.
+        if (! $esPublico) {
+            $ofertas = app(OfertaService::class)->ofertasPorProducto($productos->pluck('id')->all());
+            $productos->each(fn (Producto $p) => $p->setAttribute('oferta', $ofertas[$p->id] ?? null));
+        }
 
         return response()->json($productos);
     }
@@ -152,8 +161,50 @@ class CatalogoController extends Controller
     // cambia (?v=…) cada vez que se sube otra foto.
     public function verFoto(Producto $producto, FotoProductoService $fotos)
     {
-        abort_if(! $fotos->existe($producto), 404);
-        $ruta = (string) $producto->imagen_path;
+        return $this->respuestaFoto($producto, $fotos);
+    }
+
+    public function subirFoto(Request $request, Producto $producto, FotoProductoService $fotos)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+        $this->validarFoto($request);
+
+        return response()->json($fotos->guardar($producto, $request->file('foto'), $request->user())->load(['categoria', 'extrasGenerales:id,nombre']));
+    }
+
+    public function quitarFoto(Request $request, Producto $producto, FotoProductoService $fotos)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+
+        return response()->json($fotos->quitar($producto, $request->user())->load(['categoria', 'extrasGenerales:id,nombre']));
+    }
+
+    // Mejora (16/10/2026): la foto propia de cada presentación (la "Familiar"), con las mismas reglas
+    // que la del producto. Sin foto propia, el Menú muestra la del producto.
+    public function verFotoVariante(Variante $variante, FotoProductoService $fotos)
+    {
+        return $this->respuestaFoto($variante, $fotos);
+    }
+
+    public function subirFotoVariante(Request $request, Variante $variante, FotoProductoService $fotos)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+        $this->validarFoto($request);
+
+        return response()->json($fotos->guardar($variante, $request->file('foto'), $request->user()));
+    }
+
+    public function quitarFotoVariante(Request $request, Variante $variante, FotoProductoService $fotos)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+
+        return response()->json($fotos->quitar($variante, $request->user()));
+    }
+
+    private function respuestaFoto(Producto|Variante $modelo, FotoProductoService $fotos)
+    {
+        abort_if(! $fotos->existe($modelo), 404);
+        $ruta = (string) $modelo->imagen_path;
         $tipo = match (strtolower(pathinfo($ruta, PATHINFO_EXTENSION))) {
             'webp' => 'image/webp',
             'png' => 'image/png',
@@ -166,9 +217,8 @@ class CatalogoController extends Controller
         ], 'inline');
     }
 
-    public function subirFoto(Request $request, Producto $producto, FotoProductoService $fotos)
+    private function validarFoto(Request $request): void
     {
-        abort_if(! $request->user()->esAdministrador(), 403);
         $request->validate([
             'foto' => [
                 'required', 'file', 'mimes:jpg,jpeg,png,webp', 'mimetypes:image/jpeg,image/png,image/webp',
@@ -182,15 +232,6 @@ class CatalogoController extends Controller
             'foto.max' => 'La foto es muy pesada (máximo '.round(config('fragua_real.foto_producto_max_kb', 5120) / 1024).' MB).',
             'foto.dimensions' => 'La foto debe medir al menos 200 × 200 píxeles.',
         ]);
-
-        return response()->json($fotos->guardar($producto, $request->file('foto'), $request->user())->load(['categoria', 'extrasGenerales:id,nombre']));
-    }
-
-    public function quitarFoto(Request $request, Producto $producto, FotoProductoService $fotos)
-    {
-        abort_if(! $request->user()->esAdministrador(), 403);
-
-        return response()->json($fotos->quitar($producto, $request->user())->load(['categoria', 'extrasGenerales:id,nombre']));
     }
 
     public function storeProducto(StoreProductoRequest $request)
@@ -314,7 +355,7 @@ class CatalogoController extends Controller
     // Único listado propio: a diferencia de las variantes y los extras "específicos" (que
     // viajan dentro de su producto vía extrasEspecificos), los extras "generales" no tienen
     // producto_id — no hay forma de descubrirlos salvo pidiéndolos todos aquí.
-    // Fase 2, tarea 3: cada extra general trae los productos a los que se asoció (vacío = todo el menú).
+    // Fase 2, tarea 3: cada extra general trae los productos a los que se asoció (vacío = no se ofrece con ninguno).
     public function extras()
     {
         return response()->json(Extra::with(['producto', 'productos:id,nombre'])->orderBy('nombre')->get());

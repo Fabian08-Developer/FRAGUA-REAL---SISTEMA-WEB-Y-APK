@@ -60,8 +60,16 @@ class CajaController extends Controller
         $depositosDevueltos = Reserva::with('mesa')
             ->where('deposito_reembolso_caja_turno_id', $turno->id)
             ->get(['id', 'mesa_id', 'cliente_nombre', 'fecha_hora', 'deposito_valor', 'deposito_metodo', 'updated_at']);
+        // Mejora (16/10/2026): los depósitos pagados en línea ese día no llevan turno y no se veían aquí.
+        $depositosEnLinea = Reserva::with('mesa')
+            ->whereNull('deposito_caja_turno_id')->where('deposito_metodo', 'en_linea')->where('deposito_pagado', true)
+            ->whereBetween('deposito_pagado_at', [$desde, $hasta])
+            ->latest('deposito_pagado_at')
+            ->get(['id', 'mesa_id', 'cliente_nombre', 'fecha_hora', 'estado', 'deposito_valor', 'deposito_metodo', 'deposito_pasarela', 'deposito_confirmado_via', 'deposito_pagado_at', 'deposito_reembolsado']);
 
         return response()->json(array_merge($turno->toArray(), [
+            'resumen' => $this->cajaService->resumen($turno),
+            'depositos_en_linea' => $depositosEnLinea,
             'pagos_en_linea' => $pagosEnLinea,
             'gastos_efectivo' => $this->cajaService->gastosEnEfectivo($turno),
             'depositos_reserva' => $depositos,
@@ -113,7 +121,11 @@ class CajaController extends Controller
             return response('null', 200)->header('Content-Type', 'application/json');
         }
 
-        return response()->json($turno);
+        // Mejora (16/10/2026): el turno abierto trae su resumen (ingresos por método, de dónde sale el
+        // efectivo esperado, depósitos y anulados), para la tarjeta «Turno de hoy».
+        $this->cajaService->recalcularEfectivoEsperado($turno);
+
+        return response()->json(array_merge($turno->toArray(), ['resumen' => $this->cajaService->resumen($turno)]));
     }
 
     public function abrir(AbrirCajaRequest $request)

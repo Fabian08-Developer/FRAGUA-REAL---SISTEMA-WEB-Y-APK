@@ -1,0 +1,25 @@
+{
+  "id": "/",
+  "name": "Fragua Real Burger",
+  "short_name": "Fragua Real",
+  "description": "Pide a domicilio o para recoger, reserva tu mesa y, si eres del equipo, toma pedidos y maneja el local.",
+  "lang": "es-CO",
+  "dir": "ltr",
+  "start_url": "/?origen=app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#171510",
+  "theme_color": "#171510",
+  "categories": ["food", "shopping", "business"],
+  "icons": [
+    { "src": "/iconos/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/iconos/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/iconos/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Ver el menú", "short_name": "Menú", "url": "/menu?origen=app", "icons": [{ "src": "/iconos/icono-192.png", "sizes": "192x192" }] },
+    { "name": "Reservar mesa", "short_name": "Reservar", "url": "/reservar?origen=app", "icons": [{ "src": "/iconos/icono-192.png", "sizes": "192x192" }] },
+    { "name": "Mi pedido", "short_name": "Mi pedido", "url": "/carrito?origen=app", "icons": [{ "src": "/iconos/icono-192.png", "sizes": "192x192" }] }
+  ]
+}

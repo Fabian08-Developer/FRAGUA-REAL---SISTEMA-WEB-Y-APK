@@ -45,6 +45,9 @@ export interface Variante {
   id: number
   producto_id: number
   nombre: string
+  // Mejora (16/10/2026): lo que trae la presentación y su foto propia (sin foto, se usa la del producto).
+  descripcion?: string | null
+  imagen_url?: string | null
   precio: number
   activa: boolean
   // Fase 1: agotada temporalmente (RF-M04-016); "activa" es la baja del catálogo.
@@ -60,7 +63,7 @@ export interface Extra {
   alcance: 'general' | 'especifico'
   producto_id: number | null
   activo: boolean
-  // Fase 2, tarea 3 (RF-M04-011): productos a los que se asoció un extra general (vacío = todo el menú).
+  // Fase 2, tarea 3 (RF-M04-011): productos a los que se asoció un extra general (vacío = no se ofrece con ninguno).
   productos?: Pick<Producto, 'id' | 'nombre'>[]
 }
 
@@ -87,12 +90,34 @@ export interface Producto {
   combos_desactivados?: string[]
   // Fase 2, tarea 1 (RF-M04-035): promociones automáticas de producto o categoría vigentes ahora.
   promociones_vigentes?: PromocionVigente[]
+  // Mejora (16/10/2026): solo para el personal, la oferta activa del producto (atajo del Catálogo).
+  oferta?: OfertaProducto | null
 }
 
 export interface PromocionVigente {
   nombre: string
   tipo_valor: 'porcentaje' | 'fijo'
   valor: number
+  // Mejora (16/10/2026): si es de una sola presentación (null = todas).
+  variante_id?: number | null
+}
+
+export interface OfertaProducto {
+  promocion_id: number
+  tipo_valor: 'porcentaje' | 'fijo'
+  valor: number
+  variante_id: number | null
+  variante: string | null
+  hasta: string | null
+  vigente: boolean
+}
+
+export interface DatosOferta {
+  modo: 'precio' | 'porcentaje'
+  precio_oferta?: number | null
+  porcentaje?: number | null
+  variante_id?: number | null
+  hasta?: string | null
 }
 
 // Fase 2, tarea 1: lo que rebajó cada promoción (o el descuento manual) en un pedido.
@@ -151,6 +176,10 @@ export interface Promocion {
   franja_fin: string | null
   dias_semana: number[] | null
   activo: boolean
+  // Mejora (16/10/2026): oferta creada desde el producto, y presentación a la que se limita.
+  es_oferta?: boolean
+  variante_id?: number | null
+  variante?: Pick<Variante, 'id' | 'nombre'> | null
   productos?: Producto[]
   categorias?: Categoria[]
 }
@@ -265,6 +294,21 @@ export interface CheckoutPasarela {
 // las columnas abierto_por/cerrado_por al serializar; la llave JSON es snake_case).
 export type EstadoCajaTurno = 'abierta' | 'cerrada'
 
+// Mejora (16/10/2026): resumen del turno (CajaService::resumen) para la Caja del Administrador.
+export interface MontoPorMetodo {
+  metodo: 'efectivo' | 'tarjeta' | 'transferencia' | 'en_linea'
+  monto: number
+  cantidad: number
+}
+
+export interface ResumenCaja {
+  ingresos: { por_metodo: MontoPorMetodo[]; total: number; cantidad: number }
+  efectivo: { base_inicial: number; cobros: number; depositos: number; gastos: number; devoluciones: number; esperado: number }
+  depositos: { por_metodo: MontoPorMetodo[]; total: number; cantidad: number; devueltos: { monto: number; cantidad: number } }
+  anulados: { por_metodo: MontoPorMetodo[]; total: number; cantidad: number }
+  actualizado_at: string
+}
+
 export interface CajaTurno {
   id: number
   fecha: string
@@ -290,6 +334,9 @@ export interface CajaTurno {
   // Fase 2, tarea 2 (RN-M05-16/17, RN-M06-08): depósitos de reserva recibidos y devueltos en el turno.
   depositos_reserva?: Reserva[]
   depositos_devueltos?: Reserva[]
+  // Mejora (16/10/2026): depósitos pagados en línea ese día (no llevan turno) y el resumen del turno.
+  depositos_en_linea?: Reserva[]
+  resumen?: ResumenCaja
   depositos_efectivo?: number
   reembolsos_deposito_efectivo?: number
 }
@@ -530,6 +577,13 @@ export interface CalculoCierre {
   compras: { total: number; por_categoria: { categoria: string; monto: number; cantidad: number }[] }
   gastos: { total: number; por_categoria: { categoria: string; monto: number; cantidad: number }[] }
   compras_gastos_por_forma_de_pago: { metodo: string; compras: number; gastos: number; total: number }[]
+  // Mejora (16/10/2026): depósitos de reserva. Opcionales: los cierres anteriores no los traen.
+  anticipos_reserva?: { total: number; cantidad: number; por_metodo: { metodo: string; monto: number; cantidad: number }[] }
+  depositos_retenidos?: {
+    total: number
+    cantidad: number
+    reservas: { reserva_id: number; cliente: string; mesa: string | null; fecha_hora: string | null; metodo: string; monto: number }[]
+  }
   resultado_operativo: number
   caja: {
     id: number

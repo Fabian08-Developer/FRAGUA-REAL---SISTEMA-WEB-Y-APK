@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#171510" />
+    <title>Sin conexión · Fragua Real Burger</title>
+    <link rel="icon" href="/favicon.svg" />
+    <!-- Mejora (16/10/2026): la muestra el service worker de la app cuando no hay internet. Sin scripts:
+         la política de contenido del sitio no permite código en línea. -->
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #171510;
+        color: #f8f5ee;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        text-align: center;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      img { width: 88px; height: 88px; border-radius: 22px; }
+      h1 { font-family: Georgia, 'Times New Roman', serif; font-weight: 500; font-size: 28px; margin: 24px 0 8px; }
+      p { color: #c7c3bc; font-size: 15px; line-height: 1.5; max-width: 320px; margin: 0 auto; }
+      a {
+        display: inline-block;
+        margin-top: 28px;
+        padding: 14px 28px;
+        border-radius: 12px;
+        background: #d6a43a;
+        color: #171510;
+        font-weight: 600;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/iconos/icono-192.png" alt="Fragua Real Burger" />
+      <h1>Sin conexión</h1>
+      <p>No pudimos conectarnos. Revisa tu internet o tus datos móviles e intenta de nuevo.</p>
+      <a href="/">Reintentar</a>
+    </main>
+  </body>
+</html>

@@ -4,7 +4,7 @@
 // mutaciones (crear/editar categoría o producto, alternar disponibilidad) son exclusivas
 // Administrador (toggleDisponible también la usa Mesero), igual que en el backend.
 import api from './api'
-import type { Categoria, Producto, Combo, Variante, Extra } from '@/types/models'
+import type { Categoria, Producto, Combo, Variante, Extra, DatosOferta, Promocion } from '@/types/models'
 
 export interface CrearCategoriaPayload {
   nombre: string
@@ -27,6 +27,8 @@ export interface CrearProductoPayload {
 export interface CrearVariantePayload {
   producto_id: number
   nombre: string
+  // Mejora (16/10/2026): lo que trae la presentación ("para 3 o 4 personas").
+  descripcion?: string | null
   precio: number
   activa?: boolean
 }
@@ -50,6 +52,35 @@ export interface CrearComboPayload {
   dias_semana?: number[] | null
   activo?: boolean
   productos: { producto_id: number; cantidad: number }[]
+}
+
+// Mejora (16/10/2026): importación masiva de productos (ImportacionProductosService).
+export interface FilaImportacion {
+  fila: number
+  nombre: string
+  categoria: string
+  precio_base: number | null
+  tipo_venta: 'alimento' | 'bebida' | 'otro' | null
+  presentaciones: { nombre: string; precio: number }[]
+  disponible: boolean | null
+  descripcion: string
+  accion: 'crear' | 'actualizar' | 'sin_cambios' | 'error'
+  cambios: string[]
+  errores: string[]
+  producto_id: number | null
+}
+
+export interface VistaPreviaImportacion {
+  filas: FilaImportacion[]
+  resumen: { total: number; crear: number; actualizar: number; sin_cambios: number; errores: number }
+  categorias_nuevas: string[]
+}
+
+function datosImportacion(archivo: File, actualizar: boolean) {
+  const datos = new FormData()
+  datos.append('archivo', archivo)
+  datos.append('actualizar', actualizar ? '1' : '0')
+  return datos
 }
 
 export const catalogoService = {
@@ -100,8 +131,36 @@ export const catalogoService = {
   actualizarVariante(id: number, payload: CrearVariantePayload) {
     return api.put<Variante>(`/variantes/${id}`, payload)
   },
+  // Mejora (16/10/2026): foto propia de la presentación, con las mismas reglas que la del producto.
+  subirFotoVariante(id: number, foto: File) {
+    const datos = new FormData()
+    datos.append('foto', foto)
+    return api.post<Variante>(`/variantes/${id}/foto`, datos)
+  },
+  quitarFotoVariante(id: number) {
+    return api.delete<Variante>(`/variantes/${id}/foto`)
+  },
 
-  // ---- Extras (M04 parte 2) — "general" aplica a todo el menú, "especifico" a un producto ----
+  // Mejora (16/10/2026): atajo «Poner en oferta» (crea o reemplaza la oferta del producto).
+  ponerOferta(productoId: number, datos: DatosOferta) {
+    return api.post<Promocion>(`/productos/${productoId}/oferta`, datos)
+  },
+  quitarOferta(productoId: number) {
+    return api.delete<{ quitadas: number }>(`/productos/${productoId}/oferta`)
+  },
+
+  // Mejora (16/10/2026): importación masiva de productos desde Excel o CSV.
+  plantillaImportacion() {
+    return api.get<Blob>('/productos/importacion/plantilla', { responseType: 'blob' })
+  },
+  vistaPreviaImportacion(archivo: File, actualizar: boolean) {
+    return api.post<VistaPreviaImportacion>('/productos/importacion/vista-previa', datosImportacion(archivo, actualizar))
+  },
+  importarProductos(archivo: File, actualizar: boolean) {
+    return api.post<Pick<VistaPreviaImportacion, 'resumen' | 'categorias_nuevas'>>('/productos/importacion', datosImportacion(archivo, actualizar))
+  },
+
+  // ---- Extras (M04 parte 2) — "general" solo con los productos a los que se asocia, "especifico" con su producto ----
   extras() {
     return api.get<Extra[]>('/extras')
   },

@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\CompraGastoController;
 use App\Http\Controllers\Api\ComprobanteController;
 use App\Http\Controllers\Api\ConfiguracionController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\ImportacionProductosController;
 use App\Http\Controllers\Api\MesaController;
 use App\Http\Controllers\Api\PasarelaController;
 use App\Http\Controllers\Api\PagoController;
@@ -46,6 +47,8 @@ Route::get('/productos', [CatalogoController::class, 'productos']);
 Route::get('/productos/{producto}/promociones', [CatalogoController::class, 'promocionesDeProducto']);
 // Fase 7, tarea 3 (RF-M04-004): la foto del producto, pública (la ve el menú sin sesión).
 Route::get('/productos/{producto}/foto', [CatalogoController::class, 'verFoto'])->middleware('throttle:600,1')->name('productos.foto');
+// Mejora (16/10/2026): la foto propia de una presentación ("Familiar"), pública como la del producto.
+Route::get('/variantes/{variante}/foto', [CatalogoController::class, 'verFotoVariante'])->middleware('throttle:600,1')->name('variantes.foto');
 Route::get('/combos', [CatalogoController::class, 'combos']);
 Route::get('/mesas', [MesaController::class, 'index']);
 // RF-M02-L-025: resolver la mesa de un QR escaneado (pedido por QR, sin cuenta).
@@ -237,6 +240,10 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         // Catálogo (M04)
         Route::post('/categorias', [CatalogoController::class, 'storeCategoria']);
         Route::put('/categorias/{categoria}', [CatalogoController::class, 'updateCategoria']);
+        // Mejora (16/10/2026): importación masiva de productos desde Excel o CSV.
+        Route::get('/productos/importacion/plantilla', [ImportacionProductosController::class, 'plantilla']);
+        Route::post('/productos/importacion/vista-previa', [ImportacionProductosController::class, 'vistaPrevia']);
+        Route::post('/productos/importacion', [ImportacionProductosController::class, 'importar']);
         Route::post('/productos', [CatalogoController::class, 'storeProducto']);
         Route::put('/productos/{producto}', [CatalogoController::class, 'updateProducto']);
         // Fase 7, tarea 3 (RF-M04-004, HU-M04-002): subir o quitar la foto del producto.
@@ -246,6 +253,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         // Catálogo (M04) parte 2: variantes, extras, combos y promociones.
         Route::post('/variantes', [CatalogoController::class, 'storeVariante']);
         Route::put('/variantes/{variante}', [CatalogoController::class, 'updateVariante']);
+        Route::post('/variantes/{variante}/foto', [CatalogoController::class, 'subirFotoVariante']);
+        Route::delete('/variantes/{variante}/foto', [CatalogoController::class, 'quitarFotoVariante']);
 
         Route::get('/extras', [CatalogoController::class, 'extras']);
         Route::post('/extras', [CatalogoController::class, 'storeExtra']);
@@ -262,6 +271,9 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::get('/promociones', [PromocionController::class, 'index']);
         Route::post('/promociones', [PromocionController::class, 'store']);
         Route::put('/promociones/{promocion}', [PromocionController::class, 'update']);
+        // Mejora (16/10/2026): atajo «Poner en oferta» desde el producto (crea o reemplaza su oferta).
+        Route::post('/productos/{producto}/oferta', [PromocionController::class, 'ponerOferta']);
+        Route::delete('/productos/{producto}/oferta', [PromocionController::class, 'quitarOferta']);
 
         // Mesas (M05)
         Route::post('/mesas', [MesaController::class, 'store']);

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\CajaTurno;
 use App\Models\CompraGasto;
+use App\Models\Pago;
 use App\Models\Reserva;
 use App\Models\User;
 use RuntimeException;
@@ -102,6 +103,89 @@ class CajaService
             ->where('deposito_metodo', 'efectivo')
             ->where('deposito_reembolsado', true)
             ->sum('deposito_valor');
+    }
+
+    /**
+     * Mejora (16/10/2026): resumen del turno para el Administrador. Antes la Caja solo mostraba el
+     * efectivo esperado; para saber cuánto entró por tarjeta o transferencia había que sumar los
+     * pagos uno a uno. Ahora (RN-M06-08, RN-M06-11):
+     *  - ingresos: los cobros del turno por método, más los pagos en línea del día;
+     *  - efectivo: de dónde sale el efectivo esperado (base + cobros + depósitos − gastos − devoluciones);
+     *  - depósitos de reserva recibidos en el día por método, incluidos los pagados en línea (antes no
+     *    se veían en Caja), y los devueltos;
+     *  - anulados: aparte, para no confundirlos con lo cobrado.
+     * Solo lee: no cambia el turno.
+     */
+    public function resumen(CajaTurno $turno): array
+    {
+        [$desde, $hasta] = $this->rangoDelTurno($turno);
+        $metodos = ['efectivo', 'tarjeta', 'transferencia', 'en_linea'];
+        $agrupar = fn ($consulta, string $columnaMetodo, string $columnaMonto) => $consulta
+            ->selectRaw("{$columnaMetodo} as metodo, COUNT(*) as cantidad, COALESCE(SUM({$columnaMonto}), 0) as monto")
+            ->groupBy($columnaMetodo)->get()->keyBy('metodo');
+        $fila = fn ($grupos, string $m) => [
+            'metodo' => $m,
+            'monto' => round((float) ($grupos[$m]->monto ?? 0), 2),
+            'cantidad' => (int) ($grupos[$m]->cantidad ?? 0),
+        ];
+
+        // Cobros: los presenciales llevan el turno; los en línea, por el día (ADR-004).
+        $presenciales = $agrupar($turno->pagos()->where('tipo', 'cobro')->where('estado', 'aprobado')->where('anulado', false), 'metodo', 'monto');
+        $enLinea = $agrupar(Pago::where('metodo', 'en_linea')->where('tipo', 'cobro')->where('estado', 'aprobado')
+            ->where('anulado', false)->whereBetween('created_at', [$desde, $hasta]), 'metodo', 'monto');
+        $ingresos = array_map(fn ($m) => $fila($m === 'en_linea' ? $enLinea : $presenciales, $m), $metodos);
+
+        // Depósitos de reserva: los del local llevan el turno; los en línea, por el día en que se pagaron.
+        $depositosLocal = $agrupar(Reserva::where('deposito_caja_turno_id', $turno->id)->where('deposito_pagado', true), 'deposito_metodo', 'deposito_valor');
+        $depositosEnLinea = $agrupar(Reserva::whereNull('deposito_caja_turno_id')->where('deposito_metodo', 'en_linea')
+            ->where('deposito_pagado', true)->whereBetween('deposito_pagado_at', [$desde, $hasta]), 'deposito_metodo', 'deposito_valor');
+        $depositos = array_values(array_filter(
+            array_map(fn ($m) => $fila($m === 'en_linea' ? $depositosEnLinea : $depositosLocal, $m), $metodos),
+            fn ($d) => $d['cantidad'] > 0,
+        ));
+        $devueltos = Reserva::where('deposito_reembolso_caja_turno_id', $turno->id)->where('deposito_reembolsado', true);
+
+        $anulados = Pago::where('tipo', 'cobro')->where('anulado', true)
+            ->where(fn ($q) => $q->where('caja_turno_id', $turno->id)
+                ->orWhere(fn ($q) => $q->where('metodo', 'en_linea')->whereBetween('created_at', [$desde, $hasta])));
+        $anuladosPorMetodo = $agrupar(clone $anulados, 'metodo', 'monto');
+
+        $cobrosEfectivo = $ingresos[0]['monto'];
+        $depositosEfectivo = $this->depositosEnEfectivo($turno);
+        $gastosEfectivo = $this->gastosEnEfectivo($turno);
+        $devolucionesEfectivo = $this->reembolsosDeDepositoEnEfectivo($turno);
+
+        return [
+            'ingresos' => [
+                'por_metodo' => $ingresos,
+                'total' => round(array_sum(array_column($ingresos, 'monto')), 2),
+                'cantidad' => array_sum(array_column($ingresos, 'cantidad')),
+            ],
+            'efectivo' => [
+                'base_inicial' => (float) $turno->base_inicial,
+                'cobros' => $cobrosEfectivo,
+                'depositos' => $depositosEfectivo,
+                'gastos' => $gastosEfectivo,
+                'devoluciones' => $devolucionesEfectivo,
+                // Con la caja cerrada se muestra el esperado del arqueo; lo que cambie después (un
+                // ajuste extraordinario) se ve en sus partes y en «Ajustes extraordinarios».
+                'esperado' => $turno->estaAbierta()
+                    ? round((float) $turno->base_inicial + $cobrosEfectivo + $depositosEfectivo - $gastosEfectivo - $devolucionesEfectivo, 2)
+                    : (float) $turno->efectivo_esperado,
+            ],
+            'depositos' => [
+                'por_metodo' => $depositos,
+                'total' => round(array_sum(array_column($depositos, 'monto')), 2),
+                'cantidad' => array_sum(array_column($depositos, 'cantidad')),
+                'devueltos' => ['monto' => round((float) (clone $devueltos)->sum('deposito_valor'), 2), 'cantidad' => (clone $devueltos)->count()],
+            ],
+            'anulados' => [
+                'por_metodo' => array_values(array_filter(array_map(fn ($m) => $fila($anuladosPorMetodo, $m), $metodos), fn ($a) => $a['cantidad'] > 0)),
+                'total' => round((float) (clone $anulados)->sum('monto'), 2),
+                'cantidad' => (clone $anulados)->count(),
+            ],
+            'actualizado_at' => now()->toIso8601String(),
+        ];
     }
 
     // RF-M06-013: compras y gastos activos pagados en efectivo con la fecha del turno.

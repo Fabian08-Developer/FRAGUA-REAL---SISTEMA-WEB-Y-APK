@@ -7,6 +7,8 @@ import App from './App.vue'
 import router from './router'
 import { useAuthStore } from './stores/auth'
 import { EVENTO_SESION_INVALIDA } from './services/api'
+// Mejora (16/10/2026): escucha desde el arranque el aviso del navegador para instalar la app (PWA).
+import './composables/useInstalarApp'
 
 const app = createApp(App)
 
@@ -36,3 +38,13 @@ window.addEventListener(EVENTO_SESION_INVALIDA, () => {
 })
 
 app.mount('#app')
+
+// Mejora (16/10/2026): app instalable (PWA). El service worker (public/sw.js) solo se registra en la
+// versión compilada: en desarrollo guardaría archivos de Vite que cambian a cada rato.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Sin service worker el sitio funciona igual; solo no se puede instalar ni hay página sin conexión.
+    })
+  })
+}

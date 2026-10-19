@@ -6,7 +6,7 @@ sistema y dónde está cada documento, empieza por [`README.md`](README.md); la 
 backend está en [`README-BACKEND.md`](README-BACKEND.md), la base de datos en
 [`BASE-DE-DATOS.md`](BASE-DE-DATOS.md) y los endpoints en [`API.md`](API.md).
 
-**Estado al 13/10/2026**: plan de implementación completo (Fases 0 a 7), 321 pruebas automáticas que
+**Estado al 16/10/2026**: plan de implementación completo (Fases 0 a 7) y mejoras del 16/10/2026, 344 pruebas automáticas que
 pasan en SQLite y PostgreSQL. Falta solo lo que no es código: la cuenta comercial de Wompi, el
 proveedor de SMS y el agente local de impresión (ver «Qué falta a propósito»).
 
@@ -16,6 +16,7 @@ proveedor de SMS y el agente local de impresión (ver «Qué falta a propósito�
 - [Correrlo en el equipo de desarrollo](#correrlo-en-el-equipo-de-desarrollo)
 - [Ponerlo en el servidor (VPS)](#ponerlo-en-el-servidor-vps)
 - [Después de cada despliegue](#después-de-cada-despliegue)
+- [App instalable en el teléfono (PWA)](#app-instalable-en-el-teléfono-pwa)
 - [Decisiones del negocio](#decisiones-del-negocio)
 - [Qué falta a propósito](#qué-falta-a-propósito)
 - [Cambios de comportamiento por fase](#cambios-de-comportamiento-por-fase)
@@ -336,6 +337,71 @@ cd ../frontend && sudo -u www-data -H npm ci && sudo -u www-data -H npm run buil
 
 Si cambió algún archivo de `backend/deploy/`, volver a copiarlo a su lugar (pasos 6 y 7).
 
+## App instalable en el teléfono (PWA)
+
+Decisión del 16/10/2026: la «aplicación móvil» de la Idea de Negocio se entrega como **app instalable
+desde el navegador** (PWA), no como un archivo APK. Es el mismo sistema, con el mismo código y la misma
+dirección; no hay que publicarla en Play Store ni en App Store, y cada despliegue la actualiza sola.
+
+### Qué obtiene quien la instala
+
+- Un ícono de Fragua Real en la pantalla de inicio (o en el menú de inicio del computador) y la app
+  abre en pantalla completa, sin la barra del navegador.
+- Accesos directos al mantener presionado el ícono (Android): Ver el menú, Reservar mesa, Mi pedido.
+- Al abrirla, el Mesero y el Administrador con sesión entran directo a su panel; el Cliente, al inicio.
+- Carga más rápida: el código de la app y las fotos del menú quedan guardados en el teléfono.
+- Sin internet, muestra «Sin conexión» con un botón para reintentar. Pedir, cobrar o reservar necesita
+  conexión (no hay modo sin internet: los precios, la caja y la disponibilidad salen del servidor).
+
+### Cómo se instala
+
+| Dónde | Pasos |
+|---|---|
+| Android (Chrome, Edge, Samsung Internet) | Abrir el sitio, menú hamburguesa > **Instalar app** (o el aviso «Instalar» del navegador, o ⋮ > *Instalar app*). |
+| iPhone o iPad (Safari) | Menú hamburguesa > **Instalar app** muestra los pasos: Compartir > *Agregar a inicio* > *Agregar*. |
+| Computador (Chrome o Edge) | Ícono de instalar en la barra de direcciones, o ⋮ > *Instalar Fragua Real Burger*. |
+| Tableta o teléfono del personal | Iniciar sesión y, en la barra lateral, **Instalar app**. |
+
+El botón «Instalar app» solo aparece cuando el navegador permite instalarla y la app todavía no está
+instalada. Necesita **HTTPS** (el VPS ya lo tiene); en `http` el navegador no ofrece instalarla.
+
+### Qué guarda en el teléfono (y qué no)
+
+`frontend/public/sw.js` (service worker):
+
+- **Sí guarda:** los archivos de la app (`/assets/*`, con huella en el nombre), los íconos, la página
+  «Sin conexión» y las fotos públicas del menú (`/api/productos/{id}/foto`, `/api/variantes/{id}/foto`,
+  hasta 150).
+- **Nunca guarda:** el resto de la API (pedidos, sesiones, caja, reportes, datos personales); esas
+  peticiones siempre van al servidor.
+- Las páginas se piden primero al servidor, así siempre se ve la última versión.
+
+### Actualizaciones
+
+Cada despliegue (`npm run build`) genera archivos con nombres nuevos y la app los toma la siguiente vez
+que se abre; no hay que reinstalar nada. Si se cambia `sw.js`, subir el número de `VERSION` dentro del
+archivo para que se borren las copias anteriores en los teléfonos.
+
+### En el servidor
+
+`backend/deploy/nginx-fragua-real.conf` sirve `sw.js` y `manifest.webmanifest` sin caché del navegador,
+para que una versión nueva llegue enseguida. **Después de este cambio hay que volver a copiar ese
+archivo** al VPS (paso 6, «Poner la configuración completa»), cambiar el dominio y PHP 8.4 como la
+primera vez, y recargar Nginx.
+
+### Archivos
+
+| Archivo | Para qué |
+|---|---|
+| `frontend/public/manifest.webmanifest` | Nombre, colores, íconos, accesos directos y dirección de inicio (`/?origen=app`) |
+| `frontend/public/sw.js` | Service worker: qué se guarda en el teléfono |
+| `frontend/public/offline.html` | Página «Sin conexión» |
+| `frontend/public/iconos/` | Íconos de 192 y 512 px, el adaptable de Android y el del iPhone |
+| `frontend/src/composables/useInstalarApp.ts`, `components/common/BotonInstalarApp.vue` | Botón «Instalar app» y pasos para iPhone |
+
+Si más adelante se quiere un APK para Play Store, la misma app se puede empaquetar con una
+*Trusted Web Activity* (Bubblewrap) sin reescribir nada; hoy no hace falta.
+
 ## Decisiones del negocio
 
 | # | Decisión | Qué se decidió | Fecha |
@@ -439,7 +505,8 @@ actualizar y para explicar el cambio a quien opera el local. El detalle técnico
   exige la caja abierta y lo resta. El detalle del turno en Caja lista los depósitos.
 - En Reportes > Ventas por método, el abono del depósito sale como "Depósito de reserva".
 - En Catálogo, cada producto elige qué extras generales ofrece; un extra general sin productos
-  elegidos se ofrece con todo el menú. El Menú, el QR de mesa y el pedido del Mesero muestran
+  elegidos se ofrecía con todo el menú (corregido el 16/10/2026: ahora no se ofrece con ninguno, y
+  los que estaban sueltos quedaron asociados a los productos de tipo Alimento). El Menú, el QR de mesa y el pedido del Mesero muestran
   ahora los mismos extras (antes los generales no salían en ninguno).
 - Dar de baja un producto desactiva los combos que lo usan, y el combo no se puede volver a
   activar hasta quitar o reemplazar ese producto. Desactivar una categoría oculta sus productos
@@ -626,6 +693,54 @@ Al escribir `QA-CLIENTE.md` y `QA-MESERO.md` se cruzó cada pantalla con el cód
   - la extensión GD de PHP (`sudo apt install php-gd`; la «Revisión antes de producción» avisa si
     falta);
   - incluir `storage/app/private/productos` en las copias de seguridad.
+
+### Mejoras en producción (16/10/2026)
+
+- Menú hamburguesa del celular: «Ingresar» va arriba, como botón, y el menú ya no queda tapado por
+  la barra del navegador.
+- Extras generales según M04 (RF-M04-011, CA-M04-004): se ofrecen solo con los productos a los que
+  se asocian. Antes, uno sin asociar salía con todo el menú (a una Limonada se le podía pedir
+  «Extra queso»). La migración `2026_10_23_000001` asoció los que estaban sueltos a los productos de
+  tipo Alimento.
+- Cada presentación tiene descripción («para 3 o 4 personas») y foto propias. En el Menú, el QR y el
+  pedido del Mesero se ve qué trae cada una; al elegirla, el Menú y el QR muestran su foto (sin foto
+  propia, la del producto).
+- «Poner en oferta» en Catálogo > Productos: precio de oferta o porcentaje, hasta qué día y, si se
+  quiere, una sola presentación (la «Familiar»). Es una promoción automática más: se ve con precio
+  tachado, se combina con las demás y un descuento manual la reemplaza. Un producto tiene una oferta a
+  la vez. El precio del botón «Agregar» del Menú y del QR ya trae la oferta.
+- Caja: el turno de hoy y el detalle de cada turno muestran los ingresos del día por método
+  (efectivo, tarjeta, transferencia y en línea), de dónde sale el efectivo esperado (base + cobros +
+  depósitos − gastos − devoluciones), los depósitos de reserva del día (también los pagados en línea,
+  que antes no salían en Caja) y los pagos anulados aparte. Botón «Actualizar» para ver los cobros
+  nuevos sin recargar.
+- Cierre diario: muestra los anticipos de reservas recibidos en el día (todavía no son venta) y los
+  depósitos retenidos por no-show, que cuentan como ingreso del día en que se marca el no-show
+  (RN-M05-18) y suman al resultado operativo. El reporte «Resultado operativo» los muestra como
+  «Depósitos retenidos (no-show)». Los cierres hechos antes de este cambio no los traen.
+- Importar productos desde Excel: Catálogo > Productos > «Importar». Se descarga la plantilla
+  (Categoría, Nombre, Descripción, Precio base, Tipo de venta, Presentaciones, Disponible), se sube el
+  archivo y se ve qué pasará con cada fila (nuevo, se actualiza, sin cambios o error) antes de guardar.
+  Con un solo error no se guarda nada. Con «Actualizar los que ya existen» sirve para cambiar los
+  precios de todo el menú de una vez (las celdas vacías no borran nada). Una categoría que no existe se
+  crea. Acepta Excel y CSV (también el de Excel en español, con «;»), hasta 500 productos. Fotos,
+  extras y combos se siguen manejando en Catálogo.
+- Carrito del cliente: lo que se agrega dos veces igual se suma en una sola línea; se guarda en el
+  navegador por 24 horas (ya no se pierde al recargar) y, al volver, se actualiza con el menú de hoy,
+  avisando si se quitó algo. Nuevo diseño con foto, presentación, extras, precio por unidad y resumen.
+- Botón flotante del pedido con la cantidad, en lugar de la barra fija de abajo, y un aviso breve al
+  agregar («Agregado: Jugo en Agua · Ver pedido»).
+- Web del cliente: el pie de página ya no sube mientras cargan las páginas; Reservar con pasos
+  numerados, mesas como botones y el depósito a la vista; pie de página rediseñado para celular; en
+  tablet, menú hamburguesa.
+- Administrador: pestañas «Mesas | Reservas» para ver todas las reservas sin entrar por una mesa.
+- App instalable en el teléfono (PWA): botón «Instalar app», ícono en la pantalla de inicio, pantalla
+  completa y página «Sin conexión» (ver «App instalable en el teléfono (PWA)»). Hay que volver a copiar
+  `nginx-fragua-real.conf` al VPS.
+- Revisión antes de producción: ya no avisa «LOG_LEVEL=debug» cuando el `.env` dice `warning` con
+  `LOG_STACK=daily` (leía el canal equivocado).
+- En el servidor: `php artisan migrate --force` (tres migraciones `2026_10_23_*`); las fotos de las
+  presentaciones quedan en `storage/app/private/variantes`, dentro del respaldo diario.
 
 ## Datos de prueba en la base de desarrollo
 

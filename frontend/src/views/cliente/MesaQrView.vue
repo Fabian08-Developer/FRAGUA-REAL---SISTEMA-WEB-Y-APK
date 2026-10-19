@@ -12,8 +12,9 @@
 // pago (el Mesero cobra después, igual que Recogida) ni campos que no sean necesarios.
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { AlertTriangle, ArrowLeft, CheckCircle2, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-vue-next'
+import { AlertTriangle, ArrowLeft, CheckCircle2, Minus, Plus, Trash2 } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
+import CarritoFlotante from '@/components/common/CarritoFlotante.vue'
 import { extrasDe } from '@/utils/extras'
 import { mesaService } from '@/services/mesa.service'
 import { catalogoService } from '@/services/catalogo.service'
@@ -90,15 +91,18 @@ function alternarExtra(extra: Extra) {
   else extrasSeleccionados.value.push(extra)
 }
 
+// Mejora (16/10/2026): el precio del botón ya trae la oferta de la presentación elegida.
 const precioSeleccion = computed(() => {
   if (comboAbierto.value) return Number(comboAbierto.value.precio)
-  if (!productoAbierto.value) return 0
-  return carrito.precioUnitario({
-    producto: productoAbierto.value,
-    variante: varianteSeleccionada.value,
-    extras: extrasSeleccionados.value,
-  })
+  const producto = productoAbierto.value
+  if (!producto) return 0
+  const variante = varianteSeleccionada.value
+  const base = Number(variante?.precio ?? producto.precio_base)
+  const extras = extrasSeleccionados.value.reduce((acc, e) => acc + Number(e.precio), 0)
+  return precioConPromocion(producto, base, variante?.id ?? null) + extras
 })
+
+const fotoSeleccion = computed(() => varianteSeleccionada.value?.imagen_url || productoAbierto.value?.imagen_url || '')
 
 function confirmarAgregar() {
   if (comboAbierto.value) {
@@ -121,8 +125,15 @@ function confirmarAgregar() {
   } else {
     return
   }
+  // Mejora de diseño (16/10/2026): aviso breve de lo que se agregó (lo muestra CarritoFlotante).
+  const nombre = comboAbierto.value?.nombre ?? productoAbierto.value?.nombre ?? ''
+  const presentacion = varianteSeleccionada.value && !comboAbierto.value ? ` (${varianteSeleccionada.value.nombre})` : ''
+  const unidades = cantidadSeleccionada.value > 1 ? `${cantidadSeleccionada.value} × ` : ''
+  avisoAgregado.value = { id: Date.now(), texto: `Agregado: ${unidades}${nombre}${presentacion}` }
   cerrarModal()
 }
+
+const avisoAgregado = ref<{ id: number; texto: string } | null>(null)
 
 // ---- Pasos de la página: menú → carrito → confirmación ----
 const paso = ref<'menu' | 'carrito' | 'confirmado'>('menu')
@@ -163,9 +174,11 @@ function formatoPrecio(valor: number) {
 onMounted(async () => {
   // Pedido nuevo cada vez que se escanea un QR: si el celular traía algo en el carrito
   // de una sesión de Domicilio/Recogida sin terminar, no se mezcla con este pedido local.
-  carrito.vaciar()
-
+  // Corrección (16/10/2026): el carrito ahora se guarda en el navegador; si es de esta misma mesa
+  // (se recargó la página) se conserva y se actualiza con el catálogo de hoy.
   const qrCode = String(route.params.qr_code)
+  carrito.usarOrigen(`mesa:${qrCode}`)
+  carrito.actualizarConCatalogo()
   try {
     const { data } = await mesaService.porQrCode(qrCode)
     mesa.value = data
@@ -422,7 +435,10 @@ onMounted(async () => {
                 </p>
                 <p class="mt-1 text-sm text-ink">
                   <template v-if="etiquetaPromocion(producto)">
-                    <span class="mr-1 text-xs text-[#a59d90] line-through">{{ formatoPrecio(Number(producto.precio_base)) }}</span>{{ formatoPrecio(precioConPromocion(producto, Number(producto.precio_base))) }}
+                    <span
+                      v-if="precioConPromocion(producto, Number(producto.precio_base)) < Number(producto.precio_base)"
+                      class="mr-1 text-xs text-[#a59d90] line-through"
+                    >{{ formatoPrecio(Number(producto.precio_base)) }}</span>{{ formatoPrecio(precioConPromocion(producto, Number(producto.precio_base))) }}
                     <span class="ml-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">{{ etiquetaPromocion(producto) }}</span>
                   </template>
                   <template v-else>{{ formatoPrecio(Number(producto.precio_base)) }}</template>
@@ -440,23 +456,15 @@ onMounted(async () => {
         </template>
       </div>
 
-      <!-- Barra inferior fija: ver pedido / total — igual criterio que MenuView.vue -->
-      <div
-        v-if="paso === 'menu' && carrito.lineas.length > 0"
-        class="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-ink px-4 py-4 sm:px-6"
-      >
-        <button
-          type="button"
-          class="mx-auto flex max-w-2xl w-full items-center justify-between gap-4 rounded-xl bg-[#393630] px-5 py-3.5 text-left transition hover:bg-[#454239]"
-          @click="paso = 'carrito'"
-        >
-          <span class="flex items-center gap-2 text-sm font-medium text-brand-500">
-            <ShoppingBag :size="16" />
-            Ver mi pedido · {{ carrito.totalProductos }}
-          </span>
-          <span class="text-sm text-white">{{ formatoPrecio(totalConPromociones) }}</span>
-        </button>
-      </div>
+      <!-- Mejora de diseño (16/10/2026): botón flotante del pedido (antes, una barra fija a todo lo
+           ancho). Aquí se ve también en escritorio: esta pantalla no tiene «Mi pedido» en el encabezado. -->
+      <CarritoFlotante
+        v-if="paso === 'menu'"
+        :cantidad="carrito.totalProductos"
+        :aviso="avisoAgregado"
+        :oculto="modalAbierto"
+        @abrir="paso = 'carrito'"
+      />
     </template>
 
     <!-- Personalizar producto -->
@@ -466,10 +474,12 @@ onMounted(async () => {
       @update:model-value="cerrarModal"
     >
       <div v-if="modalAbierto" class="space-y-5">
+        <!-- Mejora (16/10/2026): con presentación elegida, su foto propia si la tiene. -->
         <img
-          v-if="productoAbierto?.imagen_url"
-          :src="productoAbierto.imagen_url"
-          :alt="productoAbierto.nombre"
+          v-if="productoAbierto && fotoSeleccion"
+          :key="fotoSeleccion"
+          :src="fotoSeleccion"
+          :alt="varianteSeleccionada ? `${productoAbierto.nombre} ${varianteSeleccionada.nombre}` : productoAbierto.nombre"
           class="aspect-[4/3] w-full rounded-xl object-cover"
         />
         <p v-if="productoAbierto?.descripcion" class="text-sm text-[#6c655c]">{{ productoAbierto.descripcion }}</p>
@@ -496,9 +506,18 @@ onMounted(async () => {
                   :checked="varianteSeleccionada?.id === variante.id"
                   @change="varianteSeleccionada = variante"
                 />
-                {{ variante.nombre }}
+                <span>
+                  <span class="block">{{ variante.nombre }}</span>
+                  <span v-if="variante.descripcion" class="mt-0.5 block text-xs leading-snug text-[#7d756b]">{{ variante.descripcion }}</span>
+                </span>
               </span>
-              <span class="text-brand-800">{{ formatoPrecio(Number(variante.precio)) }}</span>
+              <span class="shrink-0 text-right text-brand-800">
+                <template v-if="precioConPromocion(productoAbierto!, Number(variante.precio), variante.id) < Number(variante.precio)">
+                  <span class="block text-[11px] text-[#a59d90] line-through">{{ formatoPrecio(Number(variante.precio)) }}</span>
+                  <span class="font-semibold text-emerald-700">{{ formatoPrecio(precioConPromocion(productoAbierto!, Number(variante.precio), variante.id)) }}</span>
+                </template>
+                <template v-else>{{ formatoPrecio(Number(variante.precio)) }}</template>
+              </span>
             </label>
           </div>
         </div>

@@ -119,6 +119,8 @@ class PromocionService
             'promocion_id' => $promocion->id,
             'nombre' => $promocion->nombre,
             'alcance' => $promocion->alcance,
+            // Mejora (16/10/2026): solo esa presentación del producto (null = todas).
+            'variante_id' => $promocion->variante_id ? (int) $promocion->variante_id : null,
             'tipo_valor' => $promocion->tipo_valor,
             'valor' => (float) $promocion->valor,
             'productos' => $promocion->productos->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
@@ -129,7 +131,7 @@ class PromocionService
     /**
      * Reparte las rebajas de las reglas sobre las líneas.
      *
-     * @param  array<int|string, array{producto_id: ?int, categoria_id: ?int, es_combo: bool, cantidad: int, precio_unitario: float, extras_unitario: float}>  $lineas
+     * @param  array<int|string, array{producto_id: ?int, variante_id?: ?int, categoria_id: ?int, es_combo: bool, cantidad: int, precio_unitario: float, extras_unitario: float}>  $lineas
      * @param  array<int, array<string, mixed>>  $reglas
      * @return array{por_linea: array<int|string, float>, total: float, aplicadas: array<int, array{promocion_id: ?int, nombre: string, monto: float}>}
      */
@@ -212,8 +214,15 @@ class PromocionService
             return false;
         }
 
-        return $regla['alcance'] === 'producto'
-            ? in_array((int) $linea['producto_id'], $regla['productos'] ?? [], true)
-            : in_array((int) $linea['categoria_id'], $regla['categorias'] ?? [], true);
+        if ($regla['alcance'] !== 'producto') {
+            return in_array((int) $linea['categoria_id'], $regla['categorias'] ?? [], true);
+        }
+
+        // Mejora (16/10/2026): una promoción de una sola presentación no rebaja las demás. Las fotos de
+        // reglas guardadas antes en un pedido no traen `variante_id`: aplican a todas, como entonces.
+        $variante = $regla['variante_id'] ?? null;
+
+        return in_array((int) $linea['producto_id'], $regla['productos'] ?? [], true)
+            && ($variante === null || (int) ($linea['variante_id'] ?? 0) === (int) $variante);
     }
 }

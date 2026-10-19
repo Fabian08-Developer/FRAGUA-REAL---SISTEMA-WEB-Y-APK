@@ -240,12 +240,23 @@ class ReporteService
                 ->sum('valor');
         }
 
+        // Mejora (16/10/2026): los depósitos que el negocio retuvo por no-show (RN-M05-18) son un
+        // ingreso del día en que se marcó el no-show, aparte de las ventas. Se calculan siempre con las
+        // reservas (también en días con cierre), porque los cierres anteriores a esta mejora no los
+        // traían; es el mismo valor que guarda el cierre.
+        $zona = 'America/Bogota';
+        $otrosIngresos = app(CierreDiarioService::class)->depositosRetenidos(
+            CarbonImmutable::parse($desdeFecha, $zona)->startOfDay(),
+            CarbonImmutable::parse($hastaFecha, $zona)->endOfDay(),
+        )['total'];
+
         return [
             'resumen' => [
                 'total_ventas' => $totalVentas,
+                'otros_ingresos' => $otrosIngresos,
                 'total_compras' => $totalCompras,
                 'total_gastos' => $totalGastos,
-                'resultado_operativo' => $totalVentas - $totalCompras - $totalGastos,
+                'resultado_operativo' => $totalVentas + $otrosIngresos - $totalCompras - $totalGastos,
             ],
         ];
     }

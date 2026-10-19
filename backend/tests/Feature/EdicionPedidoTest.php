@@ -47,6 +47,7 @@ class EdicionPedidoTest extends TestCase
         $this->hamburguesa = Producto::create(['categoria_id' => $categoria->id, 'nombre' => 'Clásica', 'precio_base' => 20000, 'tipo_venta' => 'alimento']);
         $this->gaseosa = Producto::create(['categoria_id' => $categoria->id, 'nombre' => 'Gaseosa', 'precio_base' => 4000, 'tipo_venta' => 'bebida']);
         $this->tocineta = Extra::create(['nombre' => 'Tocineta', 'precio' => 3000, 'alcance' => 'general', 'activo' => true]);
+        $this->tocineta->productos()->attach($this->hamburguesa->id);
         $this->mesa = Mesa::create(['nombre' => 'Mesa 1', 'qr_code' => 'qr-1']);
     }
 

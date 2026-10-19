@@ -8,8 +8,9 @@
 // Revisión por rol (13/10/2026, RF-M04-020/031): pestaña "Combos" con GET /combos (solo los
 // que hoy se pueden pedir). Antes el Cliente no podía pedir combos ni en la web ni por QR.
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { X } from 'lucide-vue-next'
+import CarritoFlotante from '@/components/common/CarritoFlotante.vue'
 import { catalogoService } from '@/services/catalogo.service'
 import { extrasDe } from '@/utils/extras'
 import { useCarritoStore } from '@/stores/carrito'
@@ -47,6 +48,7 @@ const notas = ref('')
 const mostrarConfiguradorMovil = ref(false)
 
 const carrito = useCarritoStore()
+const router = useRouter()
 const route = useRoute()
 
 async function cargar() {
@@ -154,15 +156,20 @@ function alternarExtra(extra: Extra) {
   }
 }
 
+// Mejora (16/10/2026): el precio del botón "Agregar" ya trae la oferta de la presentación elegida
+// (antes se veía el precio normal aunque el producto estuviera en promoción).
 const precioSeleccion = computed(() => {
   if (comboSeleccionado.value) return Number(comboSeleccionado.value.precio)
-  if (!productoSeleccionado.value) return 0
-  return carrito.precioUnitario({
-    producto: productoSeleccionado.value,
-    variante: varianteSeleccionada.value,
-    extras: extrasSeleccionados.value,
-  })
+  const producto = productoSeleccionado.value
+  if (!producto) return 0
+  const variante = varianteSeleccionada.value
+  const base = Number(variante?.precio ?? producto.precio_base)
+  const extras = extrasSeleccionados.value.reduce((acc, e) => acc + Number(e.precio), 0)
+  return precioConPromocion(producto, base, variante?.id ?? null) + extras
 })
+
+// Mejora (16/10/2026): al elegir una presentación con foto propia ("Familiar"), se ve esa foto.
+const fotoSeleccion = computed(() => varianteSeleccionada.value?.imagen_url || productoSeleccionado.value?.imagen_url || '')
 
 function agregarAlPedido() {
   if (comboSeleccionado.value) {
@@ -185,11 +192,17 @@ function agregarAlPedido() {
   } else {
     return
   }
+  // Mejora de diseño (16/10/2026): aviso breve de lo que se agregó (lo muestra CarritoFlotante).
+  const nombre = comboSeleccionado.value?.nombre ?? productoSeleccionado.value?.nombre ?? ''
+  const presentacion = varianteSeleccionada.value && !comboSeleccionado.value ? ` (${varianteSeleccionada.value.nombre})` : ''
+  avisoAgregado.value = { id: Date.now(), texto: `Agregado: ${cantidad.value > 1 ? `${cantidad.value} × ` : ''}${nombre}${presentacion}` }
   cantidad.value = 1
   extrasSeleccionados.value = []
   notas.value = ''
   mostrarConfiguradorMovil.value = false
 }
+
+const avisoAgregado = ref<{ id: number; texto: string } | null>(null)
 
 function formatoPrecio(valor: number) {
   return valor.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
@@ -206,7 +219,29 @@ function formatoPrecio(valor: number) {
     <p class="mt-3 text-[15px] text-[#6c655c]">Elige tu favorito, personalízalo y agrégalo a tu pedido.</p>
 
     <p v-if="error" class="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{{ error }}</p>
-    <p v-else-if="cargando" class="mt-10 text-sm text-[#6c655c]">Cargando el menú…</p>
+    <!-- CORREGIDO (16/10/2026, producción): mientras cargaba solo había una línea de texto, la página
+         quedaba casi vacía y el pie de página subía hasta la mitad de la pantalla. Ahora se reserva el
+         espacio del menú con la misma forma que tendrá (categorías y tarjetas). -->
+    <div v-else-if="cargando" class="min-h-[70dvh]" role="status" aria-live="polite">
+      <span class="sr-only">Cargando el menú…</span>
+      <div class="mt-8 flex gap-2 overflow-hidden border-b border-[#e2dbcf] pb-3" aria-hidden="true">
+        <span v-for="n in 5" :key="n" class="h-10 w-32 shrink-0 animate-pulse rounded-full bg-[#ece5d9]" />
+      </div>
+      <div class="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]" aria-hidden="true">
+        <div>
+          <span class="mb-4 block h-7 w-40 animate-pulse rounded-lg bg-[#ece5d9]" />
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div v-for="n in 4" :key="n" class="rounded-2xl border border-[#e9e3d8] bg-white p-4">
+              <span class="block aspect-[4/3] animate-pulse rounded-xl bg-[#efe8db]" />
+              <span class="mt-4 block h-5 w-2/3 animate-pulse rounded bg-[#ece5d9]" />
+              <span class="mt-2 block h-3 w-full animate-pulse rounded bg-[#f1ece3]" />
+              <span class="mt-4 block h-4 w-1/3 animate-pulse rounded bg-[#ece5d9]" />
+            </div>
+          </div>
+        </div>
+        <div class="hidden h-96 animate-pulse rounded-2xl bg-[#f3eee5] lg:block" />
+      </div>
+    </div>
 
     <template v-else>
       <nav class="mt-8 flex gap-2 overflow-x-auto border-b border-[#e2dbcf] pb-3">
@@ -315,7 +350,7 @@ function formatoPrecio(valor: number) {
                 <div>
                   <p class="text-[10px] text-[#8a8379]">Desde</p>
                   <p class="text-base text-ink">
-                    <template v-if="etiquetaPromocion(producto)">
+                    <template v-if="precioConPromocion(producto, Number(producto.precio_base)) < Number(producto.precio_base)">
                       <span class="mr-1 text-xs text-[#a59d90] line-through">{{ formatoPrecio(Number(producto.precio_base)) }}</span>{{ formatoPrecio(precioConPromocion(producto, Number(producto.precio_base))) }}
                     </template>
                     <template v-else>{{ formatoPrecio(Number(producto.precio_base)) }}</template>
@@ -371,9 +406,10 @@ function formatoPrecio(valor: number) {
               class="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[#efe8db] to-[#e0d6c2] text-brand-700/60"
             >
               <img
-                v-if="productoSeleccionado?.imagen_url"
-                :src="productoSeleccionado.imagen_url"
-                :alt="productoSeleccionado.nombre"
+                v-if="productoSeleccionado && fotoSeleccion"
+                :key="fotoSeleccion"
+                :src="fotoSeleccion"
+                :alt="varianteSeleccionada ? `${productoSeleccionado.nombre} ${varianteSeleccionada.nombre}` : productoSeleccionado.nombre"
                 class="size-full object-cover"
               />
               <component :is="iconoPara(comboSeleccionado?.nombre ?? productoSeleccionado?.nombre ?? '')" v-else :size="56" :stroke-width="1.5" />
@@ -410,9 +446,19 @@ function formatoPrecio(valor: number) {
                       :checked="varianteSeleccionada?.id === variante.id"
                       @change="varianteSeleccionada = variante"
                     />
-                    {{ variante.nombre }}
+                    <span>
+                      <span class="block">{{ variante.nombre }}</span>
+                      <!-- Mejora (16/10/2026): qué trae cada presentación. -->
+                      <span v-if="variante.descripcion" class="mt-0.5 block text-[11px] leading-snug text-[#7d756b]">{{ variante.descripcion }}</span>
+                    </span>
                   </span>
-                  <span class="text-brand-800">{{ formatoPrecio(Number(variante.precio)) }}</span>
+                  <span class="shrink-0 text-right text-brand-800">
+                    <template v-if="precioConPromocion(productoSeleccionado, Number(variante.precio), variante.id) < Number(variante.precio)">
+                      <span class="block text-[10px] text-[#a59d90] line-through">{{ formatoPrecio(Number(variante.precio)) }}</span>
+                      <span class="font-semibold text-emerald-700">{{ formatoPrecio(precioConPromocion(productoSeleccionado, Number(variante.precio), variante.id)) }}</span>
+                    </template>
+                    <template v-else>{{ formatoPrecio(Number(variante.precio)) }}</template>
+                  </span>
                 </label>
               </div>
             </template>
@@ -477,25 +523,13 @@ function formatoPrecio(valor: number) {
       </div>
     </template>
 
-    <div
-      v-if="carrito.lineas.length > 0"
-      class="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-ink px-4 py-4 sm:px-6"
-    >
-      <div class="mx-auto flex max-w-6xl items-center justify-between gap-4">
-        <div>
-          <p class="font-display text-lg text-white">Mi pedido · {{ carrito.totalProductos }} productos</p>
-          <p class="text-[11px] text-[#bfb7aa]">Revisa tu pedido antes de continuar</p>
-        </div>
-        <div class="flex items-center gap-4">
-          <span class="hidden text-lg text-white sm:inline">{{ formatoPrecio(carrito.total) }}</span>
-          <router-link
-            to="/carrito"
-            class="rounded-xl bg-[#393630] px-5 py-3 text-sm font-medium text-brand-500 transition hover:bg-[#454239]"
-          >
-            Ver mi pedido →
-          </router-link>
-        </div>
-      </div>
-    </div>
+    <!-- Mejora de diseño (16/10/2026): botón flotante del pedido (antes, una barra fija a todo lo ancho). -->
+    <CarritoFlotante
+      :cantidad="carrito.totalProductos"
+      :aviso="avisoAgregado"
+      :oculto="haySeleccion && mostrarConfiguradorMovil"
+      solo-movil
+      @abrir="router.push('/carrito')"
+    />
   </div>
 </template>

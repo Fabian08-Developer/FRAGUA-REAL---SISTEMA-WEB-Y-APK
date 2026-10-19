@@ -173,8 +173,13 @@ onMounted(() => {
       </p>
 
       <!-- Totales: los del cierre tal como se hizo, o los del cálculo en vivo. -->
-      <dl class="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+      <dl class="mt-3 grid grid-cols-2 gap-3 text-sm" :class="desglose.depositos_retenidos?.total ? 'sm:grid-cols-5' : 'sm:grid-cols-4'">
         <div><dt class="text-xs text-gray-500">Ventas ({{ desglose.ventas.pedidos }} pedidos)</dt><dd class="font-semibold text-ink">{{ formatoPrecio(consulta ? consulta.cierre.total_ventas : desglose.ventas.total) }}</dd></div>
+        <!-- Mejora (16/10/2026): depósito que el negocio retuvo porque el cliente no llegó (no-show). -->
+        <div v-if="desglose.depositos_retenidos?.total">
+          <dt class="text-xs text-gray-500">Depósitos retenidos (no-show)</dt>
+          <dd class="font-semibold text-ink">{{ formatoPrecio(desglose.depositos_retenidos.total) }}</dd>
+        </div>
         <div><dt class="text-xs text-gray-500">Compras</dt><dd class="font-semibold text-ink">{{ formatoPrecio(consulta ? consulta.cierre.total_compras : desglose.compras.total) }}</dd></div>
         <div><dt class="text-xs text-gray-500">Otros gastos</dt><dd class="font-semibold text-ink">{{ formatoPrecio(consulta ? consulta.cierre.total_gastos : desglose.gastos.total) }}</dd></div>
         <div>
@@ -244,6 +249,32 @@ onMounted(() => {
             </li>
             <li v-if="!desglose.compras_gastos_por_forma_de_pago.length" class="text-gray-400">Sin registros.</li>
           </ul>
+        </section>
+        <!-- Mejora (16/10/2026): depósitos de reserva del día. Los anticipos entraron hoy pero todavía no
+             son venta; los retenidos por no-show son ingreso del día. -->
+        <section v-if="desglose.anticipos_reserva || desglose.depositos_retenidos" class="sm:col-span-2">
+          <p class="font-semibold uppercase tracking-wide text-gray-400">Depósitos de reserva</p>
+          <div class="mt-1.5 grid gap-3 sm:grid-cols-2">
+            <div>
+              <p class="text-gray-500">Anticipos recibidos (todavía no son venta)</p>
+              <ul class="mt-1 space-y-1">
+                <li v-for="a in desglose.anticipos_reserva?.por_metodo ?? []" :key="a.metodo" class="flex justify-between">
+                  <span>{{ METODOS[a.metodo] ?? a.metodo }} ({{ a.cantidad }})</span><span class="font-medium text-ink">{{ formatoPrecio(a.monto) }}</span>
+                </li>
+                <li v-if="!desglose.anticipos_reserva?.por_metodo.length" class="text-gray-400">Sin anticipos.</li>
+              </ul>
+            </div>
+            <div>
+              <p class="text-gray-500">Retenidos por no-show (ingreso del día)</p>
+              <ul class="mt-1 space-y-1">
+                <li v-for="r in desglose.depositos_retenidos?.reservas ?? []" :key="r.reserva_id" class="flex justify-between gap-3">
+                  <span>{{ r.cliente }}<template v-if="r.mesa"> · {{ r.mesa }}</template> · {{ METODOS[r.metodo] ?? r.metodo }}</span>
+                  <span class="font-medium text-ink">{{ formatoPrecio(r.monto) }}</span>
+                </li>
+                <li v-if="!desglose.depositos_retenidos?.reservas.length" class="text-gray-400">Ninguno.</li>
+              </ul>
+            </div>
+          </div>
         </section>
         <!-- RN-M06-11: el arqueo de la caja alimenta el cierre. -->
         <section class="sm:col-span-2">

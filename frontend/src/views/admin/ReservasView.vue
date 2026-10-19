@@ -17,6 +17,7 @@ import { CalendarClock, Plus, Wallet, X } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
+import PestanasSalon from '@/components/common/PestanasSalon.vue'
 import { reservaService } from '@/services/reserva.service'
 import { mesaService } from '@/services/mesa.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
@@ -64,6 +65,20 @@ function seleccionarMesa(valor: string) {
 function quitarFiltroMesa() {
   seleccionarMesa('')
 }
+
+// Corrección (16/10/2026): la pestaña «Reservas» (PestanasSalon) lleva a /admin/reservas sin filtro;
+// si se estaba viendo una sola mesa, la lista vuelve a mostrar todas.
+watch(
+  () => route.query.mesa_id,
+  (valor) => {
+    const id = valor ? Number(valor) : null
+    if (id === mesaIdFiltro.value) return
+    mesaIdFiltro.value = id
+    mesaNombreFiltro.value = typeof route.query.mesa_nombre === 'string' ? route.query.mesa_nombre : ''
+    paginaActual.value = 1
+    cargar()
+  },
+)
 
 const reservas = ref<Reserva[]>([])
 const total = ref(0)
@@ -418,6 +433,10 @@ onBeforeUnmount(() => clearInterval(reloj))
         </BaseButton>
       </template>
     </PageHeader>
+
+    <!-- Corrección (16/10/2026): pestañas Mesas | Reservas, solo en la vista del Administrador (el Mesero
+         tiene «Mesas» y «Reservas» como secciones aparte en su menú). -->
+    <PestanasSalon v-if="route.name === 'admin-reservas'" />
 
     <div class="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
       <label class="flex items-center gap-3 text-sm text-gray-600">

@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
+import BotonInstalarApp from '@/components/common/BotonInstalarApp.vue'
 
 // Navegación por rol — cada entrada referencia el módulo que implementa,
 // igual que la tabla de README.md de esta carpeta.
@@ -231,6 +232,8 @@ const iniciales = computed(() =>
     </nav>
 
     <div class="space-y-1 border-t border-white/10 p-3 md:px-2 lg:px-3">
+      <!-- Mejora (16/10/2026): instalar la app (PWA) en la tableta o el teléfono del personal. -->
+      <div class="md:hidden lg:block"><BotonInstalarApp tono="oscuro" /></div>
       <router-link
         to="/perfil"
         class="flex items-center gap-3 rounded-xl p-2 transition hover:bg-white/5 md:justify-center lg:justify-start"

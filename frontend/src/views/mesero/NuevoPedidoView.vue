@@ -22,7 +22,7 @@ import { configuracionService } from '@/services/configuracion.service'
 import { useCotizacion } from '@/composables/useCotizacion'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import { iconoPorNombre } from '@/utils/iconoCategoria'
-import { etiquetaPromocion } from '@/utils/promociones'
+import { etiquetaPromocion, precioConPromocion } from '@/utils/promociones'
 import type { Categoria, Combo, Extra, Mesa, Producto, Variante } from '@/types/models'
 
 const route = useRoute()
@@ -742,9 +742,19 @@ onMounted(() => {
                         :checked="varianteActiva?.id === variante.id"
                         @change="varianteActiva = variante"
                       />
-                      {{ variante.nombre }}
+                      <span>
+                        <span class="block">{{ variante.nombre }}</span>
+                        <!-- Mejora (16/10/2026): qué trae la presentación, para contárselo al cliente. -->
+                        <span v-if="variante.descripcion" class="mt-0.5 block text-xs leading-snug text-gray-500">{{ variante.descripcion }}</span>
+                      </span>
                     </span>
-                    <span class="text-gray-700">{{ formatoPrecio(variante.precio) }}</span>
+                    <span class="shrink-0 text-right text-gray-700">
+                      <template v-if="precioConPromocion(productoActivo, Number(variante.precio), variante.id) < Number(variante.precio)">
+                        <span class="block text-[11px] text-gray-400 line-through">{{ formatoPrecio(variante.precio) }}</span>
+                        <span class="font-semibold text-emerald-700">{{ formatoPrecio(precioConPromocion(productoActivo, Number(variante.precio), variante.id)) }}</span>
+                      </template>
+                      <template v-else>{{ formatoPrecio(variante.precio) }}</template>
+                    </span>
                   </label>
                 </div>
               </template>

@@ -72,6 +72,9 @@
 <table class="totales">
     <tr>
         <td><div class="etiqueta">Ventas @if ($d) ({{ $d['ventas']['pedidos'] ?? 0 }} pedidos) @endif</div><div class="valor">{{ $pesos($cierre->total_ventas) }}</div></td>
+        @if (($d['depositos_retenidos']['total'] ?? 0) > 0)
+            <td><div class="etiqueta">Depósitos retenidos (no-show)</div><div class="valor">{{ $pesos($d['depositos_retenidos']['total']) }}</div></td>
+        @endif
         <td><div class="etiqueta">Compras</div><div class="valor">{{ $pesos($cierre->total_compras) }}</div></td>
         <td><div class="etiqueta">Otros gastos</div><div class="valor">{{ $pesos($cierre->total_gastos) }}</div></td>
         <td><div class="etiqueta">Resultado operativo</div><div class="valor {{ (float) $cierre->resultado_operativo >= 0 ? 'positivo' : 'negativo' }}">{{ $pesos($cierre->resultado_operativo) }}</div></td>
@@ -156,6 +159,25 @@
             <tr><td colspan="4" class="quieto">Sin registros.</td></tr>
         @endforelse
     </table>
+
+    {{-- Mejora (16/10/2026): depósitos de reserva. Los cierres anteriores no traen estas claves. --}}
+    @if (isset($d['anticipos_reserva']) || isset($d['depositos_retenidos']))
+        <h2>Depósitos de reserva</h2>
+        <table class="lista">
+            <tr><th>Anticipos recibidos (todavía no son venta)</th><th class="derecha">Valor</th></tr>
+            @forelse ($d['anticipos_reserva']['por_metodo'] ?? [] as $a)
+                <tr><td>{{ $metodos[$a['metodo']] ?? $a['metodo'] }} ({{ $a['cantidad'] }})</td><td class="derecha">{{ $pesos($a['monto']) }}</td></tr>
+            @empty
+                <tr><td colspan="2" class="quieto">Sin anticipos.</td></tr>
+            @endforelse
+            <tr><th>Retenidos por no-show (ingreso del día)</th><th class="derecha">Valor</th></tr>
+            @forelse ($d['depositos_retenidos']['reservas'] ?? [] as $r)
+                <tr><td>{{ $r['cliente'] }}{{ $r['mesa'] ? ' · '.$r['mesa'] : '' }} · {{ $metodos[$r['metodo']] ?? $r['metodo'] }}</td><td class="derecha">{{ $pesos($r['monto']) }}</td></tr>
+            @empty
+                <tr><td colspan="2" class="quieto">Ninguno.</td></tr>
+            @endforelse
+        </table>
+    @endif
 
     <h2>Arqueo de caja</h2>
     @if (empty($d['caja']))

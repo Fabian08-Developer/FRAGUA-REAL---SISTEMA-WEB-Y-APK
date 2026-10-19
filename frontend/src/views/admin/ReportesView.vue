@@ -575,8 +575,10 @@ const maxOcupacionPorMesa = computed(() =>
       <!-- RF-M08-008, RN-M08-06: resultado operativo del periodo -->
       <div class="card mt-4 p-4 sm:p-5">
         <h2 class="section-title">Resultado operativo</h2>
-        <p class="text-xs text-gray-400">Ventas − compras − gastos. No es un arqueo de caja ni la utilidad contable real.</p>
-        <div class="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <p class="text-xs text-gray-400">
+          Ventas + depósitos retenidos por no-show − compras − gastos. No es un arqueo de caja ni la utilidad contable real.
+        </p>
+        <div class="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-5">
           <div>
             <p class="text-xs font-medium text-gray-500">Ventas</p>
             <p class="mt-1 font-display text-xl font-medium text-ink">{{ formatoMoneda(resultadoOperativo.resumen.total_ventas) }}</p>
@@ -587,6 +589,19 @@ const maxOcupacionPorMesa = computed(() =>
             >
               {{ badgeVariacion(comparacionResultadoOperativo?.variacion.total_ventas)!.simbolo }}
               {{ badgeVariacion(comparacionResultadoOperativo?.variacion.total_ventas)!.texto }}
+            </p>
+          </div>
+          <!-- Mejora (16/10/2026): el depósito que el negocio retuvo cuando el cliente no llegó. -->
+          <div>
+            <p class="text-xs font-medium text-gray-500">Depósitos retenidos (no-show)</p>
+            <p class="mt-1 font-display text-xl font-medium text-ink">{{ formatoMoneda(resultadoOperativo.resumen.otros_ingresos ?? 0) }}</p>
+            <p
+              v-if="badgeVariacion(comparacionResultadoOperativo?.variacion.otros_ingresos)"
+              class="mt-1 text-xs font-semibold"
+              :class="badgeVariacion(comparacionResultadoOperativo?.variacion.otros_ingresos)!.clase"
+            >
+              {{ badgeVariacion(comparacionResultadoOperativo?.variacion.otros_ingresos)!.simbolo }}
+              {{ badgeVariacion(comparacionResultadoOperativo?.variacion.otros_ingresos)!.texto }}
             </p>
           </div>
           <div>

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Producto;
 use App\Models\User;
+use App\Models\Variante;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -28,27 +29,33 @@ class FotoProductoService
 {
     public const DISCO = 'local';
     public const CARPETA = 'productos';
+    public const CARPETA_VARIANTES = 'variantes';
     public const LADO_MAXIMO = 900;
 
     public function __construct(private readonly CatalogoService $catalogoService)
     {
     }
 
-    public function guardar(Producto $producto, UploadedFile $archivo, ?User $actor): Producto
+    /**
+     * Mejora (16/10/2026): también la foto de una presentación (Variante), con la misma reducción y el
+     * mismo disco. Cada una se sirve por su propia dirección (GET /api/productos/{id}/foto o
+     * GET /api/variantes/{id}/foto).
+     */
+    public function guardar(Producto|Variante $modelo, UploadedFile $archivo, ?User $actor): Producto|Variante
     {
         [$contenido, $extension] = $this->preparar($archivo);
-        $ruta = self::CARPETA.'/'.$producto->id.'-'.Str::lower(Str::random(12)).'.'.$extension;
+        $ruta = $this->carpeta($modelo).'/'.$modelo->id.'-'.Str::lower(Str::random(12)).'.'.$extension;
         Storage::disk(self::DISCO)->put($ruta, $contenido);
 
-        $anterior = $producto->imagen_path;
-        $antes = $producto->only(['imagen_url', 'imagen_path']);
+        $anterior = $modelo->imagen_path;
+        $antes = $modelo->only(['imagen_url', 'imagen_path']);
         try {
-            DB::transaction(function () use ($producto, $ruta, $antes, $actor) {
-                $producto->forceFill([
+            DB::transaction(function () use ($modelo, $ruta, $antes, $actor) {
+                $modelo->forceFill([
                     'imagen_path' => $ruta,
-                    'imagen_url' => '/api/productos/'.$producto->id.'/foto?v='.substr(md5($ruta), 0, 10),
+                    'imagen_url' => $this->direccion($modelo).'?v='.substr(md5($ruta), 0, 10),
                 ])->save();
-                $this->catalogoService->auditar('cambiar_foto_producto', $producto, $antes, $actor);
+                $this->catalogoService->auditar($this->accion($modelo), $modelo, $antes, $actor);
             });
         } catch (\Throwable $e) {
             Storage::disk(self::DISCO)->delete($ruta);
@@ -59,25 +66,40 @@ class FotoProductoService
             Storage::disk(self::DISCO)->delete($anterior);
         }
 
-        return $producto;
+        return $modelo;
     }
 
-    public function quitar(Producto $producto, ?User $actor): Producto
+    public function quitar(Producto|Variante $modelo, ?User $actor): Producto|Variante
     {
-        $anterior = $producto->imagen_path;
-        $antes = $producto->only(['imagen_url', 'imagen_path']);
-        $producto->forceFill(['imagen_path' => null, 'imagen_url' => null])->save();
-        $this->catalogoService->auditar('cambiar_foto_producto', $producto, $antes, $actor);
+        $anterior = $modelo->imagen_path;
+        $antes = $modelo->only(['imagen_url', 'imagen_path']);
+        $modelo->forceFill(['imagen_path' => null, 'imagen_url' => null])->save();
+        $this->catalogoService->auditar($this->accion($modelo), $modelo, $antes, $actor);
         if ($anterior) {
             Storage::disk(self::DISCO)->delete($anterior);
         }
 
-        return $producto;
+        return $modelo;
     }
 
-    public function existe(Producto $producto): bool
+    public function existe(Producto|Variante $modelo): bool
     {
-        return $producto->imagen_path !== null && Storage::disk(self::DISCO)->exists($producto->imagen_path);
+        return $modelo->imagen_path !== null && Storage::disk(self::DISCO)->exists($modelo->imagen_path);
+    }
+
+    private function carpeta(Producto|Variante $modelo): string
+    {
+        return $modelo instanceof Variante ? self::CARPETA_VARIANTES : self::CARPETA;
+    }
+
+    private function direccion(Producto|Variante $modelo): string
+    {
+        return ($modelo instanceof Variante ? '/api/variantes/' : '/api/productos/').$modelo->id.'/foto';
+    }
+
+    private function accion(Producto|Variante $modelo): string
+    {
+        return $modelo instanceof Variante ? 'cambiar_foto_variante' : 'cambiar_foto_producto';
     }
 
     /** @return array{0: string, 1: string} contenido y extensión del archivo a guardar */

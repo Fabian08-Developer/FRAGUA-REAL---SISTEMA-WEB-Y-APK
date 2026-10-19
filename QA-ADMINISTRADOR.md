@@ -535,3 +535,27 @@ Resumen; la lista completa del invitado está en `QA-CLIENTE.md` (secciones 4 a 
       muestra el mensaje genérico de la pantalla (revisión por rol, 13/10/2026).
 - [ ] Con `APP_LOCALE=es` en el `.env` del servidor (ya viene así en `.env.example`), un
       formulario con un campo obligatorio vacío dice el error en español.
+
+## 11. Mejoras del 16/10/2026
+
+- [ ] Catálogo > Extras: un extra general sin productos marcados dice «no se ofrece con ningún
+      producto»; en el Menú no aparece con ninguno. Marcado en una Limonada, sí aparece en ella.
+- [ ] Catálogo > editar un producto con presentaciones: cada una tiene «Qué trae» y «Subir foto».
+      En el Menú, al elegir esa presentación se ve su foto y su descripción.
+- [ ] Catálogo > Productos > «Poner en oferta»: con precio de oferta y una presentación, el Menú
+      tacha el precio solo de esa presentación y el botón «Agregar» suma el precio de oferta. Con una
+      fecha límite, al día siguiente ya no se aplica. «Quitar oferta» la desactiva (queda en Promociones
+      como inactiva, con la etiqueta «Oferta de producto»).
+- [ ] Catálogo > Productos > «Importar»: descargar la plantilla, llenar 3 filas (una nueva, una que
+      ya existe con otro precio y una sin nombre) y subirla. La vista previa marca «Nuevo», «Se
+      actualiza» con sus cambios y «Error»; el botón «Importar» queda apagado. Al quitar la fila con
+      error e importar, aparecen el producto nuevo y el precio nuevo, y Auditoría muestra
+      «importar_productos».
+- [ ] Caja: el turno de hoy muestra «Resumen del día» con efectivo, tarjeta, transferencia y en línea,
+      el desglose del efectivo esperado y los depósitos del día. Cobrar algo en tarjeta y tocar
+      «Actualizar»: sube Tarjeta y el efectivo esperado no cambia.
+- [ ] Compras y gastos > cierre del día: con una reserva marcada como no-show hoy, «Depósitos
+      retenidos (no-show)» muestra su depósito y suma al resultado operativo; Reportes > Resultado
+      operativo lo muestra igual.
+- [ ] Mesas y reservas: las pestañas «Mesas | Reservas» llevan a todas las reservas; entrando por
+      «Ver reservas» de una mesa y tocando la pestaña «Reservas», la lista vuelve a mostrar todas.

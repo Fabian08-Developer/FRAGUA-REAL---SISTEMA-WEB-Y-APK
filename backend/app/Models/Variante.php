@@ -7,7 +7,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Variante extends Model
 {
-    protected $fillable = ['producto_id', 'nombre', 'precio', 'activa', 'disponible'];
+    protected $fillable = ['producto_id', 'nombre', 'descripcion', 'precio', 'activa', 'disponible'];
+
+    // Mejora (16/10/2026): la ruta interna de la foto no viaja; la pantalla usa `imagen_url`.
+    protected $hidden = ['imagen_path'];
 
     protected $casts = [
         'activa' => 'boolean',

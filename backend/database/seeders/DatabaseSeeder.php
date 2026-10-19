@@ -133,18 +133,21 @@ class DatabaseSeeder extends Seeder
     /** @param array<string, Producto> $productos */
     private function crearExtras(array $productos): void
     {
-        // Generales: aplican a cualquier producto del menú (RN-M04-05).
+        // Generales (RF-M04-010/011): reutilizables, pero solo se ofrecen con los productos a los que se
+        // asocian. Aquí, con las comidas (tipo Alimento); no con bebidas ni postres.
         $generales = [
             ['Extra queso', 2000],
             ['Tocineta extra', 3000],
             ['Salsa especial', 1000],
         ];
+        $comidas = collect($productos)->where('tipo_venta', 'alimento')->pluck('id')->all();
 
         foreach ($generales as [$nombre, $precio]) {
-            Extra::query()->firstOrCreate(
+            $extra = Extra::query()->firstOrCreate(
                 ['nombre' => $nombre, 'alcance' => 'general'],
                 ['precio' => $precio, 'producto_id' => null]
             );
+            $extra->productos()->syncWithoutDetaching($comidas);
         }
 
         // Específico: solo puede agregarse a la Salchipapa Especial.

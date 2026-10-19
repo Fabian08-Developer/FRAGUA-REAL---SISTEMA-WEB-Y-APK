@@ -168,6 +168,7 @@ class PromocionesYDescuentosTest extends TestCase
         $combo = Combo::create(['nombre' => 'Combo Clásico', 'precio' => 22000, 'tipo_venta' => 'alimento', 'activo' => true]);
         $combo->productos()->attach($this->clasica->id, ['cantidad' => 1]);
         $tocineta = Extra::create(['nombre' => 'Tocineta', 'precio' => 3000, 'alcance' => 'general', 'activo' => true]);
+        $tocineta->productos()->attach($this->clasica->id);
         $this->promocion(['nombre' => 'Clásica 50 %', 'alcance' => 'producto', 'valor' => 50], [$this->clasica->id]);
 
         $pedido = $this->pedidoLocal([

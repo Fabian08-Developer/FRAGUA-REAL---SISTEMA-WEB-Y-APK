@@ -262,3 +262,27 @@ En la ventana del invitado, Reservar:
 - [ ] En el teléfono, el panel de "Tu elección" se cierra con la X o tocando el fondo oscuro.
 - [ ] Los montos se ven en pesos colombianos sin decimales ($21.000).
 - [ ] Las horas salen en hora de Colombia.
+
+## 13. Mejoras del 16/10/2026
+
+- [ ] Menú en el teléfono: el menú hamburguesa muestra «Ingresar» arriba, como botón.
+- [ ] Agregar dos veces el mismo producto sin cambios: el carrito muestra una sola línea con cantidad
+      2. Con otra presentación o una nota distinta, son líneas aparte.
+- [ ] Recargar la página con productos en el carrito: siguen ahí. En el carrito se ven la foto, la
+      presentación, los extras, el precio por unidad y el resumen.
+- [ ] Al agregar un producto aparece arriba «Agregado: …» y el botón redondo de abajo muestra la
+      cantidad; se esconde mientras el panel del producto está abierto.
+- [ ] Una Limonada o un postre no ofrecen «Extra queso» ni otros extras de comida.
+- [ ] Reservar: en pasos (cuándo, mesa, datos); las mesas son botones en orden y el depósito con sus
+      condiciones se ve al lado (en el teléfono, debajo).
+- [ ] Con conexión lenta, el Menú y Reservar muestran la forma de la página mientras cargan y el pie
+      de página no sube a la mitad de la pantalla.
+- [ ] App instalable (Android, Chrome): menú hamburguesa > «Instalar app» la instala; el ícono de
+      Fragua Real queda en la pantalla de inicio y abre en pantalla completa. Al mantenerlo presionado
+      aparecen «Ver el menú», «Reservar mesa» y «Mi pedido».
+- [ ] App instalable (iPhone, Safari): «Instalar app» muestra los pasos (Compartir > Agregar a inicio)
+      y, siguiéndolos, el ícono abre la app en pantalla completa.
+- [ ] Con la app instalada y sin internet (modo avión), abrirla muestra «Sin conexión» con
+      «Reintentar»; con internet, vuelve a funcionar.
+- [ ] El Mesero con sesión abre la app desde el ícono y entra directo a Pedidos.
+

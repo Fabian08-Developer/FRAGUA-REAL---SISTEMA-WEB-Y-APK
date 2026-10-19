@@ -8,6 +8,7 @@ use App\Models\CierreDiario;
 use App\Models\CompraGasto;
 use App\Models\Pago;
 use App\Models\Pedido;
+use App\Models\Reserva;
 use App\Models\User;
 use App\Support\Documentos\PiePagina;
 use App\Support\Documentos\RegistroImpresiones;
@@ -41,7 +42,7 @@ class CierreDiarioService
 {
     private const ZONA_HORARIA_NEGOCIO = 'America/Bogota';
 
-    public const NOTA_RESULTADO = 'Resultado operativo estimado (ventas − compras − otros gastos). No es la utilidad contable del negocio.';
+    public const NOTA_RESULTADO = 'Resultado operativo estimado (ventas + depósitos retenidos por no-show − compras − otros gastos). No es la utilidad contable del negocio.';
 
     public function __construct(
         private readonly CompraGastoService $compraGastoService,
@@ -105,13 +106,26 @@ class CierreDiarioService
         // RN-M06-11: el arqueo de la caja del día alimenta el cierre.
         $turno = CajaTurno::whereDate('fecha', $dia)->first();
 
+        // Mejora (16/10/2026): los depósitos de reserva en el cierre.
+        //  - Anticipos recibidos hoy (en el local, con el turno; en línea, por la hora del pago): es
+        //    dinero que entró hoy pero todavía no es venta; se vuelve venta cuando se abona a la cuenta
+        //    de la visita ("Depósito de reserva" en Ventas por forma de pago). Se muestran para que el
+        //    cierre cuadre con la caja.
+        //  - Depósitos retenidos por no-show marcados hoy: el cliente no llegó y el negocio se queda con
+        //    el depósito (RN-M05-18). Antes ese dinero no salía en ninguna cifra; ahora es un ingreso del
+        //    día y suma al resultado operativo.
+        $anticipos = $this->anticiposDeReserva($inicio, $fin, $turno);
+        $retenidos = $this->depositosRetenidos($inicio, $fin);
+
         return [
             'fecha' => $dia,
             'ventas' => ['total' => $totalVentas, 'pedidos' => $cantidadPedidos, 'por_tipo' => $porTipo, 'por_metodo' => $porMetodo],
             'compras' => ['total' => $totalCompras, 'por_categoria' => $porCategoria('compra')],
             'gastos' => ['total' => $totalGastos, 'por_categoria' => $porCategoria('gasto')],
             'compras_gastos_por_forma_de_pago' => $porFormaDePago,
-            'resultado_operativo' => round($totalVentas - $totalCompras - $totalGastos, 2),
+            'anticipos_reserva' => $anticipos,
+            'depositos_retenidos' => $retenidos,
+            'resultado_operativo' => round($totalVentas + $retenidos['total'] - $totalCompras - $totalGastos, 2),
             'caja' => $turno ? [
                 'id' => $turno->id,
                 'estado' => $turno->estado,
@@ -122,6 +136,51 @@ class CierreDiarioService
                 'justificacion' => $turno->justificacion_descuadre,
             ] : null,
             'nota' => self::NOTA_RESULTADO,
+        ];
+    }
+
+    /** Depósitos de reserva recibidos en el día, por método (anticipos, todavía no son venta). */
+    private function anticiposDeReserva(CarbonImmutable $inicio, CarbonImmutable $fin, ?CajaTurno $turno): array
+    {
+        $porMetodo = Reserva::where('deposito_pagado', true)
+            ->where(fn ($q) => $q
+                ->when($turno, fn ($q) => $q->where('deposito_caja_turno_id', $turno->id))
+                ->orWhere(fn ($q) => $q->whereNull('deposito_caja_turno_id')->where('deposito_metodo', 'en_linea')
+                    ->whereBetween('deposito_pagado_at', [$inicio->utc(), $fin->utc()])))
+            ->selectRaw('deposito_metodo as metodo, COUNT(*) as cantidad, COALESCE(SUM(deposito_valor), 0) as monto')
+            ->groupBy('deposito_metodo')->orderBy('deposito_metodo')->get()
+            ->map(fn ($r) => ['metodo' => $r->metodo, 'monto' => (float) $r->monto, 'cantidad' => (int) $r->cantidad])
+            ->values()->all();
+
+        return [
+            'total' => round(array_sum(array_column($porMetodo, 'monto')), 2),
+            'cantidad' => array_sum(array_column($porMetodo, 'cantidad')),
+            'por_metodo' => $porMetodo,
+        ];
+    }
+
+    /** Depósitos que el negocio retuvo por no-show marcado en el día (RN-M05-18): ingreso del día. */
+    public function depositosRetenidos(CarbonImmutable $inicio, CarbonImmutable $fin): array
+    {
+        $reservas = Reserva::with('mesa:id,nombre')
+            ->where('estado', 'no_show')->where('deposito_pagado', true)->where('deposito_reembolsado', false)
+            ->whereBetween('no_show_at', [$inicio->utc(), $fin->utc()])
+            ->orderBy('no_show_at')
+            ->get(['id', 'mesa_id', 'cliente_nombre', 'fecha_hora', 'deposito_valor', 'deposito_abonado', 'deposito_metodo', 'no_show_at']);
+
+        $detalle = $reservas->map(fn (Reserva $r) => [
+            'reserva_id' => $r->id,
+            'cliente' => $r->cliente_nombre,
+            'mesa' => $r->mesa?->nombre,
+            'fecha_hora' => $r->fecha_hora?->toIso8601String(),
+            'metodo' => $r->deposito_metodo,
+            'monto' => round((float) $r->deposito_valor - (float) $r->deposito_abonado, 2),
+        ])->filter(fn ($r) => $r['monto'] > 0)->values()->all();
+
+        return [
+            'total' => round(array_sum(array_column($detalle, 'monto')), 2),
+            'cantidad' => count($detalle),
+            'reservas' => $detalle,
         ];
     }
 

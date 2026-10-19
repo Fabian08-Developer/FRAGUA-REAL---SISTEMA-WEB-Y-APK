@@ -14,8 +14,8 @@ use Illuminate\Support\Collection;
  *
  *  - Extras (RF-M04-010/011, HU-M04-004): cada producto trae `extras_disponibles`, la misma lista
  *    para el Menú, el QR de mesa y el pedido del Mesero: sus extras específicos activos más los
- *    generales activos que le aplican (los asociados a él, o los que no se asociaron a ningún
- *    producto y por eso sirven para todo el menú). PedidoService valida con la misma regla
+ *    generales activos que el Administrador le asoció (un general sin asociar no se ofrece con
+ *    ningún producto, CA-M04-004). PedidoService valida con la misma regla
  *    (Extra::aplicaA), así lo que se ofrece es exactamente lo que se acepta.
  *  - Bajas (RF-M04-027, RN-M04-12): desactivar un producto desactiva los combos que lo usan; el
  *    combo no se puede reactivar mientras tenga un componente dado de baja.
@@ -27,15 +27,11 @@ class CatalogoService
     /** Agrega `extras_disponibles` (activos y aplicables) a cada producto. */
     public function conExtrasDisponibles(Collection $productos): Collection
     {
-        $generalesLibres = Extra::where('alcance', 'general')->where('activo', true)
-            ->whereDoesntHave('productos')->orderBy('nombre')->get();
-
         $productos->loadMissing(['extrasEspecificos', 'extrasGenerales']);
 
-        return $productos->each(function (Producto $p) use ($generalesLibres) {
+        return $productos->each(function (Producto $p) {
             $extras = $p->extrasEspecificos->where('activo', true)
                 ->concat($p->extrasGenerales->where('activo', true))
-                ->concat($generalesLibres)
                 ->unique('id')->sortBy('nombre')->values()
                 ->map(fn (Extra $e) => $e->only(['id', 'nombre', 'precio', 'alcance', 'producto_id', 'activo']));
             $p->setAttribute('extras_disponibles', $extras->all());

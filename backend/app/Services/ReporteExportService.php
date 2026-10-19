@@ -59,6 +59,7 @@ class ReporteExportService
         'total_compras' => ['Compras', 'moneda'],
         'total_gastos' => ['Otros gastos', 'moneda'],
         'total_ventas' => ['Ventas', 'moneda'],
+        'otros_ingresos' => ['Depósitos retenidos (no-show)', 'moneda'],
         'resultado_operativo' => ['Resultado operativo', 'moneda'],
         'reservas_creadas' => ['Reservas del periodo', 'numero'],
         'reservas_canceladas' => ['Reservas canceladas', 'numero'],

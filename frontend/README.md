@@ -41,15 +41,16 @@ además pide el permiso `puede_registrar_gastos`.
 | `views/auth/` | Iniciar sesión, Registro, Recuperar y Restablecer contraseña |
 | `views/` | Inicio y página no encontrada |
 | `layouts/` | Un layout por zona: Cliente, Mesero, Administrador y acceso |
-| `components/common/` | Botones, campos, modales, encabezado, barra lateral, QR de mesa, sesiones |
+| `components/common/` | Botones, campos, modales, encabezado, barra lateral, QR de mesa, sesiones, botón flotante del pedido (`CarritoFlotante`) y pestañas Mesas/Reservas (`PestanasSalon`) |
 | `components/pedidos/` | Editar, historial, descuento, cuenta de la mesa, comanda, comprobante, datos de entrega, listo para recoger |
-| `components/caja/`, `compras/`, `configuracion/` | Pagos por revisar, cierre diario, tareas automáticas y revisión antes de producción |
+| `components/caja/`, `compras/`, `configuracion/` | Pagos por revisar, resumen del turno (`ResumenTurno`), cierre diario, tareas automáticas y revisión antes de producción |
 | `services/` | Una llamada a la API por módulo (`pedido.service.ts`, `caja.service.ts`…) y el manejo de errores en español (`errors.ts`) |
-| `stores/` | `auth.ts` (sesión) y `carrito.ts` (carrito con productos y combos) |
-| `composables/` | `useAuth` y `useCotizacion` (total con promociones antes de pedir) |
+| `stores/` | `auth.ts` (sesión) y `carrito.ts` (carrito con productos y combos; se guarda en el navegador 24 horas y une las líneas iguales) |
+| `composables/` | `useAuth`, `useCotizacion` (total con promociones antes de pedir) y `useInstalarApp` (botón «Instalar app») |
 | `utils/` | Comandas, comprobantes, combos, extras, promociones, pasarela, auditoría, redirección segura |
 | `types/models.ts` | Tipos que reflejan las respuestas del backend |
 | `assets/` | Estilos de Tailwind, mascota, foto del local y fotos de platos |
+| `public/` | Ícono del sitio y la app instalable (PWA): `manifest.webmanifest`, `sw.js` (qué se guarda en el teléfono; nunca la API), `offline.html` e `iconos/` |
 
 Las vistas del Administrador y del Mesero que comparten pantalla (Reservas y la de agotados) usan el
 mismo componente con permisos distintos.
@@ -71,3 +72,11 @@ mismo componente con permisos distintos.
 
 El catálogo de pantallas con lo que cubre cada una está en la carpeta «Documentacion Fragua Real»; el
 resto, en la raíz del repositorio (`README.md`).
+
+## App instalable (PWA)
+
+El service worker solo se registra en la versión compilada (`npm run build`). Para probarlo en el
+equipo: `npm run build && npx vite preview`, abrir `http://localhost:4173` y revisar en las
+herramientas del navegador > Aplicación el manifiesto y el service worker. Instrucciones de instalación
+y qué se guarda en el teléfono: `README-ENTREGA.md`, «App instalable en el teléfono (PWA)».
+

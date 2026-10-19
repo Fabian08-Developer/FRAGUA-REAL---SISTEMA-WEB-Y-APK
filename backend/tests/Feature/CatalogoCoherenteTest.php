@@ -145,19 +145,50 @@ class CatalogoCoherenteTest extends TestCase
 
     // ---- Extras generales en Menú, QR y Mesero (RF-M04-010/011, HU-M04-004) ----
 
-    public function test_RF_M04_010_un_extra_general_sin_asociar_se_ofrece_con_todo_el_menu(): void
+    // CORREGIDO (16/10/2026, producción): antes un general sin asociar iba "con todo el menú", y a una
+    // Limonada se le ofrecía "Extra queso". Según M04 (CA-M04-004) solo va con los productos asociados.
+    public function test_RF_M04_010_un_extra_general_sin_asociar_no_se_ofrece_con_ningun_producto(): void
     {
-        Extra::create(['nombre' => 'Salsa de la casa', 'precio' => 1000, 'alcance' => 'general', 'activo' => true]);
+        $salsa = Extra::create(['nombre' => 'Salsa de la casa', 'precio' => 1000, 'alcance' => 'general', 'activo' => true]);
         Extra::create(['nombre' => 'Inactivo', 'precio' => 1000, 'alcance' => 'general', 'activo' => false]);
         Extra::create(['nombre' => 'Tocineta', 'precio' => 3000, 'alcance' => 'especifico', 'producto_id' => $this->clasica->id, 'activo' => true]);
         Extra::create(['nombre' => 'Queso viejo', 'precio' => 3000, 'alcance' => 'especifico', 'producto_id' => $this->clasica->id, 'activo' => false]);
 
         $productos = collect($this->getJson('/api/productos')->assertOk()->json());
 
-        $this->assertSame(['Salsa de la casa', 'Tocineta'], collect($productos->firstWhere('nombre', 'Clásica')['extras_disponibles'])->pluck('nombre')->all());
-        $this->assertSame(['Salsa de la casa'], collect($productos->firstWhere('nombre', 'Gaseosa')['extras_disponibles'])->pluck('nombre')->all());
+        $this->assertSame(['Tocineta'], collect($productos->firstWhere('nombre', 'Clásica')['extras_disponibles'])->pluck('nombre')->all());
+        $this->assertSame([], $productos->firstWhere('nombre', 'Gaseosa')['extras_disponibles']);
         // El público no recibe los extras específicos inactivos.
         $this->assertSame(['Tocineta'], collect($productos->firstWhere('nombre', 'Clásica')['extras_especificos'])->pluck('nombre')->all());
+
+        // Lo que no se ofrece tampoco se acepta.
+        $this->pedidoQr(['producto_id' => $this->gaseosa->id, 'cantidad' => 1, 'extras_ids' => [$salsa->id]])->assertStatus(422);
+        $this->pedidoQr(['producto_id' => $this->clasica->id, 'cantidad' => 1, 'extras_ids' => [$salsa->id]])->assertStatus(422);
+    }
+
+    public function test_la_migracion_asocia_los_generales_sueltos_solo_a_las_comidas(): void
+    {
+        $queso = Extra::create(['nombre' => 'Extra queso', 'precio' => 2000, 'alcance' => 'general', 'activo' => true]);
+        $hielo = Extra::create(['nombre' => 'Hielo extra', 'precio' => 500, 'alcance' => 'general', 'activo' => true]);
+        $hielo->productos()->attach($this->gaseosa->id); // ya estaba asociado: no se toca
+
+        (require database_path('migrations/2026_10_23_000001_asociar_extras_generales_a_las_comidas.php'))->up();
+
+        $this->assertEqualsCanonicalizing([$this->clasica->id, $this->doble->id], $queso->productos()->pluck('productos.id')->all());
+        $this->assertSame([$this->gaseosa->id], $hielo->productos()->pluck('productos.id')->all());
+    }
+
+    public function test_un_extra_general_se_ofrece_con_una_bebida_solo_si_se_le_asocia(): void
+    {
+        $hielo = Extra::create(['nombre' => 'Hielo extra', 'precio' => 500, 'alcance' => 'general', 'activo' => true]);
+        Sanctum::actingAs($this->admin);
+        $this->putJson("/api/productos/{$this->gaseosa->id}", $this->datosProducto($this->gaseosa, ['extras_generales' => [$hielo->id]]))->assertOk();
+
+        $this->app['auth']->forgetGuards();
+        $productos = collect($this->getJson('/api/productos')->json());
+        $this->assertSame(['Hielo extra'], collect($productos->firstWhere('nombre', 'Gaseosa')['extras_disponibles'])->pluck('nombre')->all());
+        $this->assertSame([], $productos->firstWhere('nombre', 'Clásica')['extras_disponibles']);
+        $this->pedidoQr(['producto_id' => $this->gaseosa->id, 'cantidad' => 1, 'extras_ids' => [$hielo->id]])->assertCreated();
     }
 
     public function test_RF_M04_011_un_extra_general_asociado_solo_se_ofrece_y_se_acepta_con_sus_productos(): void

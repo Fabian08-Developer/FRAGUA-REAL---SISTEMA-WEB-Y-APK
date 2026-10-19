@@ -1,7 +1,7 @@
 # Backend — Fragua Real Burger
 
 API REST en Laravel 13 que usa la aplicación web (`frontend/`). Este documento explica cómo está
-armado el backend hoy y guarda el historial de los 50 cambios técnicos que lo llevaron a ese estado.
+armado el backend hoy y guarda el historial de los 60 cambios técnicos que lo llevaron a ese estado.
 
 - Instalación y puesta en producción: [`README-ENTREGA.md`](README-ENTREGA.md).
 - Tablas, relaciones y migraciones: [`BASE-DE-DATOS.md`](BASE-DE-DATOS.md).
@@ -23,7 +23,7 @@ armado el backend hoy y guarda el historial de los 50 cambios técnicos que lo l
 
 Cada petición pasa por las mismas capas:
 
-1. **Ruta** (`routes/api.php`): 149 endpoints bajo `/api`, agrupados por nivel de acceso con los
+1. **Ruta** (`routes/api.php`): 157 endpoints bajo `/api`, agrupados por nivel de acceso con los
    middleware `auth:sanctum`, `activo` y `role:...`, y límites de peticiones en las rutas públicas.
 2. **Form Request** (`app/Http/Requests/Api`, 38 clases): valida los datos y devuelve los mensajes
    en español (`lang/es/validation.php`).
@@ -52,9 +52,9 @@ mensajes de validación o de la regla de negocio, y 429 por exceso de intentos.
 | M01 Usuarios | `AuthController`, `UsuarioController`, `AuditoriaController` | `SesionService`, `AuditoriaService`, `AuditoriaConsultaService` | Registro de Clientes, inicio de sesión con correo o usuario, recuperación de contraseña, sesiones con vencimiento, cuentas del personal, permisos, auditoría |
 | M02 Pedidos locales | `PedidoController`, `ComandaController`, `MesaController` (cuenta y cobro de la mesa) | `PedidoService`, `ComandaService`, `MesaCuentaService` | Pedidos de mesa y por QR, edición con historial, descuentos, comandas de cocina, cuenta acumulada de la mesa |
 | M03 Compras y cierre | `CompraGastoController` | `CompraGastoService`, `CierreDiarioService` | Compras y gastos con soporte, Mesero autorizado, cierre diario con desglose, ajustes posteriores y PDF |
-| M04 Catálogo | `CatalogoController`, `PromocionController` | `CatalogoService`, `ComboService`, `PromocionService`, `FotoProductoService` | Categorías, productos, presentaciones, extras, combos, promociones, agotados y fotos |
+| M04 Catálogo | `CatalogoController`, `PromocionController`, `ImportacionProductosController` | `CatalogoService`, `ComboService`, `PromocionService`, `OfertaService`, `FotoProductoService`, `ImportacionProductosService` | Categorías, productos, presentaciones (con descripción y foto), extras, combos, promociones y ofertas, agotados, fotos e importación desde Excel |
 | M05 Mesas y reservas | `MesaController`, `ReservaController`, `ReservaPublicaController` | `ReservaService`, `AbonoDepositoService`, `ReservaAutomaticaService`, `AvisoReservaService` | Mesas y QR, reservas con depósito, abono a la cuenta, no-show automático, recordatorios y avisos |
-| M06 Caja y ventas | `CajaController`, `PagoController`, `ComprobanteController`, `PasarelaController` | `CajaService`, `PagoService`, `ComprobanteService`, `PasarelaPagoService` | Turnos de caja, cobros, pago mixto, anulaciones, comprobantes, pagos en línea con Wompi |
+| M06 Caja y ventas | `CajaController`, `PagoController`, `ComprobanteController`, `PasarelaController` | `CajaService`, `PagoService`, `ComprobanteService`, `PasarelaPagoService` | Turnos de caja con resumen por método, cobros, pago mixto, anulaciones, comprobantes, pagos en línea con Wompi |
 | M07 Domicilios y recogida | `PedidoController` (la misma tabla de pedidos, ADR-001) | `PedidoService`, `AvisoPedidoService` | Domicilios y recogidas web y por teléfono, entrega y recogida confirmadas, «listo para recoger» |
 | M08 Reportes | `ReporteController`, `DashboardController` | `ReporteService`, `ReporteExportService` | Los 6 reportes, comparación con el periodo anterior, exportación a PDF y Excel |
 | Transversal | `ConfiguracionController` | `EstadoSistemaService`, `RevisionProduccionService` | Valores editables, estado del programador y la cola, revisión antes de producción |
@@ -144,17 +144,17 @@ partir de la copia guardada en la base, así una reimpresión dice exactamente l
 
 ## Pruebas automáticas
 
-`backend/tests/Feature` tiene 44 archivos y 320 pruebas; `tests/Unit` tiene la de ejemplo de Laravel.
-En total son 321.
+`backend/tests/Feature` tiene 47 archivos y 343 pruebas; `tests/Unit` tiene la de ejemplo de Laravel.
+En total son 344.
 
 ```bash
-php artisan test                    # SQLite en memoria (3 pruebas se saltan: usan funciones de PostgreSQL)
+php artisan test                    # SQLite en memoria (4 pruebas se saltan: usan funciones de PostgreSQL)
 php artisan test --filter=Caja      # solo las que coinciden
 ```
 
 Para correrlas contra PostgreSQL, como en producción, se apunta a una base de prueba con las variables
 `DB_CONNECTION=pgsql`, `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD` al lanzar `php artisan test`; ahí
-pasan las 321. Cada prueba cita el requisito que cubre. `DiaCompletoTest` recorre un día completo de
+pasan las 344. Cada prueba cita el requisito que cubre. `DiaCompletoTest` recorre un día completo de
 operación por la API con los tres roles.
 
 ## Qué falta a propósito
@@ -587,8 +587,10 @@ inconsistencias con lo que existía o era correcto en Laravel:
       canales, y no se pueden pedir; el combo no se da de baja: vuelve solo al reactivarla.
     - Extras generales (RF-M04-010/011): el Administrador elige en cada producto qué extras
       generales ofrece (`extras_generales` en `POST/PUT /productos`, tabla `producto_extra`). Un
-      extra general que no se asocia a ningún producto se sigue ofreciendo con todo el menú (así no
-      cambia lo ya cargado). Cada producto trae `extras_disponibles`, la misma lista para el Menú,
+      extra general que no se asocia a ningún producto no se ofrece con ninguno (CA-M04-004).
+      CORREGIDO (16/10/2026, producción): antes se ofrecía con todo el menú, y una Limonada aceptaba
+      "Extra queso"; la migración `2026_10_23_000001` asoció los generales sueltos a los productos
+      de tipo Alimento. Cada producto trae `extras_disponibles`, la misma lista para el Menú,
       el QR y el pedido del Mesero, y `PedidoService` acepta exactamente esa lista
       (`Extra::aplicaA`). `GET /extras` dice con qué productos se ofrece cada general.
     - Bajas (RF-M04-027, RN-M04-12): dar de baja un producto desactiva los combos que lo usan (queda
@@ -1415,3 +1417,142 @@ inconsistencias con lo que existía o era correcto en Laravel:
     - Pruebas: `ReportesRendimientoTest` (3). Revisan los índices, el resultado operativo con días
       sin cierre (un pedido de las 11:30 p. m. cuenta en su día de Colombia) y el comando. Las dos
       últimas corren solo en PostgreSQL.
+
+51. **Puesta en el VPS (16/10/2026).** Sin migración. Revisión del proyecto antes de desplegarlo en el
+    VPS de Hostinger (decisión D2).
+    - `backend/deploy/nginx-fragua-real-inicial.conf` (nuevo): solo el puerto 80, para sacar el
+      certificado la primera vez con `certbot certonly --webroot`. `nginx-fragua-real.conf` no carga
+      sin el certificado; ahora trae las líneas `ssl_certificate` activas y deja abierta por http la
+      carpeta de Let's Encrypt, para que la renovación automática funcione.
+    - `backend/deploy/respaldo-fragua-real.sh` (nuevo): copia diaria de la base (`pg_dump`) y de
+      `storage/app/private`, con 14 días de historia; lo corre el cron (`cron-fragua-real`).
+    - `backend/deploy/logrotate-fragua-real` (nuevo): rota `storage/logs/cola.log`, el log del
+      trabajador de la cola. Los logs de Laravel rotan con `LOG_STACK=daily`.
+    - `frontend/public/favicon.svg` (nuevo): `index.html` lo pedía y no existía.
+    - `README-ENTREGA.md`, «Ponerlo en el servidor»: reescrito en 10 pasos (clonar primero, paquetes y
+      firewall, base de datos propia, permisos con `www-data`, `.env` y sembrado inicial una sola vez,
+      Nginx en dos tiempos, cron/cola/logs, respaldos, Wompi y revisión final).
+    - `.gitignore` en la raíz: `Claude outputs/` (tenía una copia de un `.env` con claves).
+
+52. **Extras generales solo donde se asocian (16/10/2026, M04).** RF-M04-011, CA-M04-004. Migración
+    `2026_10_23_000001_asociar_extras_generales_a_las_comidas`. En producción, a una Limonada se le
+    podía pedir «Extra queso»: un extra general sin productos asociados se ofrecía con todo el menú.
+    - `Extra::aplicaA()` y `CatalogoService::conExtrasDisponibles()`: un general solo se ofrece y se
+      acepta con los productos a los que el Administrador lo asoció; sin asociar, con ninguno.
+    - La migración asoció los generales que estaban sueltos a todos los productos de tipo Alimento,
+      para no quitárselos de golpe a las comidas. El sembrado hace lo mismo.
+    - Catálogo dice «no se ofrece con ningún producto: márcalo en los productos que lo llevan».
+    - Pruebas: `CatalogoCoherenteTest` (sin asociar no se ofrece; una bebida con un extra asociado a
+      mano; la migración), y las que usaban generales sueltos ahora los asocian.
+
+53. **Descripción y foto de cada presentación (16/10/2026, M04).** RF-M04-008. Migración
+    `2026_10_23_000002_descripcion_y_foto_de_variantes` (`variantes.descripcion`, `imagen_url`,
+    `imagen_path`).
+    - `FotoProductoService` sirve para productos y presentaciones (misma reducción a 900 px y WebP,
+      carpeta `storage/app/private/variantes`, auditoría `cambiar_foto_variante`).
+    - Rutas: `GET` (pública), `POST` y `DELETE /variantes/{variante}/foto`.
+    - Menú y QR: al elegir la presentación se ve su foto (sin foto propia, la del producto) y cada
+      opción muestra lo que trae. El Mesero también ve la descripción.
+
+54. **«Poner en oferta» (16/10/2026, M04).** RF-M04-033 a 035. Migración
+    `2026_10_23_000003_ofertas_por_presentacion` (`promociones.variante_id`, `promociones.es_oferta`).
+    - `OfertaService` y `POST`/`DELETE /productos/{producto}/oferta`: precio de oferta (el sistema
+      calcula la rebaja) o porcentaje, fecha límite y, si se quiere, una sola presentación. Es una
+      promoción automática de producto marcada `es_oferta`; un producto tiene una oferta a la vez.
+    - `PromocionService`: una promoción con `variante_id` solo rebaja esa presentación. Las fotos de
+      reglas guardadas antes en un pedido no traen el campo y aplican a todas, como entonces.
+    - `GET /productos` trae `variante_id` en cada promoción vigente y, para el personal, la `oferta`
+      del producto. El botón «Agregar» del Menú y del QR muestra el precio con la oferta.
+    - Pruebas: `VariantesYOfertasTest` (9).
+
+55. **Resumen de Caja (16/10/2026, M06).** RN-M06-08, RN-M06-11. Sin migración.
+    - `CajaService::resumen()`: ingresos del turno por método (los pagos en línea, por el día),
+      desglose del efectivo esperado (base + cobros + depósitos − gastos − devoluciones), depósitos de
+      reserva del día por método (también los pagados en línea) y anulados aparte.
+    - `GET /caja/turno-actual` y `GET /caja/turnos/{turno}` traen `resumen`; el detalle trae además
+      `depositos_en_linea`, que antes no salían en Caja.
+    - Pantalla: «Resumen del día» con botón «Actualizar», y el mismo resumen en el detalle de cada
+      turno del historial.
+
+56. **Depósitos de reserva en el cierre y en los reportes (16/10/2026, M03, M05, M08).** RN-M05-18,
+    RN-M06-11. Sin migración.
+    - `CierreDiarioService::calcular()`: `anticipos_reserva` (depósitos recibidos en el día, por método;
+      todavía no son venta) y `depositos_retenidos` (no-show marcado en el día y no devuelto: ingreso
+      del día). El resultado operativo es ventas + retenidos − compras − gastos.
+    - `ReporteService::resultadoOperativo()`: `otros_ingresos` con los retenidos del periodo, calculados
+      con las reservas (también en días cerrados antes de este cambio). El PDF del cierre y la
+      exportación del reporte los muestran.
+    - Pruebas: `CajaResumenYDepositosTest` (4; la del reporte solo corre en PostgreSQL).
+
+57. **Importación masiva de productos (16/10/2026, M04).** RF-M04-004, 008, 022, 023, 042,
+    RN-M04-10, 14. Sin migración.
+    - `ImportacionProductosService` e `ImportacionProductosController`:
+      - `GET /productos/importacion/plantilla`: Excel con las columnas (Categoría, Nombre, Descripción,
+        Precio base, Tipo de venta, Presentaciones, Disponible), listas desplegables y una hoja de
+        instrucciones;
+      - `POST /productos/importacion/vista-previa`: dice qué haría cada fila (crear, actualizar, sin
+        cambios o error) sin guardar nada;
+      - `POST /productos/importacion`: vuelve a revisar el archivo y, sin errores, crea y actualiza todo
+        en una transacción; con algún error, no guarda nada (422).
+    - Reglas: el nombre identifica el producto (sin importar mayúsculas ni tildes); con «Actualizar los
+      que ya existen» cambian los datos que trae la fila y las celdas vacías no borran nada; las
+      presentaciones (`Personal:18000 | Familiar:32000`) se crean o cambian de precio, y las que no
+      vienen no se tocan; una categoría nueva se crea. Excel o CSV (también con `;` y precios como
+      «18.000»), hasta 2 MB y 500 filas. Fotos, extras y combos siguen en Catálogo.
+    - Auditoría: cada categoría, producto y presentación como si se hubiera hecho a mano (con
+      `origen: importacion`), más un registro `importar_productos` con el resumen.
+    - Pantalla: Catálogo > Productos > «Importar» (plantilla, archivo, vista previa e importar).
+    - Pruebas: `ImportacionProductosTest` (7).
+
+58. **Ajustes de la web del cliente (16/10/2026).** Solo frontend, sin cambios en la API.
+    - Carrito: un producto igual (misma presentación, extras y nota) se suma a la línea que ya está;
+      se guarda en el navegador por 24 horas y, al volver, se actualiza con el menú de hoy (quita lo
+      que ya no está, con aviso). La web y el QR de cada mesa tienen carritos separados. Nuevo diseño
+      con foto, presentación, extras, precio por unidad, rebaja por línea y resumen.
+    - Botón flotante del pedido (`CarritoFlotante.vue`) en lugar de la barra fija de abajo, con un
+      aviso breve al agregar; en el Menú solo en celular y tablet.
+    - Menú y Reservar: el pie de página ya no sube mientras cargan; Reservar con pasos numerados,
+      mesas como botones y panel del depósito. El contenido ocupa al menos el alto de la pantalla en
+      todas las páginas del cliente.
+    - Menú hamburguesa con «Ingresar» arriba; en tablet se usa el menú hamburguesa (desde 1024 px, el
+      menú completo); pie de página rediseñado para celular.
+    - Administrador: pestañas «Mesas | Reservas» (`PestanasSalon.vue`) para ver todas las reservas sin
+      entrar por una mesa; textos del resumen de Caja más oscuros.
+
+59. **Revisión antes de producción: nivel de log (16/10/2026).** Sin migración. Con `LOG_CHANNEL=stack`
+    y `LOG_STACK=daily`, `RevisionProduccionService` leía el nivel del canal «stack», que no tiene, y
+    avisaba «LOG_LEVEL=debug» aunque el `.env` dijera `warning`. Ahora sigue el stack hasta los canales
+    que escriben y dice cuál revisó («LOG_LEVEL=warning (canal daily)»). Prueba nueva en
+    `EndurecimientoTest`.
+
+60. **App instalable en el teléfono, PWA (16/10/2026).** Solo frontend y Nginx, sin cambios en la API.
+    Decisión: la «aplicación móvil» de la Idea de Negocio se entrega como PWA, no como APK.
+    - `frontend/public/manifest.webmanifest`: nombre, colores, íconos (192, 512 y adaptable), accesos
+      directos y `start_url` `/?origen=app`; el guard de rutas lleva al Mesero y al Administrador a su
+      panel y quita la marca de la dirección.
+    - `frontend/public/sw.js`: guarda los archivos con huella, los íconos y las fotos públicas del menú;
+      nunca guarda el resto de la API; páginas primero de la red y, sin conexión, `offline.html`. Se
+      registra solo en la versión compilada (`main.ts`).
+    - `useInstalarApp.ts` y `BotonInstalarApp.vue`: «Instalar app» en el menú del cliente y en la barra
+      lateral del personal; en iPhone muestra los pasos de Safari.
+    - `index.html`: manifiesto, ícono del iPhone y modo pantalla completa.
+    - `nginx-fragua-real.conf`: `sw.js` y el manifiesto sin caché del navegador.
+    - Detalle e instrucciones de instalación: `README-ENTREGA.md`, «App instalable en el teléfono».
+61. **Documentación oficial al día (16/10/2026).** Sin cambios de código. Los requisitos de los puntos
+    51 a 60 quedaron formalizados en la carpeta «Documentacion Fragua Real» (versión 1.1, o 2.1 en M03
+    y M07), con su trazabilidad completa:
+    - M00: sección 6 nueva, app instalable (RNF-TRANS-030 a 034).
+    - M02: RF-M02-L-029 a 032, RNF-M02-017, RN-PED-33, HU-M02-023 (carrito guardado).
+    - M03: RF-M03-35 a 37, RN-M03-16/17, HU-M03-13; la fórmula del resultado operativo suma los
+      depósitos retenidos.
+    - M04: P14/P15, RF-M04-044 a 054, RNF-M04-009/010, RN-M04-27 a 31, HU-M04-016 a 018
+      (presentaciones con descripción y foto, ofertas, importación).
+    - M05: P14, RF-M05-037/038, RN-M05-20, HU-M05-016 (faltaba en el documento) y HU-M05-017; la
+      HU-M05-015 pasa a completa.
+    - M06: P09, RF-M06-025 a 028, RN-M06-13/14, HU-M06-012 (resumen del turno).
+    - M07: RF-M07-032, RNF-M07-002, RN-M07-10, HU-M07-014. M08: RF-M08-016, RN-M08-08.
+    - Diagrama entidad-relación (`variantes` y `promociones` con sus columnas nuevas y la llave
+      `promociones.variante_id`), Cronograma (hoja «Mejoras en producción»), Catálogo de Pantallas
+      (historias por pantalla) y Flujos por rol (34 páginas: app instalable, carrito, Reportes y
+      Catálogo corregidos, ofertas, importación y caja del turno).
+

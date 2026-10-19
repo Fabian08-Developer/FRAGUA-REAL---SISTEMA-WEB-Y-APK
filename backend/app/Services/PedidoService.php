@@ -238,9 +238,8 @@ class PedidoService
         $extras = collect();
         foreach ($linea['extras_ids'] ?? [] as $extraId) {
             $extra = Extra::findOrFail($extraId);
-            // RN-M04-05: un extra específico solo acompaña a su propio producto. Fase 2, tarea 3
-            // (RF-M04-011): un extra general acompaña a los productos a los que se asoció, o a todo
-            // el menú si no se asoció a ninguno. En ambos casos tiene que estar activo.
+            // RN-M04-05: un extra específico solo acompaña a su propio producto. RF-M04-011: un extra
+            // general solo acompaña a los productos a los que se asoció. En ambos casos, activo.
             if (! $extra->aplicaA($productoId ? (int) $productoId : null)) {
                 throw new InvalidArgumentException("El extra \"{$extra->nombre}\" no está disponible para este producto.");
             }
@@ -296,6 +295,7 @@ class PedidoService
         }
         $descriptores = array_map(fn ($d) => [
             'producto_id' => $d['producto_id'],
+            'variante_id' => $d['variante_id'],
             'categoria_id' => $d['categoria_id'],
             'es_combo' => $d['combo_id'] !== null,
             'cantidad' => $d['cantidad'],
@@ -509,6 +509,7 @@ class PedidoService
         foreach ($detalles as $d) {
             $descriptores[$d->id] = [
                 'producto_id' => $d->combo_id ? null : $d->producto_id,
+                'variante_id' => $d->combo_id ? null : $d->variante_id,
                 'categoria_id' => $d->combo_id ? null : $d->producto?->categoria_id,
                 'es_combo' => $d->combo_id !== null,
                 'cantidad' => (int) $d->cantidad,

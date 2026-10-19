@@ -19,7 +19,7 @@ class StoreExtraRequest extends FormRequest
             'precio' => ['required', 'numeric', 'gt:0'],
             'alcance' => ['required', 'in:general,especifico'],
             // RN-M04-05: "especifico" exige producto_id; "general" debe dejarlo vacío
-            // (aplica a todo el menú, no a un producto puntual).
+            // (se asocia a productos al editarlos; sin asociar no se ofrece con ninguno).
             'producto_id' => ['required_if:alcance,especifico', 'prohibited_if:alcance,general', 'nullable', 'exists:productos,id'],
             'activo' => ['boolean'],
         ];

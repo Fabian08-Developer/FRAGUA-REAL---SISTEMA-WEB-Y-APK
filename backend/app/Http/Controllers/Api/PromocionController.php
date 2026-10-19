@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\Catalogo\PonerOfertaRequest;
 use App\Http\Requests\Api\Catalogo\StorePromocionRequest;
+use App\Models\Producto;
 use App\Models\Promocion;
 use App\Services\AuditoriaService;
+use App\Services\OfertaService;
 use App\Services\PromocionService;
+use Illuminate\Http\Request;
 
 /**
  * M04 — Menú y Catálogo. CRUD de promociones para el Administrador (RN-M04-19 a 23):
@@ -20,7 +24,7 @@ class PromocionController extends Controller
 {
     public function index()
     {
-        return response()->json(Promocion::with(['productos', 'categorias'])->latest()->get());
+        return response()->json(Promocion::with(['productos', 'categorias', 'variante:id,nombre'])->latest()->get());
     }
 
     // Fase 2, tarea 1 (RF-M04-036, HU-M04-015): promociones de tipo "manual" activas y vigentes,
@@ -53,6 +57,19 @@ class PromocionController extends Controller
         return response()->json($promocion->load(['productos', 'categorias']));
     }
 
+    // Mejora (16/10/2026): atajo «Poner en oferta» desde el producto (ver OfertaService).
+    public function ponerOferta(PonerOfertaRequest $request, Producto $producto, OfertaService $ofertas)
+    {
+        return response()->json($ofertas->poner($producto, $request->validated(), $request->user()), 201);
+    }
+
+    public function quitarOferta(Request $request, Producto $producto, OfertaService $ofertas)
+    {
+        abort_if(! $request->user()->esAdministrador(), 403);
+
+        return response()->json(['quitadas' => $ofertas->quitar($producto, $request->user())]);
+    }
+
     // RF-M04-039 (Fase 2, tarea 1): cada promoción creada o editada queda en la auditoría.
     private function auditar(string $accion, Promocion $promocion, ?array $antes): void
     {
@@ -79,7 +96,14 @@ class PromocionController extends Controller
         $categorias = $data['categorias'] ?? [];
         unset($data['productos'], $data['categorias']);
 
-        $promocion->fill($data)->save();
+        $promocion->fill($data);
+        // Mejora (16/10/2026): una promoción de una sola presentación (oferta) deja de serlo si se le
+        // cambia el alcance o el producto, para no rebajar una presentación de otro producto.
+        if ($promocion->variante_id && ($promocion->alcance !== 'producto'
+            || array_map('intval', $productos) !== [(int) $promocion->variante?->producto_id])) {
+            $promocion->variante_id = null;
+        }
+        $promocion->save();
 
         // RN-M04-19/20: el vínculo solo tiene sentido en el lado que coincide con el
         // alcance actual — al cambiar de alcance (ej. de "producto" a "categoria") se

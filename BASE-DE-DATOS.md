@@ -1,6 +1,6 @@
 # Base de datos — Fragua Real Burger
 
-PostgreSQL en producción; SQLite en memoria para las pruebas automáticas. 39 tablas propias del sistema más la de control de migraciones, creadas por 56 migraciones de Laravel en `backend/database/migrations`. Este documento describe cómo está hoy la base; la lógica que la usa está en [`README-BACKEND.md`](README-BACKEND.md) y los endpoints en [`API.md`](API.md).
+PostgreSQL en producción; SQLite en memoria para las pruebas automáticas. 39 tablas propias del sistema más la de control de migraciones, creadas por 59 migraciones de Laravel en `backend/database/migrations`. Este documento describe cómo está hoy la base; la lógica que la usa está en [`README-BACKEND.md`](README-BACKEND.md) y los endpoints en [`API.md`](API.md).
 
 ## Contenido
 
@@ -41,12 +41,12 @@ La fecha del nombre de cada migración solo fija el orden en que corren; no es l
 |---|---|---|
 | `categorias` | 5 | Categorías del menú. Desactivar una oculta sus productos y combos. |
 | `productos` | 12 | Productos con precio base, tipo de venta (bebida, alimento u otro), disponibilidad y foto (`imagen_path`, archivo privado). `imagen_url` es una columna antigua que ya no se usa. |
-| `variantes` | 8 | Presentaciones o tamaños de un producto, con su precio y su disponibilidad. |
+| `variantes` | 8 | Presentaciones o tamaños de un producto, con su precio, su disponibilidad y, desde el 16/10/2026, una descripción y una foto propias. |
 | `extras` | 8 | Adicionales: generales (`producto_id` nulo) o específicos de un producto. |
-| `producto_extra` | 5 | Qué extras generales ofrece cada producto. Un extra general sin productos elegidos se ofrece con todo el menú. |
+| `producto_extra` | 5 | Qué extras generales ofrece cada producto. Un extra general sin productos elegidos no se ofrece con ninguno (desde el 16/10/2026). |
 | `combos` | 12 | Combos con precio propio, tipo de venta, vigencia, franja horaria y días. |
 | `combo_producto` | 4 | Productos y cantidades de cada combo (al menos dos unidades). |
-| `promociones` | 14 | Promociones automáticas o manuales: alcance (producto, categoría o total), porcentaje o valor, vigencia, franja y días. |
+| `promociones` | 14 | Promociones automáticas o manuales: alcance (producto, categoría o total), porcentaje o valor, vigencia, franja y días. `variante_id` la limita a una presentación y `es_oferta` marca las creadas con «Poner en oferta». |
 | `promocion_producto` | 3 | Productos de una promoción. |
 | `promocion_categoria` | 3 | Categorías de una promoción. |
 
@@ -117,6 +117,7 @@ erDiagram
     promocion_producto }o--|| promociones : "promocion_id"
     promocion_categoria }o--|| categorias : "categoria_id"
     promocion_categoria }o--|| promociones : "promocion_id"
+    promociones }o--o| variantes : "variante_id"
     producto_extra }o--|| extras : "extra_id"
     producto_extra }o--|| productos : "producto_id"
 ```
@@ -210,6 +211,9 @@ Además, `transacciones_pasarela` se enlaza con un pago o con una reserva por `p
 | `2026_10_21_000001` | Fase 7 | `users.puede_registrar_gastos`. | 47 |
 | `2026_10_21_000002` | Fase 7 | `productos.imagen_path`. | 48 |
 | `2026_10_22_000001` | Fase 7 | Solo índices para reportes y búsquedas frecuentes. | 50 |
+| `2026_10_23_000001` | 16/10/2026 | Asocia los extras generales sin productos a los de tipo Alimento (desde aquí un general solo se ofrece donde se asocia). | — |
+| `2026_10_23_000002` | 16/10/2026 | `variantes.descripcion`, `imagen_url` e `imagen_path`. | — |
+| `2026_10_23_000003` | 16/10/2026 | `promociones.variante_id` y `promociones.es_oferta`. | — |
 ## Decisiones de diseño (ADR)
 
 ### ADR-001 — Una sola tabla `pedidos` para Local, QR, Domicilio y Recogida
@@ -247,8 +251,9 @@ la pasarela o una persona.
 ### ADR-005 — Extras generales y específicos
 
 Un extra `especifico` siempre tiene `producto_id`. Uno `general` tiene `producto_id` nulo y la tabla
-`producto_extra` dice qué productos lo ofrecen; sin productos elegidos, se ofrece con todo el menú
-(RN-M04-05, Fase 2). Antes de la Fase 2 no existía `producto_extra` y los generales no salían en
+`producto_extra` dice qué productos lo ofrecen; sin productos elegidos no se ofrece con ninguno
+(RF-M04-011, CA-M04-004; hasta el 16/10/2026 se ofrecía con todo el menú, ver la migración
+`2026_10_23_000001`). Antes de la Fase 2 no existía `producto_extra` y los generales no salían en
 ningún canal.
 
 ### ADR-006 — Reportes sin tablas propias

@@ -183,6 +183,15 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore()
   await esperarSesionLista(auth)
 
+  // Mejora (16/10/2026): la app instalada abre en "/?origen=app" (manifest.webmanifest). El Mesero y el
+  // Administrador entran directo a su panel; el Cliente, al inicio. La marca se quita de la dirección.
+  if (to.query.origen === 'app') {
+    const { origen: _origen, ...resto } = to.query
+    if (to.path === '/' && auth.rol === 'mesero') return { name: 'mesero-pedidos', replace: true }
+    if (to.path === '/' && auth.rol === 'administrador') return { name: 'admin-dashboard', replace: true }
+    return { path: to.path, query: resto, hash: to.hash, replace: true }
+  }
+
   if (to.meta.soloInvitado && auth.estaAutenticado) {
     return { name: 'home' }
   }

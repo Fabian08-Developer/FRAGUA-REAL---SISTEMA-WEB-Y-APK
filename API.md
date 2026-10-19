@@ -1,6 +1,6 @@
 # API — Fragua Real Burger
 
-Referencia de los 149 endpoints de `backend/routes/api.php`, agrupados por módulo. Todas las rutas van bajo `/api` y responden JSON, salvo los PDF, tickets, fotos y archivos exportados.
+Referencia de los 157 endpoints de `backend/routes/api.php`, agrupados por módulo. Todas las rutas van bajo `/api` y responden JSON, salvo los PDF, tickets, fotos y archivos exportados.
 
 Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). Si cambia una ruta, actualiza esta tabla.
 
@@ -74,6 +74,9 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 | `PUT` | `/extras/{extra}` | Administrador | Edita un extra o los productos que lo ofrecen. |  |
 | `GET` | `/productos` | Pública | Productos con presentaciones, extras y foto. Sin sesión o como Cliente, solo lo que se puede pedir; con sesión del personal, todo el catálogo. Filtros `q` y `categoria_id`. |  |
 | `POST` | `/productos` | Administrador | Crea un producto. |  |
+| `GET` | `/productos/importacion/plantilla` | Administrador | Descarga la plantilla de Excel para importar productos (hoja «Productos» e «Instrucciones»). |  |
+| `POST` | `/productos/importacion/vista-previa` | Administrador | Lee el archivo (`archivo`: .xlsx, .xls o .csv, hasta 2 MB y 500 filas; `actualizar`: 1 o 0) y devuelve qué haría cada fila (crear, actualizar, sin cambios o error). No guarda nada. |  |
+| `POST` | `/productos/importacion` | Administrador | Importa el mismo archivo: crea y actualiza todo en una transacción, o nada si alguna fila tiene error (422). |  |
 | `PUT` | `/productos/{producto}` | Administrador | Edita un producto (darlo de baja desactiva sus combos). |  |
 | `POST` | `/productos/{producto}/disponibilidad` | Administrador, Mesero | Marca un producto agotado o disponible. |  |
 | `GET` | `/productos/{producto}/foto` | Pública | Foto del producto (WebP, caché larga). Pública para el Menú. | 600/min |
@@ -84,8 +87,13 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 | `POST` | `/promociones` | Administrador | Crea una promoción (producto, categoría o total; automática o manual). |  |
 | `GET` | `/promociones/manuales` | Administrador, Mesero | Promociones de tipo manual (para el descuento en Pedidos). |  |
 | `PUT` | `/promociones/{promocion}` | Administrador | Edita o desactiva una promoción. |  |
+| `POST` | `/productos/{producto}/oferta` | Administrador | «Poner en oferta»: `modo` (`precio` o `porcentaje`), `precio_oferta` o `porcentaje`, `variante_id` (opcional; obligatoria con precio y presentaciones), `hasta` (opcional). Crea una promoción automática de producto y reemplaza la oferta anterior. |  |
+| `DELETE` | `/productos/{producto}/oferta` | Administrador | Quita la oferta del producto (queda inactiva, con su historial). |  |
 | `POST` | `/variantes` | Administrador | Crea una presentación (tamaño) de un producto. |  |
-| `PUT` | `/variantes/{variante}` | Administrador | Edita una presentación. |  |
+| `PUT` | `/variantes/{variante}` | Administrador | Edita una presentación (incluida su `descripcion`, hasta 160 caracteres). |  |
+| `GET` | `/variantes/{variante}/foto` | Pública | Foto propia de la presentación (WebP, caché larga). | 600/min |
+| `POST` | `/variantes/{variante}/foto` | Administrador | Sube o cambia la foto de la presentación (mismas reglas que la del producto). |  |
+| `DELETE` | `/variantes/{variante}/foto` | Administrador | Quita la foto de la presentación (el Menú vuelve a mostrar la del producto). |  |
 | `POST` | `/variantes/{variante}/disponibilidad` | Administrador, Mesero | Marca una presentación agotada o disponible. |  |
 
 ## Pedidos (M02 y M07)
@@ -167,9 +175,9 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 |---|---|---|---|---|
 | `POST` | `/caja/abrir` | Administrador | Abre la caja del día con la base inicial. Un solo turno por día. |  |
 | `GET` | `/caja/estado` | Administrador, Mesero | Estado de la caja de hoy (sin abrir, abierta o cerrada), quién la abrió y el efectivo esperado. Solo lectura. |  |
-| `GET` | `/caja/turno-actual` | Administrador | Detalle del turno abierto hoy (pagos, depósitos, gastos, arqueo), o nulo. |  |
+| `GET` | `/caja/turno-actual` | Administrador | Turno abierto hoy con su `resumen` (ingresos por método, desglose del efectivo esperado, depósitos de reserva del día y anulados), o nulo. |  |
 | `GET` | `/caja/turnos` | Administrador | Historial de turnos de caja. |  |
-| `GET` | `/caja/turnos/{turno}` | Administrador | Detalle de un turno. |  |
+| `GET` | `/caja/turnos/{turno}` | Administrador | Detalle de un turno: pagos, pagos y depósitos en línea del día (`depositos_en_linea`), gastos, ajustes y `resumen`. |  |
 | `POST` | `/caja/turnos/{turno}/cerrar` | Administrador | Cierra el turno con el efectivo contado y guarda la diferencia. |  |
 | `POST` | `/pagos/{pago}/anular` | Administrador | Anula o reembolsa un pago; con la caja del día cerrada pide contraseña y queda como ajuste. |  |
 | `POST` | `/pagos/{pago}/confirmar-en-linea` | Administrador, Mesero | Aprueba a mano un pago en línea (respaldo de la pasarela). |  |
