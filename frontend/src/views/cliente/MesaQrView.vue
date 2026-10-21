@@ -15,6 +15,7 @@ import { useRoute } from 'vue-router'
 import { AlertTriangle, ArrowLeft, CheckCircle2, Minus, Plus, Trash2 } from 'lucide-vue-next'
 import BaseModal from '@/components/common/BaseModal.vue'
 import CarritoFlotante from '@/components/common/CarritoFlotante.vue'
+import LogoNegocio from '@/components/common/LogoNegocio.vue'
 import { extrasDe } from '@/utils/extras'
 import { mesaService } from '@/services/mesa.service'
 import { catalogoService } from '@/services/catalogo.service'
@@ -216,9 +217,7 @@ onMounted(async () => {
     <header class="sticky top-0 z-20 border-b border-[#e9e3d8] bg-white px-4 py-3.5 sm:px-6">
       <div class="mx-auto flex max-w-2xl items-center justify-between">
         <div class="flex items-center gap-2.5">
-          <span class="flex size-9 items-center justify-center rounded-full bg-ink text-brand-500" aria-hidden="true">
-            <span class="font-display text-sm">FR</span>
-          </span>
+          <LogoNegocio tamano="size-9" texto="text-sm" />
           <span class="font-display text-base font-medium text-ink">Fragua Real</span>
         </div>
         <span

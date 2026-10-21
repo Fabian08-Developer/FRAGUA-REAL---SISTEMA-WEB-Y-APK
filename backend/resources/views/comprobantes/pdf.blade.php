@@ -40,6 +40,7 @@
 <table class="encabezado">
     <tr>
         <td>
+            @if (! empty($logo))<img src="{{ $logo }}" alt="" style="max-height: 46px; max-width: 140px; margin-bottom: 4px;">@endif
             <h1>{{ $n['nombre'] ?? 'Fragua Real Burger' }}</h1>
             @if (! empty($n['nit']))<div>NIT {{ $n['nit'] }}</div>@endif
             <div class="quieto">{{ $n['direccion'] ?? '' }}</div>
@@ -50,8 +51,8 @@
             <div style="font-size: 14px; font-weight: bold;">{{ $c['numero'] }}</div>
             <div class="quieto">{{ $fecha($c['fecha']) }}</div>
             @if ($reimpresion)
-                <div class="reimpresion">REIMPRESIÓN · copia {{ $reimpresion['vez'] }}</div>
-                <div class="quieto">Impresa el {{ $fecha($reimpresion['fecha']) }}</div>
+                <div class="reimpresion">{{ ! empty($reimpresion['consulta']) ? 'COPIA DE CONSULTA · SOPORTE' : 'REIMPRESIÓN · copia '.$reimpresion['vez'] }}</div>
+                <div class="quieto">{{ ! empty($reimpresion['consulta']) ? 'Consultada' : 'Impresa' }} el {{ $fecha($reimpresion['fecha']) }}</div>
             @endif
         </td>
     </tr>

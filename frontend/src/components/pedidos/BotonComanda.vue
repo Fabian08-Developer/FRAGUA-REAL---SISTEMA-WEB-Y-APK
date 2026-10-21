@@ -65,13 +65,13 @@ async function noSalio(c: Comanda) {
       <span class="badge w-fit bg-amber-50 text-amber-800 ring-amber-600/20">
         {{ pendiente.estado_impresion === 'fallida' ? 'La comanda no salió' : 'Comanda por imprimir' }}
       </span>
-      <BaseButton variant="primary" :size="size" :disabled="abriendo" @click="imprimir(pendiente)">
+      <BaseButton v-escritura variant="primary" :size="size" :disabled="abriendo" @click="imprimir(pendiente)">
         <ChefHat :size="15" />
         {{ abriendo ? 'Abriendo…' : `Imprimir ${nombre(pendiente).toLowerCase()}` }}
       </BaseButton>
     </template>
     <template v-else-if="ultimaImpresa">
-      <BaseButton variant="secondary" :size="size" :disabled="abriendo" @click="imprimir(ultimaImpresa)">
+      <BaseButton v-escritura variant="secondary" :size="size" :disabled="abriendo" @click="imprimir(ultimaImpresa)">
         <ChefHat :size="15" />
         {{ abriendo ? 'Abriendo…' : `Reimprimir ${nombre(ultimaImpresa).toLowerCase()}` }}
       </BaseButton>
@@ -79,7 +79,7 @@ async function noSalio(c: Comanda) {
     </template>
     <p v-if="recienImpresa" class="text-xs text-gray-600">
       ¿No salió de la impresora?
-      <button type="button" class="font-medium text-red-700 underline" @click="noSalio(recienImpresa)">Avisar</button>
+      <button v-escritura type="button" class="font-medium text-red-700 underline" @click="noSalio(recienImpresa)">Avisar</button>
     </p>
     <p v-if="error" class="text-xs text-red-600">{{ error }}</p>
   </div>

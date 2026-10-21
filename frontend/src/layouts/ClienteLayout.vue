@@ -5,6 +5,8 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useCarritoStore } from '@/stores/carrito'
 import BotonInstalarApp from '@/components/common/BotonInstalarApp.vue'
+import LogoNegocio from '@/components/common/LogoNegocio.vue'
+import { useNegocioStore } from '@/stores/negocio'
 
 // Layout público/Cliente: Home, Menú (M04), Carrito/Checkout (M02/M07),
 // Reserva (M05), Mis pedidos y Perfil (M01). Header calcado del Figma
@@ -26,7 +28,7 @@ import BotonInstalarApp from '@/components/common/BotonInstalarApp.vue'
 // partir de ese mismo breakpoint para no dejar un rango intermedio sin nada.
 // AJUSTE (16/10/2026): ese breakpoint pasó de md (768 px) a lg (1024 px): en una tablet vertical el
 // menú completo no cabía y el botón "Mi pedido" quedaba cortado; ahí se usa el menú hamburguesa.
-const { estaAutenticado, rol, logout } = useAuth()
+const { estaAutenticado, rol, rolDeZona, logout } = useAuth()
 const carrito = useCarritoStore()
 const router = useRouter()
 
@@ -38,7 +40,7 @@ onMounted(() => {
   carrito.actualizarConCatalogo()
 })
 
-const rutaPanel = computed(() => (rol.value === 'administrador' ? '/admin' : rol.value === 'mesero' ? '/mesero' : null))
+const rutaPanel = computed(() => (rolDeZona.value === 'administrador' ? '/admin' : rol.value === 'mesero' ? '/mesero' : null))
 
 const menuAbierto = ref(false)
 
@@ -59,14 +61,14 @@ const enlaces = [
   { to: { path: '/', hash: '#contacto' }, texto: 'Contacto' },
 ]
 
-// Mismos datos de contacto reales que usa el Home (no se inventan) —
-// se repiten aquí porque el footer, a diferencia del header, vive en
-// todas las páginas del layout Cliente, incluidas las que no muestran
-// la sección de contacto del Home.
-const direccion = 'Esquina frente al malecón turístico, etapa 1.'
-const telefono = '322 725 9965'
-const whatsappUrl = `https://wa.me/57${telefono.replace(/\s+/g, '')}`
-const mapaUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`
+// Mejora (19/10/2026): dirección, teléfono y WhatsApp salen de Configuración (los cambia el
+// Administrador); antes estaban escritos aquí y en el Home.
+const negocio = useNegocioStore()
+negocio.cargar()
+const direccion = computed(() => negocio.datos.direccion)
+const telefono = computed(() => negocio.datos.telefono)
+const whatsappUrl = computed(() => negocio.whatsappUrl)
+const mapaUrl = computed(() => negocio.mapaUrl)
 const anioActual = new Date().getFullYear()
 </script>
 
@@ -85,12 +87,7 @@ const anioActual = new Date().getFullYear()
           </button>
 
           <router-link to="/" class="flex items-center gap-3">
-            <span
-              class="flex size-11 items-center justify-center rounded-full bg-ink text-brand-500"
-              aria-hidden="true"
-            >
-              <span class="font-display text-lg">FR</span>
-            </span>
+            <LogoNegocio />
             <span class="flex flex-col leading-tight">
               <span class="font-display text-lg font-medium text-ink">Fragua Real</span>
               <span class="text-[10px] font-medium tracking-[2.6px] text-brand-700">BURGER</span>
@@ -187,9 +184,7 @@ const anioActual = new Date().getFullYear()
     >
       <div class="flex items-center justify-between border-b border-[#e9e3d8] px-4 py-5">
         <router-link to="/" class="flex items-center gap-3" @click="cerrarMenu">
-          <span class="flex size-10 items-center justify-center rounded-full bg-ink text-brand-500" aria-hidden="true">
-            <span class="font-display text-base">FR</span>
-          </span>
+          <LogoNegocio tamano="size-10" texto="text-base" />
           <span class="flex flex-col leading-tight">
             <span class="font-display text-base font-medium text-ink">Fragua Real</span>
             <span class="text-[9px] font-medium tracking-[2.4px] text-brand-700">BURGER</span>
@@ -297,9 +292,7 @@ const anioActual = new Date().getFullYear()
           <!-- Marca y acciones -->
           <div class="sm:col-span-2 lg:col-span-1">
             <router-link to="/" class="inline-flex items-center gap-3">
-              <span class="flex size-11 items-center justify-center rounded-full bg-white/10 text-brand-500" aria-hidden="true">
-                <span class="font-display text-lg">FR</span>
-              </span>
+              <LogoNegocio fondo="bg-white/10" />
               <span class="flex flex-col leading-tight">
                 <span class="font-display text-lg font-medium text-white">Fragua Real</span>
                 <span class="text-[10px] font-medium tracking-[2.6px] text-brand-500">BURGER</span>

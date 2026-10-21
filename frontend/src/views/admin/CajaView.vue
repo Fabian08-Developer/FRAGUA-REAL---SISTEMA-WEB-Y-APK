@@ -310,7 +310,7 @@ onMounted(() => {
             <p class="mt-0.5 text-xs text-gray-500">El Mesero no puede registrar cobros hasta que se abra el turno.</p>
           </div>
         </div>
-        <BaseButton variant="primary" @click="abrirModalAbrir">Abrir turno</BaseButton>
+        <BaseButton v-escritura variant="primary" @click="abrirModalAbrir">Abrir turno</BaseButton>
       </div>
 
       <div v-else class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -330,7 +330,7 @@ onMounted(() => {
             {{ turnoActual.abierto_por_usuario?.nombre ?? '—' }}
           </p>
         </div>
-        <BaseButton variant="danger" @click="abrirModalCerrar">Cerrar turno</BaseButton>
+        <BaseButton v-escritura variant="danger" @click="abrirModalCerrar">Cerrar turno</BaseButton>
       </div>
     </section>
 
@@ -512,7 +512,7 @@ onMounted(() => {
                 </template>
               </p>
             </div>
-            <BaseButton v-if="!pago.anulado" variant="danger-soft" size="sm" class="shrink-0" @click="abrirAnular(pago)">
+            <BaseButton v-escritura v-if="!pago.anulado" variant="danger-soft" size="sm" class="shrink-0" @click="abrirAnular(pago)">
               Anular
             </BaseButton>
           </li>
@@ -556,7 +556,7 @@ onMounted(() => {
                   {{ ESTADO_REEMBOLSO[pago.transaccion_pasarela.reembolso_estado] }}<template v-if="pago.transaccion_pasarela.reembolso_mensaje">: {{ pago.transaccion_pasarela.reembolso_mensaje }}</template>
                 </p>
               </div>
-              <BaseButton
+              <BaseButton v-escritura
                 v-if="!pago.anulado && pago.estado === 'aprobado'"
                 variant="danger-soft"
                 size="sm"

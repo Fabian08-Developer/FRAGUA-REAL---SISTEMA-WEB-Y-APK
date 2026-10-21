@@ -11,14 +11,14 @@ import { destinoInterno } from '@/utils/redireccion'
 
 const router = useRouter()
 const route = useRoute()
-const { login, rol } = useAuth()
+const { login, rol, rolDeZona } = useAuth()
 
 // CORREGIDO (28/09/2026): antes SIEMPRE mandaba a "/" (Home de Cliente) cuando no
 // venía de un redirect por el guard — un Mesero/Administrador que entraba por
 // /login directo (no por un enlace protegido) quedaba viendo el sitio de Cliente
 // sin ninguna pista de cómo llegar a su panel (RF-M01-009: cada rol a su zona).
 function rutaSegunRol(): string {
-  if (rol.value === 'administrador') return '/admin'
+  if (rolDeZona.value === 'administrador') return '/admin'
   if (rol.value === 'mesero') return '/mesero'
   return '/'
 }

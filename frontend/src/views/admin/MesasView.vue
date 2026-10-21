@@ -186,7 +186,7 @@ onMounted(cargar)
   <div>
     <PageHeader eyebrow="SALÓN" titulo="Mesas y reservas" descripcion="Alta de mesas, baja lógica y liberación forzada.">
       <template #actions>
-        <BaseButton variant="primary" @click="abrirNueva">
+        <BaseButton v-escritura variant="primary" @click="abrirNueva">
           <Plus :size="17" />
           Nueva mesa
         </BaseButton>
@@ -245,12 +245,12 @@ onMounted(cargar)
               <QrCode :size="14" />
               Ver QR
             </BaseButton>
-            <BaseButton variant="ghost" size="sm" class="col-span-2" @click="abrirEditar(mesa)">
+            <BaseButton v-escritura variant="ghost" size="sm" class="col-span-2" @click="abrirEditar(mesa)">
               <Pencil :size="14" />
               Cambiar nombre
             </BaseButton>
             <template v-if="mesa.activa">
-              <BaseButton
+              <BaseButton v-escritura
                 v-if="mesa.estado !== 'libre'"
                 variant="ghost"
                 size="sm"
@@ -259,7 +259,7 @@ onMounted(cargar)
               >
                 Liberar
               </BaseButton>
-              <BaseButton
+              <BaseButton v-escritura
                 v-if="mesa.estado !== 'libre'"
                 variant="ghost"
                 size="sm"
@@ -268,7 +268,7 @@ onMounted(cargar)
               >
                 Liberar forzada
               </BaseButton>
-              <BaseButton
+              <BaseButton v-escritura
                 variant="ghost"
                 size="sm"
                 class="col-span-2 !text-red-700 hover:!border-red-300 hover:!bg-red-50"
@@ -278,7 +278,7 @@ onMounted(cargar)
                 Dar de baja
               </BaseButton>
             </template>
-            <BaseButton
+            <BaseButton v-escritura
               v-else
               variant="primary"
               size="sm"

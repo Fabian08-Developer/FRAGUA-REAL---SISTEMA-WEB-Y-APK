@@ -1084,27 +1084,27 @@ onMounted(cargar)
         >
           Agotados y disponibilidad
         </router-link>
-        <BaseButton v-if="seccion === 'productos'" variant="secondary" @click="abrirImportar">
+        <BaseButton v-escritura v-if="seccion === 'productos'" variant="secondary" @click="abrirImportar">
           <FileSpreadsheet :size="17" />
           Importar
         </BaseButton>
-        <BaseButton v-if="seccion === 'categorias'" variant="primary" @click="abrirNuevaCategoria">
+        <BaseButton v-escritura v-if="seccion === 'categorias'" variant="primary" @click="abrirNuevaCategoria">
           <Plus :size="17" />
           Nueva categoría
         </BaseButton>
-        <BaseButton v-else-if="seccion === 'productos'" variant="primary" @click="abrirNuevoProducto">
+        <BaseButton v-escritura v-else-if="seccion === 'productos'" variant="primary" @click="abrirNuevoProducto">
           <Plus :size="17" />
           Nuevo producto
         </BaseButton>
-        <BaseButton v-else-if="seccion === 'combos'" variant="primary" @click="abrirNuevoCombo">
+        <BaseButton v-escritura v-else-if="seccion === 'combos'" variant="primary" @click="abrirNuevoCombo">
           <Plus :size="17" />
           Nuevo combo
         </BaseButton>
-        <BaseButton v-else-if="seccion === 'extras'" variant="primary" @click="abrirNuevoExtraGeneral">
+        <BaseButton v-escritura v-else-if="seccion === 'extras'" variant="primary" @click="abrirNuevoExtraGeneral">
           <Plus :size="17" />
           Nuevo extra
         </BaseButton>
-        <BaseButton v-else variant="primary" @click="abrirNuevaPromocion">
+        <BaseButton v-escritura v-else variant="primary" @click="abrirNuevaPromocion">
           <Plus :size="17" />
           Nueva promoción
         </BaseButton>
@@ -1189,7 +1189,7 @@ onMounted(cargar)
               {{ categoria.productos?.length ?? 0 }} producto(s)
             </p>
           </div>
-          <BaseButton variant="ghost" size="sm" class="shrink-0" @click="abrirEditarCategoria(categoria)">
+          <BaseButton v-escritura variant="ghost" size="sm" class="shrink-0" @click="abrirEditarCategoria(categoria)">
             <Pencil :size="14" />
             Editar
           </BaseButton>
@@ -1284,11 +1284,11 @@ onMounted(cargar)
             </p>
           </div>
           <div class="grid shrink-0 grid-cols-2 gap-2 sm:flex">
-            <BaseButton variant="ghost" size="sm" class="col-span-2 sm:col-span-1" @click="abrirOferta(producto)">
+            <BaseButton v-escritura variant="ghost" size="sm" class="col-span-2 sm:col-span-1" @click="abrirOferta(producto)">
               <Percent :size="14" />
               {{ producto.oferta ? 'Cambiar oferta' : 'Poner en oferta' }}
             </BaseButton>
-            <BaseButton
+            <BaseButton v-escritura
               variant="ghost"
               size="sm"
               :disabled="procesandoDisponibilidad === producto.id"
@@ -1296,7 +1296,7 @@ onMounted(cargar)
             >
               {{ producto.disponible ? 'Marcar agotado' : 'Marcar disponible' }}
             </BaseButton>
-            <BaseButton variant="ghost" size="sm" @click="abrirEditarProducto(producto)">
+            <BaseButton v-escritura variant="ghost" size="sm" @click="abrirEditarProducto(producto)">
               <Pencil :size="14" />
               Editar
             </BaseButton>
@@ -1339,7 +1339,7 @@ onMounted(cargar)
               {{ comparacionCombo(combo.precio, sumaComponentesCombo(combo))?.texto }}
             </p>
           </div>
-          <BaseButton variant="ghost" size="sm" class="shrink-0" @click="abrirEditarCombo(combo)">
+          <BaseButton v-escritura variant="ghost" size="sm" class="shrink-0" @click="abrirEditarCombo(combo)">
             <Pencil :size="14" />
             Editar
           </BaseButton>
@@ -1374,7 +1374,7 @@ onMounted(cargar)
               {{ extra.productos?.length ? `se ofrece con ${extra.productos.map((p) => p.nombre).join(', ')}` : 'no se ofrece con ningún producto: márcalo en los productos que lo llevan' }}
             </p>
           </div>
-          <BaseButton variant="ghost" size="sm" class="shrink-0" @click="abrirEditarExtraGeneral(extra)">
+          <BaseButton v-escritura variant="ghost" size="sm" class="shrink-0" @click="abrirEditarExtraGeneral(extra)">
             <Pencil :size="14" />
             Editar
           </BaseButton>
@@ -1420,7 +1420,7 @@ onMounted(cargar)
               · {{ vigenciaTexto(promocion.vigencia_inicio, promocion.vigencia_fin) }}
             </p>
           </div>
-          <BaseButton variant="ghost" size="sm" class="shrink-0" @click="abrirEditarPromocion(promocion)">
+          <BaseButton v-escritura variant="ghost" size="sm" class="shrink-0" @click="abrirEditarPromocion(promocion)">
             <Pencil :size="14" />
             Editar
           </BaseButton>

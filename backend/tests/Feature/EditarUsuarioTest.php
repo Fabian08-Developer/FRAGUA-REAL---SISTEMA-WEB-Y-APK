@@ -92,7 +92,12 @@ class EditarUsuarioTest extends TestCase
     {
         $token = $this->mesero->createToken('acceso')->plainTextToken;
         $this->mesero->createToken('tablet');
+        // M09 (19/10/2026): volver Administrador a alguien es solo del SuperAdmin.
         Sanctum::actingAs($this->admin);
+        $this->putJson("/api/usuarios/{$this->mesero->id}", $this->datos(['role' => 'administrador']))
+            ->assertForbidden()
+            ->assertJsonPath('message', 'Solo el SuperAdmin puede gestionar las cuentas de Administrador.');
+        Sanctum::actingAs(User::create(['role' => 'superadmin', 'nombre' => 'Sara Super', 'email' => 'super@test.co', 'password' => bcrypt('secreto123'), 'activo' => true]));
 
         $this->putJson("/api/usuarios/{$this->mesero->id}", $this->datos(['role' => 'administrador']))
             ->assertOk()

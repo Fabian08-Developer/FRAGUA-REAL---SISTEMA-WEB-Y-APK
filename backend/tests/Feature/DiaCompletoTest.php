@@ -30,9 +30,9 @@ use Tests\TestCase;
  *  11:30 pedido por QR en la Mesa 3: $20.000 con tarjeta.
  *  12:00 domicilio de un invitado, contra entrega: $22.000 en efectivo (con el domicilio).
  *  12:15 recogida de un cliente con cuenta, pagada en línea: $8.000.
- *  13:00 llega la reserva: pedido de $40.000 en la Mesa 2; el depósito se abona y el resto ($20.000) en efectivo.
  *  14:00 compras y gastos en efectivo: $30.000 y $5.000.
  *  15:00 un pedido confirmado se cancela (con la clave del Administrador).
+ *  16:00 llega la reserva: pedido de $40.000 en la Mesa 2; el depósito se abona y el resto ($20.000) en efectivo.
  *  21:00 cierre de caja (sin descuadre), cierre del día y reportes.
  *
  * Ventas del día: 44.000 + 20.000 + 22.000 + 8.000 + 40.000 = $134.000.
@@ -117,12 +117,13 @@ class DiaCompletoTest extends TestCase
         $turnoId = $this->postJson('/api/caja/abrir', ['base_inicial' => 100000])->assertSuccessful()->json('id');
         $this->postJson('/api/caja/abrir', ['base_inicial' => 50000])->assertStatus(422); // un solo turno por día
 
-        // 10:00 — Reserva web de la Mesa 2 para la 1:00 p. m., depósito en línea (modo manual).
+        // 10:00 — Reserva web de la Mesa 2 para las 4:00 p. m. (primera hora del horario de reservas y
+        // con más de 3 horas de anticipación), depósito en línea (modo manual).
         $this->a('10:00');
         $this->como(null);
         $creada = $this->postJson('/api/reservas', [
             'mesa_id' => $this->mesa2->id, 'cliente_nombre' => 'Laura Pérez', 'cliente_telefono' => '3105551234',
-            'cliente_correo' => 'laura@correo.co', 'fecha_hora' => self::HOY.' 13:00',
+            'cliente_correo' => 'laura@correo.co', 'fecha_hora' => self::HOY.' 16:00',
         ])->assertCreated()->assertJsonPath('estado', 'pendiente_pago');
         $reservaId = $creada->json('id');
         $this->postJson("/api/reservas/{$reservaId}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $creada->json('token_publico')])
@@ -184,19 +185,6 @@ class DiaCompletoTest extends TestCase
             fn ($aviso, $canales, $destino) => array_key_exists('carla@correo.co', $destino->routes['mail']));
         $this->postJson("/api/pedidos/{$recogida}/recoger")->assertOk()->assertJsonPath('estado', 'finalizado');
 
-        // 13:00 — Llega la reserva: Mesa 2 ocupada, pedido de $40.000; el depósito se abona.
-        $this->a('13:00');
-        $this->como($this->mesero);
-        $this->postJson("/api/reservas/{$reservaId}/completar")->assertOk()->assertJsonPath('estado', 'completada');
-        $visita = $this->postJson('/api/pedidos', [
-            'tipo' => 'local', 'origen' => 'mesero', 'mesa_id' => $this->mesa2->id,
-            'lineas' => $this->lineas([[$this->clasica, 2]]),
-        ])->assertCreated()->json('id');
-        $this->aCocina($visita);
-        $this->getJson("/api/mesas/{$this->mesa2->id}/cuenta")->assertOk()->assertJsonPath('saldo', fn ($s) => (float) $s === 20000.0);
-        $this->postJson("/api/mesas/{$this->mesa2->id}/cobrar", ['metodo' => 'efectivo', 'monto' => 20000])->assertOk();
-        $this->assertSame('finalizado', Pedido::find($visita)->estado);
-
         // 14:00 — Compras y gastos del día, en efectivo.
         $this->a('14:00');
         $this->como($this->admin);
@@ -215,6 +203,19 @@ class DiaCompletoTest extends TestCase
         $this->postJson("/api/pedidos/{$cancelado}/cancelar", ['motivo' => 'El cliente se fue', 'password_administrador' => 'Clave-Admin-2026'])->assertOk();
         $this->assertSame('pendiente', Comanda::where('pedido_id', $cancelado)->where('tipo', 'cancelacion')->sole()->estado_impresion);
         $this->getJson('/api/comandas/pendientes')->assertOk()->assertJsonCount(1);
+
+        // 16:00 — Llega la reserva: Mesa 2 ocupada, pedido de $40.000; el depósito se abona.
+        $this->a('16:00');
+        $this->como($this->mesero);
+        $this->postJson("/api/reservas/{$reservaId}/completar")->assertOk()->assertJsonPath('estado', 'completada');
+        $visita = $this->postJson('/api/pedidos', [
+            'tipo' => 'local', 'origen' => 'mesero', 'mesa_id' => $this->mesa2->id,
+            'lineas' => $this->lineas([[$this->clasica, 2]]),
+        ])->assertCreated()->json('id');
+        $this->aCocina($visita);
+        $this->getJson("/api/mesas/{$this->mesa2->id}/cuenta")->assertOk()->assertJsonPath('saldo', fn ($s) => (float) $s === 20000.0);
+        $this->postJson("/api/mesas/{$this->mesa2->id}/cobrar", ['metodo' => 'efectivo', 'monto' => 20000])->assertOk();
+        $this->assertSame('finalizado', Pedido::find($visita)->estado);
 
         // Todas las mesas quedan libres.
         $this->assertSame(['libre', 'libre', 'libre'], [$this->mesa1->fresh()->estado, $this->mesa2->fresh()->estado, $this->mesa3->fresh()->estado]);

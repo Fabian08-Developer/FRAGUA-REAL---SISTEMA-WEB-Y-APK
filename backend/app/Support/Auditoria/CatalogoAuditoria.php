@@ -50,6 +50,14 @@ final class CatalogoAuditoria
         'crear_usuario' => ['Alta de usuario del personal', 'usuarios'],
         'editar_usuario' => ['Edición de datos de usuario', 'usuarios'],
         'cambiar_rol' => ['Cambio de rol de usuario', 'usuarios'],
+        // M09 (19/10/2026)
+        'crear_superadmin' => ['Alta de la cuenta SuperAdmin (en el servidor)', 'usuarios'],
+        'asignar_superadmin' => ['Cuenta convertida en SuperAdmin (en el servidor)', 'usuarios'],
+        'cambiar_menus' => ['Cambio de los menús de una cuenta', 'usuarios'],
+        // M10 (20/10/2026)
+        'crear_soporte' => ['Alta de la cuenta de Soporte (en el servidor)', 'usuarios'],
+        'actualizar_soporte' => ['Cambio de la cuenta de Soporte (en el servidor)', 'usuarios'],
+        'consultar_documento' => ['Consulta de un comprobante o un cierre por Soporte (no cuenta como impresión)', 'seguridad'],
         'cambiar_permiso_gastos' => ['Cambio de permiso de compras y gastos', 'usuarios'],
         'activar_usuario' => ['Activación de usuario', 'usuarios'],
         'desactivar_usuario' => ['Desactivación de usuario', 'usuarios'],
@@ -123,6 +131,9 @@ final class CatalogoAuditoria
 
         // Configuración
         'editar_configuracion' => ['Cambio de configuración', 'configuracion'],
+        'editar_datos_negocio' => ['Cambio de los datos del negocio', 'configuracion'],
+        'cambiar_logo_negocio' => ['Cambio del logo del negocio', 'configuracion'],
+        'quitar_logo_negocio' => ['Logo del negocio quitado', 'configuracion'],
     ];
 
     public const ENTIDADES = [

@@ -241,6 +241,27 @@ Usuarios.
 - [ ] En la pestaña Red, `/api/cierres-diarios` y anular (`/api/compras-gastos/{id}/anular`)
       responden 403.
 
+## 8b-bis. Permisos de menú (M09, 20/10/2026)
+
+- [ ] Si el SuperAdmin le quitó menús a esta cuenta, solo aparecen los habilitados (Pedidos siempre) y
+      los botones que llevan a los quitados no se muestran (por ejemplo, cobrar desde Mesas).
+
+## 8b-ter. Notificaciones (M11, 21/10/2026)
+
+- [ ] En la barra de arriba está la campana. Un pedido nuevo por el QR o la web, una reserva nueva o
+      que empieza en 30 min, un pedido listo para recoger, un producto agotado por otro y una comanda que
+      no salió aparecen ahí con el contador. Tocar uno abre su pantalla (Pedidos, Reservas o Menú).
+- [ ] Lo que hace este Mesero (por ejemplo, marcar un agotado) no le llega a él mismo. Los avisos de
+      caja y del sistema no le llegan.
+
+## 8c. Correcciones del 19/10/2026
+
+- [ ] Con una mesa dada de baja por el Administrador: no aparece en Mesas, ni en Nuevo pedido, ni en
+      el filtro de Reservas.
+- [ ] «Nueva reserva»: la hora es una lista de 4:00 p. m. a 11:00 p. m.; las que están a menos de 3
+      horas salen «no disponible». Hay campo «Descripción (opcional)».
+- [ ] La descripción que dejó el cliente se ve en la tarjeta de su reserva.
+
 ## 9. Un turno completo
 
 - [ ] Hacer el recorrido de `PRUEBA-DIA-COMPLETO.md` con el Mesero en el teléfono o la tableta. Al final, el efectivo esperado de la caja ($142.000) y las ventas del día ($125.000) deben cuadrar.

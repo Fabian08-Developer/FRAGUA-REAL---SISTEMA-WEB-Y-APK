@@ -292,7 +292,7 @@ onMounted(() => {
       <!-- Cierre formal (RF-M03-25, HU-M03-08): solo una vez por día y con la caja cerrada. -->
       <div v-if="!consulta" class="mt-5 flex flex-col gap-2 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between print:hidden">
         <p class="text-xs text-gray-500">{{ previa.motivo_no_cierra ?? 'El cierre guarda estos valores y su desglose. Después, cualquier corrección de ese día pide tu contraseña y un motivo.' }}</p>
-        <BaseButton :disabled="!previa.puede_cerrar || cerrando" @click="cerrarDia">
+        <BaseButton v-escritura :disabled="!previa.puede_cerrar || cerrando" @click="cerrarDia">
           <Lock :size="15" /> {{ cerrando ? 'Cerrando…' : 'Cerrar el día' }}
         </BaseButton>
       </div>

@@ -29,6 +29,21 @@ export const useAuthStore = defineStore('auth', () => {
 
   const estaAutenticado = computed(() => !!token.value)
   const rol = computed(() => usuario.value?.role ?? null)
+  // M09 (19/10/2026): el SuperAdmin entra a todo lo del Administrador; lo exclusivo suyo
+  // (cuentas de Administrador, nombre y NIT del negocio) se pregunta con esSuperAdmin.
+  const esSuperAdmin = computed(() => rol.value === 'superadmin')
+  // M10 (20/10/2026): Soporte entra al panel del Administrador solo para consultar; con esSoporte
+  // se esconden los botones que cambian algo (el servidor de todos modos los rechaza).
+  const esSoporte = computed(() => rol.value === 'soporte')
+  const esAdministrador = computed(() => rol.value === 'administrador' || rol.value === 'superadmin' || rol.value === 'soporte')
+  /** M09 (20/10/2026): ¿esta cuenta tiene ese menú habilitado? El SuperAdmin y Soporte, siempre. */
+  function tieneMenu(clave: string): boolean {
+    if (esSuperAdmin.value || esSoporte.value) return true
+    const menus = usuario.value?.menus
+    return !menus || menus.includes(clave)
+  }
+  /** El rol para decidir a qué zona entra: el SuperAdmin y Soporte cuentan como Administrador. */
+  const rolDeZona = computed(() => (rol.value === 'superadmin' || rol.value === 'soporte' ? 'administrador' : rol.value))
 
   async function login(payload: LoginPayload) {
     const { data } = await authService.login(payload)
@@ -97,6 +112,11 @@ export const useAuthStore = defineStore('auth', () => {
     listo,
     estaAutenticado,
     rol,
+    esSuperAdmin,
+    esSoporte,
+    esAdministrador,
+    rolDeZona,
+    tieneMenu,
     login,
     registrar,
     cargarUsuarioActual,

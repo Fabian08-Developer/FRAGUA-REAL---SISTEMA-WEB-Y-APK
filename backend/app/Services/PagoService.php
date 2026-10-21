@@ -166,6 +166,7 @@ class PagoService
             $pago->save();
 
             $this->auditarEnLinea('confirmar_pago_en_linea', $pago, $actor, $via);
+            app(NotificacionService::class)->pagoEnLinea($pago, true, $actor); // M11
             $this->finalizarSiQuedoCompleto($pago->pedido, null);
 
             return $pago;
@@ -190,6 +191,7 @@ class PagoService
         $pago->save();
 
         $this->auditarEnLinea('rechazar_pago_en_linea', $pago, $actor, $via, $motivo);
+        app(NotificacionService::class)->pagoEnLinea($pago, false, $actor); // M11
 
         return $pago;
     }
@@ -368,6 +370,8 @@ class PagoService
             // pedido ya no esté totalPagado(), este Service NO revierte automáticamente el
             // pedido de "finalizado" a otro estado — no hay una regla de negocio documentada
             // para ese caso. Se deja así a propósito en vez de asumir un comportamiento.
+
+            app(NotificacionService::class)->pagoAnulado($pago, $actor); // M11
 
             return $pago;
         });

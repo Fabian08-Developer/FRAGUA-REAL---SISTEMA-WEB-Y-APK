@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   BarChart3,
   ClipboardList,
+  Lock,
   Receipt,
   UtensilsCrossed,
   Users,
@@ -16,11 +17,13 @@ import {
 import PageHeader from '@/components/common/PageHeader.vue'
 import StatCard from '@/components/common/StatCard.vue'
 import { useAuth } from '@/composables/useAuth'
+import { useAuthStore } from '@/stores/auth'
 import { dashboardService } from '@/services/dashboard.service'
 import { mensajeDeError } from '@/services/errors'
 import type { ResumenDashboard } from '@/services/dashboard.service'
 
 const { usuario } = useAuth()
+const auth = useAuthStore()
 
 const resumen = ref<ResumenDashboard | null>(null)
 const cargando = ref(true)
@@ -44,14 +47,18 @@ const fechaHoy = computed(() => {
 
 // Accesos directos a los módulos que ya existen — en teléfono el menú está oculto detrás
 // de la hamburguesa, y desde aquí el Administrador llega a lo de siempre con un toque.
-const accesos = [
-  { to: '/admin/caja', titulo: 'Caja', detalle: 'Turnos y pagos', icono: Wallet },
-  { to: '/admin/catalogo', titulo: 'Catálogo', detalle: 'Productos y combos', icono: UtensilsCrossed },
-  { to: '/admin/mesas', titulo: 'Mesas y reservas', detalle: 'Salón y QR', icono: Armchair },
-  { to: '/admin/compras-gastos', titulo: 'Compras y gastos', detalle: 'Egresos del local', icono: Receipt },
-  { to: '/admin/reportes', titulo: 'Reportes', detalle: 'Ventas y márgenes', icono: BarChart3 },
-  { to: '/admin/usuarios', titulo: 'Usuarios', detalle: 'Staff y clientes', icono: Users },
-]
+// M09 (20/10/2026): cada acceso lleva su menú. Si el SuperAdmin no se lo habilitó a esta cuenta, el
+// acceso se ve bloqueado (gris, con candado y «Sin permiso») y no abre nada; el servidor también lo rechaza.
+const accesos = computed(() =>
+  [
+    { to: '/admin/caja', titulo: 'Caja', detalle: 'Turnos y pagos', icono: Wallet, menu: 'caja' },
+    { to: '/admin/catalogo', titulo: 'Catálogo', detalle: 'Productos y combos', icono: UtensilsCrossed, menu: 'catalogo' },
+    { to: '/admin/mesas', titulo: 'Mesas y reservas', detalle: 'Salón y QR', icono: Armchair, menu: 'mesas' },
+    { to: '/admin/compras-gastos', titulo: 'Compras y gastos', detalle: 'Egresos del local', icono: Receipt, menu: 'compras_gastos' },
+    { to: '/admin/reportes', titulo: 'Reportes', detalle: 'Ventas y márgenes', icono: BarChart3, menu: 'reportes' },
+    { to: '/admin/usuarios', titulo: 'Usuarios', detalle: 'Staff y clientes', icono: Users, menu: 'usuarios' },
+  ].map((a) => ({ ...a, permitido: auth.tieneMenu(a.menu) })),
+)
 
 async function cargar() {
   cargando.value = true
@@ -106,9 +113,31 @@ onMounted(cargar)
     <section class="mt-10">
       <h2 class="section-title">Accesos rápidos</h2>
       <div class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:gap-4">
+        <template v-for="acceso in accesos" :key="acceso.to">
+        <!-- M09: acceso sin permiso — visible, pero bloqueado. -->
+        <div
+          v-if="!acceso.permitido"
+          class="relative flex cursor-not-allowed select-none flex-col gap-3 overflow-hidden rounded-2xl border border-dashed border-gray-300 bg-gray-50/80 p-4 sm:p-5"
+          role="link"
+          aria-disabled="true"
+          :title="`${acceso.titulo}: sin permiso. Pídele al SuperAdmin que lo active.`"
+        >
+          <span class="flex items-center justify-between">
+            <span class="flex size-10 items-center justify-center rounded-xl bg-gray-200/70 text-gray-400">
+              <component :is="acceso.icono" :size="20" />
+            </span>
+            <span class="inline-flex items-center gap-1 rounded-full bg-gray-200/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+              <Lock :size="11" />
+              Sin permiso
+            </span>
+          </span>
+          <span>
+            <span class="block text-[15px] font-semibold text-gray-400">{{ acceso.titulo }}</span>
+            <span class="mt-0.5 block text-xs text-gray-400">Pídele al SuperAdmin que lo active.</span>
+          </span>
+        </div>
         <router-link
-          v-for="acceso in accesos"
-          :key="acceso.to"
+          v-else
           :to="acceso.to"
           class="card-interactive group flex flex-col gap-3 p-4 sm:p-5"
         >
@@ -128,6 +157,7 @@ onMounted(cargar)
             <span class="mt-0.5 block text-xs text-gray-500">{{ acceso.detalle }}</span>
           </span>
         </router-link>
+        </template>
       </div>
     </section>
   </div>

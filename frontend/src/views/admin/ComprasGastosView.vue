@@ -332,7 +332,7 @@ onMounted(() => {
       descripcion="Registro de compras, otros gastos y cierre diario (M03)."
     >
       <template #actions>
-        <BaseButton variant="primary" @click="abrirCrear">
+        <BaseButton v-escritura variant="primary" @click="abrirCrear">
           <Plus :size="17" />
           Registrar compra o gasto
         </BaseButton>
@@ -486,10 +486,10 @@ onMounted(() => {
           <div class="flex shrink-0 items-center justify-between gap-3 border-t border-gray-100 pt-3 sm:justify-end sm:border-0 sm:pt-0">
             <span class="font-display text-xl font-medium text-ink">{{ formatoPrecio(registro.valor) }}</span>
             <div v-if="registro.estado === 'activo'" class="flex gap-1.5">
-              <button type="button" class="flex size-10 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition hover:border-brand-400 hover:bg-brand-50 hover:text-ink" title="Editar" aria-label="Editar" @click="abrirEditar(registro)">
+              <button v-escritura type="button" class="flex size-10 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition hover:border-brand-400 hover:bg-brand-50 hover:text-ink" title="Editar" aria-label="Editar" @click="abrirEditar(registro)">
                 <Pencil :size="16" />
               </button>
-              <button type="button" class="flex size-10 items-center justify-center rounded-xl border border-gray-200 text-red-600 transition hover:border-red-300 hover:bg-red-50" title="Anular" aria-label="Anular" @click="abrirAnular(registro)">
+              <button v-escritura type="button" class="flex size-10 items-center justify-center rounded-xl border border-gray-200 text-red-600 transition hover:border-red-300 hover:bg-red-50" title="Anular" aria-label="Anular" @click="abrirAnular(registro)">
                 <Ban :size="16" />
               </button>
             </div>

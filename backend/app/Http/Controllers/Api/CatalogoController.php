@@ -304,6 +304,10 @@ class CatalogoController extends Controller
         app(\App\Services\AuditoriaService::class)->registrar('cambiar_disponibilidad', 'Producto', $producto->id, [
             'nombre' => $producto->nombre, 'disponible' => $producto->disponible,
         ], $request->user());
+        // M11 (21/10/2026): marcar un producto agotado avisa al resto del personal.
+        if (! $producto->disponible) {
+            app(\App\Services\NotificacionService::class)->productoAgotado($producto->nombre, "producto:{$producto->id}", $request->user());
+        }
 
         return response()->json($producto->load(['variantes', 'categoria']));
     }
@@ -320,6 +324,9 @@ class CatalogoController extends Controller
         app(\App\Services\AuditoriaService::class)->registrar('cambiar_disponibilidad', 'Variante', $variante->id, [
             'nombre' => $variante->producto?->nombre.' ('.$variante->nombre.')', 'disponible' => $variante->disponible,
         ], $request->user());
+        if (! $variante->disponible) {
+            app(\App\Services\NotificacionService::class)->productoAgotado($variante->producto?->nombre.' ('.$variante->nombre.')', "variante:{$variante->id}", $request->user());
+        }
 
         return response()->json($variante);
     }
@@ -462,6 +469,8 @@ class CatalogoController extends Controller
             ),
             // Fase 4, tarea 2: tiempos de las reservas (el Cliente ve la tolerancia al reservar).
             ...\App\Support\Reservas\PoliticaReservas::valores(),
+            // Mejora (19/10/2026): dirección, teléfono, WhatsApp y logo que cambia el Administrador.
+            'negocio' => app(\App\Services\NegocioService::class)->publico(),
         ]);
     }
 }

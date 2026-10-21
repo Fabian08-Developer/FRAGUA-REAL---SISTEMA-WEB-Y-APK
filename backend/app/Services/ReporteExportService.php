@@ -270,7 +270,7 @@ class ReporteExportService
 
     public function pdf(array $doc): string
     {
-        $pdf = Pdf::loadView('reportes.pdf', ['doc' => $doc, 'negocio' => config('fragua_real.negocio')])
+        $pdf = Pdf::loadView('reportes.pdf', ['doc' => $doc, 'negocio' => app(NegocioService::class)->datos()])
             ->setOption(RegistroImpresiones::OPCIONES_PDF)
             ->setPaper('letter', 'portrait');
 

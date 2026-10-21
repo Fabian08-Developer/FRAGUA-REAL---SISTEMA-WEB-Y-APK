@@ -181,6 +181,7 @@ class ComandaService
             app(AuditoriaService::class)->registrar('comanda_no_impresa', 'Pedido', $fila->pedido_id, [
                 'comanda' => $fila->numero, 'tipo' => $fila->tipo, 'motivo' => $fila->ultimo_error,
             ], $actor);
+            app(NotificacionService::class)->comandaNoSalio($fila, $actor); // M11
 
             return $fila;
         });

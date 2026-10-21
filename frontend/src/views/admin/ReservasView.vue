@@ -24,12 +24,13 @@ import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import { ESTADO_REEMBOLSO, ESTADO_TRANSACCION, metodoPasarela } from '@/utils/pasarela'
 import { useAuthStore } from '@/stores/auth'
 import { configuracionService } from '@/services/configuracion.service'
+import { HORARIO_POR_DEFECTO, fechaMinimaReserva, horasDelDia, textoHorario, type HorarioReservas } from '@/utils/horarioReservas'
 import type { EstadoReserva, Mesa, Reserva, ReservaAviso } from '@/types/models'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const esAdministrador = computed(() => auth.rol === 'administrador')
+const esAdministrador = computed(() => auth.esAdministrador)
 
 // Historial de reservas de UNA mesa — se puede llegar aquí con ?mesa_id=&mesa_nombre=
 // (enlace "Ver reservas" en MesasView.vue) o eligiendo la mesa directamente en el
@@ -222,18 +223,18 @@ async function confirmarDepositoManual() {
 // ---- Nueva reserva por teléfono (RF-M05-013, RN-M05-12) ----
 // Primero fecha y hora; con eso se piden las mesas que no tienen otra reserva a esa hora.
 const nuevaAbierta = ref(false)
-const nueva = ref({ fecha: '', hora: '', mesa_id: 0, nombre: '', telefono: '', correo: '' })
+const nueva = ref({ fecha: '', hora: '', mesa_id: 0, nombre: '', telefono: '', correo: '', descripcion: '' })
 const mesasLibres = ref<Mesa[]>([])
 const buscandoMesas = ref(false)
 const erroresNueva = ref<Record<string, string>>({})
 const errorNueva = ref('')
 const creandoNueva = ref(false)
 
-function hoyBogota() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' })
-}
-
 const depositoVigente = ref(0)
+// Corrección (19/10/2026): la reserva por teléfono sigue el mismo horario (4:00 p. m. a 11:00 p. m.)
+// y la misma anticipación mínima (3 horas) que la web; el servidor lo valida igual.
+const horario = ref<HorarioReservas>({ ...HORARIO_POR_DEFECTO })
+const horasNueva = computed(() => horasDelDia(nueva.value.fecha, horario.value, ahora.value))
 // Fase 4, tarea 3 (RN-M05-07/08): minutos de tolerancia; la reserva se libera sola a la hora + esto.
 const toleranciaMinutos = ref(15)
 
@@ -242,6 +243,11 @@ async function cargarDepositoVigente() {
     const { data } = await configuracionService.obtener()
     depositoVigente.value = Number(data.deposito_reserva)
     toleranciaMinutos.value = data.reserva_tolerancia_minutos ?? 15
+    horario.value = {
+      inicio: data.reserva_hora_inicio ?? HORARIO_POR_DEFECTO.inicio,
+      fin: data.reserva_hora_fin ?? HORARIO_POR_DEFECTO.fin,
+      anticipacionMinutos: data.reserva_anticipacion_minutos ?? HORARIO_POR_DEFECTO.anticipacionMinutos,
+    }
   } catch {
     // Solo es informativo: el servidor fija el valor real al crear la reserva.
   }
@@ -265,7 +271,7 @@ function horaCorta(valor: Date | string): string {
 
 function abrirNueva() {
   if (!depositoVigente.value) cargarDepositoVigente()
-  nueva.value = { fecha: hoyBogota(), hora: '', mesa_id: 0, nombre: '', telefono: '', correo: '' }
+  nueva.value = { fecha: fechaMinimaReserva(horario.value), hora: '', mesa_id: 0, nombre: '', telefono: '', correo: '', descripcion: '' }
   mesasLibres.value = []
   erroresNueva.value = {}
   errorNueva.value = ''
@@ -309,6 +315,7 @@ async function crearNueva() {
       cliente_telefono: n.telefono.trim(),
       cliente_correo: n.correo.trim(),
       fecha_hora: `${n.fecha} ${n.hora}`,
+      descripcion: n.descripcion.trim() || null,
     })
     nuevaAbierta.value = false
     if (filtro.value === 'proximas') await cargar()
@@ -423,7 +430,7 @@ onBeforeUnmount(() => clearInterval(reloj))
   <div>
     <PageHeader eyebrow="SALÓN" titulo="Reservas" descripcion="Reservas por teléfono, depósitos y llegada de los clientes.">
       <template #actions>
-        <BaseButton variant="primary" @click="abrirNueva">
+        <BaseButton v-escritura variant="primary" @click="abrirNueva">
           <Plus :size="16" />
           Nueva reserva
         </BaseButton>
@@ -508,6 +515,10 @@ onBeforeUnmount(() => clearInterval(reloj))
               <a :href="`tel:${reserva.cliente_telefono.replace(/[^\d+]/g, '')}`" class="text-brand-700 hover:underline">{{ reserva.cliente_telefono }}</a>
               · {{ reserva.cliente_correo }}
             </p>
+            <!-- Corrección (19/10/2026): la nota que dejó el cliente. -->
+            <p v-if="reserva.descripcion" class="mt-2 whitespace-pre-line rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              «{{ reserva.descripcion }}»
+            </p>
             <p class="mt-1 text-xs text-gray-500">
               {{
                 reserva.creado_por === 'cliente_web'
@@ -543,7 +554,7 @@ onBeforeUnmount(() => clearInterval(reloj))
                 {{ TIPOS_AVISO[aviso.tipo] }}:
                 {{ aviso.estado === 'enviado' ? `enviado ${horaCorta(aviso.enviado_at ?? aviso.created_at)}` : aviso.estado === 'fallido' ? 'falló' : 'en cola' }}
               </span>
-              <button
+              <button v-escritura
                 v-for="aviso in reserva.avisos.filter((a) => a.estado === 'fallido')"
                 :key="`r-${aviso.id}`"
                 type="button"
@@ -594,7 +605,7 @@ onBeforeUnmount(() => clearInterval(reloj))
             <template v-if="reserva.estado === 'pendiente_pago'">
               <template v-if="reserva.deposito_estado === 'pendiente'">
                 <!-- Con Wompi se confirma solo; los botones quedan de respaldo (D4). -->
-                <BaseButton
+                <BaseButton v-escritura
                   size="sm"
                   :variant="reserva.transaccion_deposito ? 'secondary' : 'primary'"
                   :disabled="procesando === reserva.id"
@@ -602,24 +613,24 @@ onBeforeUnmount(() => clearInterval(reloj))
                 >
                   {{ reserva.transaccion_deposito ? 'Confirmar a mano' : 'Confirmar depósito' }}
                 </BaseButton>
-                <BaseButton size="sm" variant="ghost" :disabled="procesando === reserva.id" @click="rechazarDeposito(reserva)">
+                <BaseButton v-escritura size="sm" variant="ghost" :disabled="procesando === reserva.id" @click="rechazarDeposito(reserva)">
                   {{ reserva.transaccion_deposito ? 'Rechazar a mano' : 'Rechazar depósito' }}
                 </BaseButton>
               </template>
-              <BaseButton v-else size="sm" variant="primary" :disabled="procesando === reserva.id" @click="abrirDeposito(reserva)">
+              <BaseButton v-escritura v-else size="sm" variant="primary" :disabled="procesando === reserva.id" @click="abrirDeposito(reserva)">
                 Registrar depósito manual
               </BaseButton>
-              <BaseButton size="sm" variant="danger-soft" :disabled="procesando === reserva.id" @click="cancelar(reserva)">
+              <BaseButton v-escritura size="sm" variant="danger-soft" :disabled="procesando === reserva.id" @click="cancelar(reserva)">
                 Cancelar
               </BaseButton>
             </template>
 
             <template v-else-if="reserva.estado === 'confirmada'">
-              <BaseButton size="sm" variant="primary" :disabled="procesando === reserva.id" @click="completar(reserva)">
+              <BaseButton v-escritura size="sm" variant="primary" :disabled="procesando === reserva.id" @click="completar(reserva)">
                 Confirmar llegada
               </BaseButton>
               <!-- Fase 4, tarea 3 (RN-M05-07): el no-show solo cuando ya venció la tolerancia. -->
-              <BaseButton
+              <BaseButton v-escritura
                 v-if="yaVencioTolerancia(reserva)"
                 size="sm"
                 variant="ghost"
@@ -628,7 +639,7 @@ onBeforeUnmount(() => clearInterval(reloj))
               >
                 Marcar no-show
               </BaseButton>
-              <BaseButton size="sm" variant="danger-soft" :disabled="procesando === reserva.id" @click="cancelar(reserva)">
+              <BaseButton v-escritura size="sm" variant="danger-soft" :disabled="procesando === reserva.id" @click="cancelar(reserva)">
                 Cancelar
               </BaseButton>
             </template>
@@ -683,13 +694,19 @@ onBeforeUnmount(() => clearInterval(reloj))
         <div class="grid grid-cols-2 gap-3">
           <label class="block">
             <span class="field-label">Fecha</span>
-            <input v-model="nueva.fecha" type="date" :min="hoyBogota()" class="field" />
+            <input v-model="nueva.fecha" type="date" :min="fechaMinimaReserva(horario, ahora)" class="field" @change="nueva.hora = ''" />
           </label>
           <label class="block">
             <span class="field-label">Hora</span>
-            <input v-model="nueva.hora" type="time" step="900" class="field" />
+            <select v-model="nueva.hora" class="field" :disabled="!nueva.fecha">
+              <option value="" disabled>{{ nueva.fecha ? 'Elige la hora' : 'Primero la fecha' }}</option>
+              <option v-for="h in horasNueva" :key="h.valor" :value="h.valor" :disabled="!h.disponible">
+                {{ h.texto }}{{ h.disponible ? '' : ' · no disponible' }}
+              </option>
+            </select>
           </label>
         </div>
+        <p class="-mt-2 text-xs text-gray-500">{{ textoHorario(horario) }}</p>
         <p v-if="erroresNueva.fecha_hora" class="-mt-2 text-xs text-red-600">{{ erroresNueva.fecha_hora }}</p>
 
         <label class="block">
@@ -728,6 +745,11 @@ onBeforeUnmount(() => clearInterval(reloj))
             <span v-if="erroresNueva.cliente_correo" class="mt-1 block text-xs text-red-600">{{ erroresNueva.cliente_correo }}</span>
           </label>
         </div>
+        <label class="block">
+          <span class="field-label">Descripción (opcional)</span>
+          <textarea v-model="nueva.descripcion" rows="2" maxlength="500" class="field resize-none" placeholder="Cumpleaños, silla para bebé, cerca de la ventana…" />
+          <span v-if="erroresNueva.descripcion" class="mt-1 block text-xs text-red-600">{{ erroresNueva.descripcion }}</span>
+        </label>
         <p class="text-xs text-gray-500">
           La reserva queda pendiente hasta registrar el depósito<template v-if="depositoVigente">
             de {{ formatoPesos.format(depositoVigente) }}</template> en efectivo, tarjeta o transferencia.

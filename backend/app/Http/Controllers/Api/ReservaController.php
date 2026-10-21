@@ -58,7 +58,11 @@ class ReservaController extends Controller
         $data = $request->validated();
         $usuario = $request->user('sanctum');
         $esPersonal = $usuario && ($usuario->esMesero() || $usuario->esAdministrador());
-        $data['creado_por'] = $esPersonal ? $usuario->role : 'cliente_web';
+        // M09 (20/10/2026): POST /reservas es pública; el personal sin el menú de Mesas ni el de
+        // Reservas no registra reservas por teléfono.
+        abort_if($esPersonal && ! \App\Support\Usuarios\MenusPorRol::permite($usuario, ['mesas', 'reservas']), 403, \App\Support\Usuarios\MenusPorRol::SIN_PERMISO);
+        // M09: la reserva del SuperAdmin cuenta como del Administrador (creado_por no tiene otro valor).
+        $data['creado_por'] = $esPersonal ? ($usuario->esMesero() ? 'mesero' : 'administrador') : 'cliente_web';
 
         // Valor vigente fijado por el servidor, no por el Cliente (mismo criterio que
         // valor_domicilio en PedidoController) — tabla `configuraciones`.

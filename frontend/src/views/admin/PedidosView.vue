@@ -373,7 +373,7 @@ onMounted(cargar)
               v-if="['pendiente', 'confirmado', 'preparando'].includes(pedido.estado)"
               class="mt-4 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap"
             >
-              <BaseButton
+              <BaseButton v-escritura
                 v-if="pedido.estado === 'pendiente'"
                 variant="primary"
                 :disabled="procesando === pedido.id"
@@ -381,7 +381,7 @@ onMounted(cargar)
               >
                 Confirmar pedido
               </BaseButton>
-              <BaseButton
+              <BaseButton v-escritura
                 v-if="pedido.estado === 'confirmado'"
                 variant="primary"
                 :disabled="procesando === pedido.id"
@@ -389,7 +389,7 @@ onMounted(cargar)
               >
                 Marcar preparando
               </BaseButton>
-              <BaseButton
+              <BaseButton v-escritura
                 v-if="pedido.estado === 'pendiente' || pedido.estado === 'confirmado'"
                 variant="secondary"
                 :disabled="procesando === pedido.id"
@@ -400,7 +400,7 @@ onMounted(cargar)
               <BaseButton variant="secondary" :disabled="procesando === pedido.id" @click="descuentoId = pedido.id">
                 <Percent :size="15" /> {{ pedido.descuento_manual ? 'Ver descuento' : 'Descuento' }}
               </BaseButton>
-              <BaseButton variant="ghost" :disabled="procesando === pedido.id" @click="abrirCancelar(pedido)">
+              <BaseButton v-escritura variant="ghost" :disabled="procesando === pedido.id" @click="abrirCancelar(pedido)">
                 Cancelar pedido
               </BaseButton>
             </div>

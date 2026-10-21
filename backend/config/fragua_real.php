@@ -63,6 +63,12 @@ return [
         'tolerancia_minutos' => (int) env('FRAGUA_REAL_RESERVA_TOLERANCIA_MINUTOS', 15),
         'recordatorio_minutos' => (int) env('FRAGUA_REAL_RESERVA_RECORDATORIO_MINUTOS', 120),
         'ventana_reservada_minutos' => (int) env('FRAGUA_REAL_RESERVA_VENTANA_MINUTOS', 60),
+        // Corrección (19/10/2026, decisión del negocio): las reservas son de 4:00 p. m. a 11:00 p. m.
+        // (hora de Colombia, la última a las 11:00 en punto) y se hacen con al menos 3 horas de
+        // anticipación. Aplica a la web y a las que registra el personal por teléfono.
+        'hora_inicio' => env('FRAGUA_REAL_RESERVA_HORA_INICIO', '16:00'),
+        'hora_fin' => env('FRAGUA_REAL_RESERVA_HORA_FIN', '23:00'),
+        'anticipacion_minutos' => (int) env('FRAGUA_REAL_RESERVA_ANTICIPACION_MINUTOS', 180),
     ],
 
     // Fase 3, tarea 4 (RF-M01-010, RNF-M01-005, decisión de seguridad): política de las sesiones.
@@ -87,5 +93,19 @@ return [
         // Endurecimiento: un evento firmado más viejo que esto no se aplica (podría ser uno
         // capturado y reenviado). No se pierde nada: la conciliación pregunta el estado a Wompi.
         'eventos_max_horas' => (int) env('PASARELA_EVENTOS_MAX_HORAS', 72),
+    ],
+
+    // M11 (21/10/2026): notificaciones del sistema (la campana del Mesero y del Administrador).
+    // Horas en hora de Colombia ("HH:MM"). Los avisos se borran solos después de 'dias_guardadas'.
+    'notificaciones' => [
+        // «La reserva empieza en N minutos».
+        'reserva_proxima_minutos' => (int) env('FRAGUA_REAL_NOTIF_RESERVA_PROXIMA_MINUTOS', 30),
+        // Desde esta hora se avisa si la caja del día sigue abierta.
+        'caja_abierta_hora' => env('FRAGUA_REAL_NOTIF_CAJA_ABIERTA_HORA', '23:30'),
+        // Desde esta hora se avisa si falta el cierre diario de ayer.
+        'cierre_pendiente_hora' => env('FRAGUA_REAL_NOTIF_CIERRE_PENDIENTE_HORA', '10:00'),
+        // A esta hora se corre la revisión antes de producción y se avisa si tiene errores.
+        'revision_hora' => env('FRAGUA_REAL_NOTIF_REVISION_HORA', '07:00'),
+        'dias_guardadas' => (int) env('FRAGUA_REAL_NOTIF_DIAS', 30),
     ],
 ];

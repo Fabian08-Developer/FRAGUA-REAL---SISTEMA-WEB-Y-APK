@@ -8,6 +8,8 @@ use App\Http\Requests\Api\Usuario\UpdateUsuarioRequest;
 use App\Models\User;
 use App\Services\AuditoriaService;
 use App\Services\SesionService;
+use App\Support\Usuarios\GestionCuentas;
+use App\Support\Usuarios\MenusPorRol;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -27,10 +29,13 @@ class UsuarioController extends Controller
     // ve staff y clientes desde la misma pantalla.
     public function index(Request $request)
     {
+        $actor = $request->user();
         // Fase 3, tarea 4: cuántas sesiones vigentes tiene cada cuenta.
         $usuarios = User::query()
             ->withCount(['tokens as sesiones_activas' => fn ($q) => app(SesionService::class)->vigentes($q)])
             ->when($request->rol, fn ($q) => $q->where('role', $request->rol))
+            // M10 (20/10/2026): la cuenta de Soporte solo la ven el SuperAdmin y ella misma.
+            ->when(! $actor->esSuperAdmin() && ! $actor->esSoporte(), fn ($q) => $q->where('role', '!=', 'soporte'))
             ->when($request->busqueda, fn ($q) => $q->where(
                 fn ($q2) => $q2->where('nombre', 'like', "%{$request->busqueda}%")
                     ->orWhere('email', 'like', "%{$request->busqueda}%")
@@ -39,6 +44,10 @@ class UsuarioController extends Controller
             ->orderBy('nombre')
             ->paginate(20);
 
+        // M09 (19/10/2026): la pantalla sabe qué cuentas puede tocar quien la mira (el
+        // Administrador ve a los Administradores y al SuperAdmin, pero no los modifica).
+        $usuarios->getCollection()->each(fn (User $u) => $u->setAttribute('gestionable', GestionCuentas::puedeGestionar($actor, $u)));
+
         return response()->json($usuarios);
     }
 
@@ -46,6 +55,10 @@ class UsuarioController extends Controller
     // inicial y se la comunica él mismo — M01 no pide enviarla por correo.
     public function store(StoreUsuarioRequest $request)
     {
+        // M09: una cuenta de Administrador solo la crea el SuperAdmin.
+        $motivo = GestionCuentas::motivoNoAsigna($request->user(), (string) $request->role);
+        abort_if($motivo !== null, 403, (string) $motivo);
+
         $usuario = User::create([
             'role' => $request->role,
             'nombre' => $request->nombre,
@@ -77,13 +90,21 @@ class UsuarioController extends Controller
     //    cambio de rol aparte (`cambiar_rol`), para poder filtrarlo.
     public function update(UpdateUsuarioRequest $request, User $usuario)
     {
+        // M10: UpdateUsuarioRequest ya rechazó editar la cuenta de Soporte (se cambia en el servidor).
+        $this->exigirGestion($request, $usuario);
         $datos = $request->validated();
+        $motivo = $datos['role'] !== $usuario->role ? GestionCuentas::motivoNoAsigna($request->user(), $datos['role']) : null;
+        abort_if($motivo !== null, 403, (string) $motivo);
         $cambiaRol = $datos['role'] !== $usuario->role;
         // Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32): el permiso de compras y gastos es solo de un
         // Mesero; si deja de serlo, se le quita. No es un rol: no cierra sus sesiones.
         $permisoAntes = (bool) $usuario->puede_registrar_gastos;
         if ($datos['role'] !== 'mesero') {
             $datos['puede_registrar_gastos'] = false;
+        }
+        // M09: los menús de un rol no sirven para otro; con el rol nuevo vuelve a ver todos los suyos.
+        if ($cambiaRol) {
+            $datos['menus_permitidos'] = null;
         }
         $permisoDespues = (bool) ($datos['puede_registrar_gastos'] ?? $permisoAntes);
 
@@ -135,6 +156,7 @@ class UsuarioController extends Controller
     public function activar(Request $request, User $usuario)
     {
         $this->impedirAutogestion($request, $usuario);
+        $this->exigirGestion($request, $usuario);
         $usuario->update(['activo' => true]);
         app(AuditoriaService::class)->registrar('activar_usuario', 'User', $usuario->id, [], $request->user());
 
@@ -144,6 +166,7 @@ class UsuarioController extends Controller
     public function desactivar(Request $request, User $usuario)
     {
         $this->impedirAutogestion($request, $usuario);
+        $this->exigirGestion($request, $usuario);
         $usuario->update(['activo' => false]);
         // RF-M01-023, RN-USR-06 (Fase 0, tarea 6): desactivar cierra todas sus sesiones. Antes
         // había que pedirlo aparte con "revocar sesiones".
@@ -159,6 +182,7 @@ class UsuarioController extends Controller
     public function revocarSesiones(Request $request, User $usuario)
     {
         $this->impedirAutogestion($request, $usuario);
+        $this->exigirGestion($request, $usuario);
         $usuario->tokens()->delete();
         app(AuditoriaService::class)->registrar('revocar_sesiones', 'User', $usuario->id, [], $request->user());
 
@@ -167,8 +191,13 @@ class UsuarioController extends Controller
 
     // RF-M01-010, RF-M01-024, HU-M01-010 (Fase 3, tarea 4): las sesiones abiertas de una cuenta,
     // con dispositivo, IP, último uso y vencimiento, para revisar o cerrar una en particular.
-    public function sesiones(User $usuario, SesionService $sesiones)
+    public function sesiones(Request $request, User $usuario, SesionService $sesiones)
     {
+        // M10: Soporte consulta las sesiones de cualquier cuenta (no puede cerrarlas).
+        if (! $request->user()->esSoporte()) {
+            $this->exigirGestion($request, $usuario);
+        }
+
         return response()->json([
             'sesiones' => $sesiones->listar($usuario),
             'politica' => $sesiones->politica(),
@@ -178,6 +207,7 @@ class UsuarioController extends Controller
     public function revocarSesion(Request $request, User $usuario, SesionService $sesiones, int $sesion)
     {
         $this->impedirAutogestion($request, $usuario);
+        $this->exigirGestion($request, $usuario);
         $cerrada = $sesiones->cerrar($usuario, $sesion);
         abort_if(! $cerrada, 404, 'Esa sesión ya no está abierta.');
 
@@ -194,5 +224,66 @@ class UsuarioController extends Controller
     private function impedirAutogestion(Request $request, User $usuario): void
     {
         abort_if($usuario->is($request->user()), 422, 'No puedes hacer esto sobre tu propia cuenta.');
+    }
+
+    // M09 (20/10/2026): permisos de menú por cuenta (RF-M09-011 a 015). Solo el SuperAdmin los ve y
+    // los cambia, y solo para cuentas de Administrador o de Mesero.
+    public function menus(Request $request, User $usuario)
+    {
+        $this->exigirPermisosDeMenu($request, $usuario);
+
+        return response()->json($this->presentarMenus($usuario));
+    }
+
+    public function actualizarMenus(Request $request, User $usuario)
+    {
+        $this->exigirPermisosDeMenu($request, $usuario);
+        $claves = MenusPorRol::claves($usuario->role);
+        $datos = $request->validate([
+            'menus' => ['present', 'array'],
+            'menus.*' => ['string', \Illuminate\Validation\Rule::in($claves)],
+        ], ['menus.*.in' => 'Ese menú no existe para este rol.']);
+
+        $antes = MenusPorRol::efectivos($usuario);
+        $elegidos = array_values(array_unique([...MenusPorRol::fijos($usuario->role), ...$datos['menus']]));
+        // Con todos los menús elegidos se guarda «sin restricción» (null): así un menú nuevo del
+        // sistema también le aparece.
+        $usuario->forceFill(['menus_permitidos' => count(array_intersect($claves, $elegidos)) === count($claves) ? null : $elegidos])->save();
+        $despues = MenusPorRol::efectivos($usuario->fresh());
+
+        if ($antes !== $despues) {
+            app(AuditoriaService::class)->registrar('cambiar_menus', 'User', $usuario->id, [
+                'quitados' => array_values(array_diff($antes, $despues)),
+                'agregados' => array_values(array_diff($despues, $antes)),
+                'menus' => $despues,
+            ], $request->user());
+        }
+
+        return response()->json($this->presentarMenus($usuario->fresh()));
+    }
+
+    private function presentarMenus(User $usuario): array
+    {
+        return [
+            'usuario_id' => $usuario->id,
+            'rol' => $usuario->role,
+            'catalogo' => MenusPorRol::paraPantalla($usuario->role),
+            'menus' => MenusPorRol::efectivos($usuario),
+            'todos' => $usuario->menus_permitidos === null,
+        ];
+    }
+
+    private function exigirPermisosDeMenu(Request $request, User $usuario): void
+    {
+        abort_if(! $request->user()->esSuperAdmin(), 403, 'Solo el SuperAdmin cambia los menús de una cuenta.');
+        abort_if(! MenusPorRol::tieneMenus($usuario->role), 422, 'Solo las cuentas de Administrador y de Mesero tienen permisos de menú.');
+    }
+
+    // M09 (19/10/2026): las cuentas de Administrador solo las gestiona el SuperAdmin, y la del
+    // SuperAdmin no se gestiona desde la aplicación (GestionCuentas).
+    private function exigirGestion(Request $request, User $usuario): void
+    {
+        $motivo = GestionCuentas::motivoNoGestiona($request->user(), $usuario);
+        abort_if($motivo !== null, 403, (string) $motivo);
     }
 }

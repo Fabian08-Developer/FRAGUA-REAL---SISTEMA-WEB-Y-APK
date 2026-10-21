@@ -559,3 +559,86 @@ Resumen; la lista completa del invitado está en `QA-CLIENTE.md` (secciones 4 a 
       operativo lo muestra igual.
 - [ ] Mesas y reservas: las pestañas «Mesas | Reservas» llevan a todas las reservas; entrando por
       «Ver reservas» de una mesa y tocando la pestaña «Reservas», la lista vuelve a mostrar todas.
+
+## 12. Datos del negocio (19/10/2026)
+
+- [ ] Configuración > «Datos del negocio»: cambiar la dirección y el teléfono y guardar. El Inicio y el
+      pie de página muestran los nuevos y el botón de WhatsApp abre el número nuevo.
+- [ ] Un teléfono con letras o con menos de 7 dígitos se rechaza con un mensaje claro.
+- [ ] «Subir logo» con un PNG cuadrado: se ve en la tarjeta, en el encabezado y el pie de página del
+      sitio, en Ingresar, en el QR de mesa y en la barra lateral del personal.
+- [ ] Un PDF exportado de Reportes, un comprobante en PDF y el PDF del cierre diario llevan el logo
+      arriba a la izquierda.
+- [ ] Un archivo que no es imagen se rechaza. «Quitar logo» vuelve al círculo «FR».
+- [ ] Auditoría muestra «editar_datos_negocio», «cambiar_logo_negocio» y «quitar_logo_negocio».
+
+## 13. SuperAdmin (M09, 20/10/2026)
+
+- [ ] En el servidor, `php artisan fragua:crear-superadmin correo@…` crea la cuenta (pide la contraseña
+      dos veces); con el correo de una cuenta existente, pide confirmación y la vuelve SuperAdmin.
+- [ ] Con el SuperAdmin: el menú dice «SuperAdmin» y entra a todas las pantallas del Administrador.
+- [ ] Usuarios (SuperAdmin): «Nuevo usuario» ofrece Mesero y Administrador; puede editar, cambiar de rol,
+      desactivar y cerrar sesiones de un Administrador; su propia cuenta no deja cambiar el rol.
+- [ ] Usuarios (Administrador): «Nuevo usuario» solo ofrece Mesero; las cuentas de Administrador dicen
+      «Solo la gestiona el SuperAdmin» y la del SuperAdmin «Se cambia en el servidor», sin botones.
+- [ ] Configuración > Datos del negocio: el SuperAdmin cambia nombre y NIT (un NIT con letras se
+      rechaza) y salen en el sitio y en los PDF nuevos; el Administrador los ve sin poder cambiarlos.
+- [ ] Revisión antes de producción: «Cuenta de SuperAdmin» en verde; si se desactiva, sale el aviso.
+- [ ] Auditoría muestra «crear_superadmin» o «asignar_superadmin» y las acciones del SuperAdmin a su nombre.
+- [ ] Permisos de menú: como SuperAdmin, en Usuarios > «Permisos» de un Mesero, quitar Reservas y Cobrar
+      y guardar. Con ese Mesero: el menú muestra Pedidos, Mesas y Menú; /mesero/caja lleva a Pedidos; en
+      Mesas no aparece cobrar la cuenta ni «Ver reservas».
+- [ ] Con un Administrador al que se le quitó Reportes: no aparece en el menú y /admin/reportes lleva al
+      Dashboard. Dashboard (Administrador) y Pedidos (Mesero) salen marcados y no se pueden quitar.
+- [ ] Un Administrador no ve el botón «Permisos». Auditoría muestra «cambiar_menus» con lo quitado.
+- [ ] Dashboard de un Administrador con menús limitados: los accesos rápidos que no tiene salen en gris,
+      con candado y «Sin permiso»; al tocarlos no pasa nada. Los que sí tiene abren normalmente.
+- [ ] Ubicación del local (SuperAdmin): en Configuración > Datos del negocio, «Ubicación en el mapa».
+      Tocar el mapa pone el marcador; arrastrarlo lo mueve; abajo dice «Punto: … · sin guardar» hasta
+      «Guardar datos del negocio». El Inicio muestra el mapa y «Cómo llegar» abre Google Maps en ese punto.
+- [ ] Pegar en «Usar enlace» el enlace de «Compartir» de Google Maps (`maps.app.goo.gl/…`), uno largo
+      del navegador o «1.6144, -75.6062»: el marcador va a ese punto. Un enlace de otra página dice «No
+      encontramos la ubicación en ese enlace…».
+- [ ] «Quitar punto» y guardar: el mapa del Inicio desaparece y «Cómo llegar» vuelve a buscar la dirección.
+- [ ] Con un Administrador: ve el mapa sin poder moverlo, con «Solo el SuperAdmin cambia el punto del
+      local», y sin el campo del enlace.
+
+## 14. Soporte técnico (M10, 20/10/2026)
+
+- [ ] En el servidor, `php artisan fragua:crear-soporte dev@dominio.com --nombre="Dev"` pide la contraseña
+      dos veces y crea la cuenta. Con el correo de una cuenta del negocio (por ejemplo, el del
+      Administrador) dice «Ese correo ya es de una cuenta de administrador…» y no cambia nada.
+- [ ] Entrar con la cuenta de Soporte (en local, `soporte` / contraseña de prueba): llega al panel del
+      Administrador, el menú dice «Soporte» y arriba de cada pantalla sale «Modo soporte: solo consulta».
+- [ ] Recorrer Pedidos, Catálogo, Mesas, Reservas, Caja, Compras y gastos, Reportes, Usuarios, Auditoría y
+      Configuración: se ve todo y no aparecen botones de crear, editar, cobrar, anular, guardar ni
+      desactivar. Reportes sí exporta a PDF y Excel.
+- [ ] Desde la consola del navegador, un `PUT /api/configuraciones` (o cualquier otra escritura) responde
+      403 «La cuenta de Soporte solo puede consultar.».
+- [ ] Abrir el comprobante de un pedido cobrado: dice «COPIA DE CONSULTA · SOPORTE». Luego, con el
+      Mesero, el primero que imprime sale como original (no como reimpresión).
+- [ ] Con el Administrador: la cuenta de Soporte no aparece en Usuarios.
+- [ ] Con el SuperAdmin: en Usuarios aparece con «Se cambia en el servidor», Sesiones y Desactivar.
+      Al desactivarla, la sesión de Soporte se cierra; al reactivarla puede volver a entrar. «Editar» no
+      aparece. Auditoría muestra lo de Soporte a su nombre con el rol «Soporte».
+- [ ] Revisión antes de producción: «Cuenta de Soporte» informa si hay una activa; con la contraseña de
+      prueba, «Sin cuentas activas con contraseña de prueba» la nombra.
+
+## 15. Notificaciones del personal (M11, 21/10/2026)
+
+- [ ] En el menú lateral (y en el teléfono, en la barra de arriba) está la campana «Notificaciones».
+- [ ] Hacer un pedido por el QR de una mesa (o a domicilio desde la web): en menos de 20 s la campana
+      muestra el contador; al abrirla sale «Pedido nuevo #…» con el canal, el cliente y el total.
+      Tocarlo lo marca como leído y abre Pedidos.
+- [ ] Un Administrador al que el SuperAdmin le quitó Pedidos no recibe ese aviso.
+- [ ] Con el Mesero, marcar un producto agotado: el Administrador recibe «Producto agotado»; el Mesero
+      que lo marcó no.
+- [ ] Reservar desde la web: llega «Reserva nueva». Registrar el depósito: a los demás les llega
+      «Depósito pagado: reserva confirmada». Cancelarla con el enlace del correo: llega «El cliente
+      canceló su reserva». Treinta minutos antes de una reserva confirmada llega «Reserva en … min».
+- [ ] Anular un pago en Caja: a los otros Administradores les llega «Pago anulado».
+- [ ] Con la caja abierta después de las 11:30 p. m. llega «La caja sigue abierta». Al otro día, desde
+      las 10:00 a. m., si no se hizo el cierre llega «Falta el cierre diario de ayer».
+- [ ] Si se detiene el cron del servidor, al Administrador (y a Soporte) les llega «Las tareas
+      automáticas están detenidas». Si la revisión antes de producción tiene errores, llega a las 7:00 a. m.
+- [ ] «Marcar todo como leído» deja el contador en cero. Un aviso no se repite.

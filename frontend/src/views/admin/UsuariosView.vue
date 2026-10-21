@@ -2,13 +2,13 @@
 // M01 — Usuarios del Administrador: listar (staff y clientes), crear cuentas de
 // Mesero/Administrador, activar/desactivar y revocar sesiones. Ver UsuarioController.
 import { computed, onMounted, ref } from 'vue'
-import { History, KeyRound, Pencil, Plus, Users as UsersIcon } from 'lucide-vue-next'
+import { History, KeyRound, LayoutGrid, Pencil, Plus, Users as UsersIcon } from 'lucide-vue-next'
 import SesionesLista from '@/components/common/SesionesLista.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { useAuthStore } from '@/stores/auth'
-import { usuarioService } from '@/services/usuario.service'
+import { usuarioService, type MenusDeCuenta } from '@/services/usuario.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import type { PoliticaSesiones, Rol, SesionAbierta, Usuario } from '@/types/models'
 
@@ -23,15 +23,20 @@ const procesando = ref<number | null>(null)
 const filtroRol = ref<'todos' | Rol>('todos')
 const busqueda = ref('')
 
-const OPCIONES_ROL: { v: typeof filtroRol.value; t: string }[] = [
+// M10 (20/10/2026): la cuenta de Soporte solo la ven el SuperAdmin y la propia cuenta de Soporte.
+const OPCIONES_ROL = computed<{ v: typeof filtroRol.value; t: string }[]>(() => [
   { v: 'todos', t: 'Todos' },
+  { v: 'superadmin', t: 'SuperAdmin' },
   { v: 'administrador', t: 'Administrador' },
+  ...(auth.esSuperAdmin || auth.esSoporte ? [{ v: 'soporte' as const, t: 'Soporte' }] : []),
   { v: 'mesero', t: 'Mesero' },
   { v: 'cliente', t: 'Cliente' },
-]
+])
 
 const ROLES: Record<Rol, { texto: string; clase: string }> = {
+  superadmin: { texto: 'SuperAdmin', clase: 'bg-amber-50 text-amber-800 ring-amber-600/30' },
   administrador: { texto: 'Administrador', clase: 'bg-violet-50 text-violet-700 ring-violet-600/20' },
+  soporte: { texto: 'Soporte', clase: 'bg-teal-50 text-teal-700 ring-teal-600/20' },
   mesero: { texto: 'Mesero', clase: 'bg-sky-50 text-sky-700 ring-sky-600/20' },
   cliente: { texto: 'Cliente', clase: 'bg-gray-100 text-gray-600 ring-gray-500/20' },
 }
@@ -93,6 +98,54 @@ const mensajeRevocar = ref('')
 // ---- Sesiones de una cuenta (Fase 3, tarea 4: RF-M01-010/023/024, HU-M01-010) ----
 // "Sesiones" abre la lista de dispositivos donde la cuenta está abierta: se cierra una en
 // particular o todas a la vez (lo que antes hacía "Revocar sesiones").
+// ---- M09 (20/10/2026): permisos de menú por cuenta (solo el SuperAdmin) ----
+const cuentaMenus = ref<Usuario | null>(null)
+const datosMenus = ref<MenusDeCuenta | null>(null)
+const menusElegidos = ref<string[]>([])
+const cargandoMenus = ref(false)
+const guardandoMenus = ref(false)
+const errorMenus = ref('')
+const tienePermisosDeMenu = (usuario: Usuario) => auth.esSuperAdmin && (usuario.role === 'administrador' || usuario.role === 'mesero')
+
+async function abrirMenus(usuario: Usuario) {
+  cuentaMenus.value = usuario
+  datosMenus.value = null
+  errorMenus.value = ''
+  cargandoMenus.value = true
+  try {
+    const { data } = await usuarioService.menus(usuario.id)
+    datosMenus.value = data
+    menusElegidos.value = [...data.menus]
+  } catch (e) {
+    errorMenus.value = mensajeDeError(e, 'No pudimos cargar los menús de esta cuenta.')
+  } finally {
+    cargandoMenus.value = false
+  }
+}
+
+function alternarMenu(clave: string) {
+  menusElegidos.value = menusElegidos.value.includes(clave)
+    ? menusElegidos.value.filter((m) => m !== clave)
+    : [...menusElegidos.value, clave]
+}
+
+async function guardarMenus() {
+  if (!cuentaMenus.value) return
+  guardandoMenus.value = true
+  errorMenus.value = ''
+  try {
+    const { data } = await usuarioService.actualizarMenus(cuentaMenus.value.id, menusElegidos.value)
+    const nombre = cuentaMenus.value.nombre
+    reemplazar({ ...cuentaMenus.value, menus: data.menus })
+    cuentaMenus.value = null
+    mensajeEdicion.value = `Menús de ${nombre} guardados. Los verá la próxima vez que cambie de pantalla o entre al sistema.`
+  } catch (e) {
+    errorMenus.value = mensajeDeError(e, 'No pudimos guardar los menús.')
+  } finally {
+    guardandoMenus.value = false
+  }
+}
+
 const usuarioSesiones = ref<Usuario | null>(null)
 const sesionesUsuario = ref<SesionAbierta[]>([])
 const politicaSesiones = ref<PoliticaSesiones | null>(null)
@@ -228,7 +281,12 @@ const modalEditarAbierto = computed({
 })
 const editandoPropia = computed(() => usuarioEditando.value?.id === auth.usuario?.id)
 const cambiaRol = computed(() => !!usuarioEditando.value && formEditar.value.role !== usuarioEditando.value.role)
-const OPCIONES_ROL_EDITAR: Rol[] = ['administrador', 'mesero', 'cliente']
+// M09 (19/10/2026): dar o quitar el rol de Administrador es solo del SuperAdmin.
+const OPCIONES_ROL_EDITAR = computed<Rol[]>(() => (auth.esSuperAdmin ? ['administrador', 'mesero', 'cliente'] : ['mesero', 'cliente']))
+// Lo que el servidor dijo de cada cuenta; sin el dato, se deja intentar (el servidor decide).
+const sePuedeGestionar = (usuario: Usuario) => usuario.gestionable !== false
+const notaCuenta = (usuario: Usuario) =>
+  usuario.role === 'superadmin' || usuario.role === 'soporte' ? 'Se cambia en el servidor' : 'Solo la gestiona el SuperAdmin'
 
 function abrirEditar(usuario: Usuario) {
   usuarioEditando.value = usuario
@@ -290,7 +348,7 @@ onMounted(cargar)
   <div>
     <PageHeader eyebrow="ADMINISTRACIÓN" titulo="Usuarios" descripcion="Staff y clientes del sistema.">
       <template #actions>
-        <BaseButton variant="primary" @click="abrirCrear">
+        <BaseButton v-escritura variant="primary" @click="abrirCrear">
           <Plus :size="17" />
           Nuevo usuario
         </BaseButton>
@@ -336,7 +394,7 @@ onMounted(cargar)
         <li
           v-for="usuario in usuarios"
           :key="usuario.id"
-          class="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+          class="card flex flex-col gap-3 p-4 xl:flex-row xl:items-center xl:justify-between"
           :class="{ 'opacity-70': !usuario.activo }"
         >
           <div class="flex min-w-0 items-center gap-3.5">
@@ -367,16 +425,29 @@ onMounted(cargar)
             </div>
           </div>
 
-          <div class="grid shrink-0 grid-cols-2 gap-2 sm:flex">
+          <!-- M09: con el botón «Permisos» ya no caben al lado del nombre en tablet: bajan y se acomodan. -->
+          <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap xl:shrink-0 xl:flex-nowrap">
             <!-- Fase 3, tarea 1 (RF-M01-025): lo que hizo este usuario, en Auditoría. -->
             <router-link
+              v-if="auth.tieneMenu('auditoria')"
               :to="{ name: 'admin-auditoria', query: { user_id: String(usuario.id) } }"
               class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 hover:text-ink sm:min-h-9"
             >
               <History :size="14" />
               Actividad
             </router-link>
+            <!-- M09: las cuentas que no puede gestionar quien mira solo se consultan. M10: la de Soporte
+                 se cambia en el servidor; el SuperAdmin solo la desactiva, la reactiva y le cierra sesiones. -->
+            <span
+              v-if="!sePuedeGestionar(usuario) || usuario.role === 'soporte'"
+              class="inline-flex min-h-10 items-center rounded-xl bg-gray-50 px-3 text-xs text-gray-500 sm:min-h-9"
+              :title="notaCuenta(usuario)"
+            >
+              {{ notaCuenta(usuario) }}
+            </span>
             <BaseButton
+              v-if="sePuedeGestionar(usuario) && usuario.role !== 'soporte'"
+              v-escritura
               variant="ghost"
               size="sm"
               :disabled="procesando === usuario.id"
@@ -385,12 +456,18 @@ onMounted(cargar)
               <Pencil :size="14" />
               Editar
             </BaseButton>
-            <template v-if="usuario.id !== auth.usuario?.id">
+            <!-- M09 (20/10/2026): qué menús ve esta cuenta (solo el SuperAdmin). -->
+            <BaseButton v-if="tienePermisosDeMenu(usuario)" variant="ghost" size="sm" :disabled="procesando === usuario.id" @click="abrirMenus(usuario)">
+              <LayoutGrid :size="14" />
+              Permisos<template v-if="usuario.menus"> ({{ usuario.menus.length }})</template>
+            </BaseButton>
+            <template v-if="usuario.id !== auth.usuario?.id && sePuedeGestionar(usuario)">
             <BaseButton variant="ghost" size="sm" :disabled="procesando === usuario.id" @click="abrirSesiones(usuario)">
               <KeyRound :size="14" />
               Sesiones<template v-if="usuario.sesiones_activas !== undefined"> ({{ usuario.sesiones_activas }})</template>
             </BaseButton>
             <BaseButton
+              v-escritura
               size="sm"
               :variant="usuario.activo ? 'danger-soft' : 'primary'"
               :disabled="procesando === usuario.id"
@@ -409,7 +486,7 @@ onMounted(cargar)
       <form class="space-y-4" @submit.prevent="confirmarCrear">
         <div>
           <p class="field-label">Rol</p>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid gap-2" :class="auth.esSuperAdmin ? 'grid-cols-2' : 'grid-cols-1'">
             <button
               type="button"
               class="rounded-xl border px-3 py-3 text-sm font-semibold transition active:scale-[0.98]"
@@ -418,7 +495,9 @@ onMounted(cargar)
             >
               Mesero
             </button>
+            <!-- M09: solo el SuperAdmin crea cuentas de Administrador. -->
             <button
+              v-if="auth.esSuperAdmin"
               type="button"
               class="rounded-xl border px-3 py-3 text-sm font-semibold transition active:scale-[0.98]"
               :class="form.role === 'administrador' ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 hover:border-brand-300'"
@@ -491,11 +570,13 @@ onMounted(cargar)
           :politica="politicaSesiones"
           :procesando="cerrandoSesion"
           permitir-cerrar-actual
+          :solo-ver="auth.esSoporte"
           @cerrar="cerrarSesionDe"
         />
         <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <BaseButton variant="ghost" type="button" @click="usuarioSesiones = null">Cerrar ventana</BaseButton>
           <BaseButton
+            v-escritura
             variant="danger-soft"
             type="button"
             :disabled="procesando === usuarioSesiones.id || !sesionesUsuario.length"
@@ -504,6 +585,39 @@ onMounted(cargar)
             Cerrar todas sus sesiones
           </BaseButton>
         </div>
+      </div>
+    </BaseModal>
+
+    <!-- M09 (20/10/2026): permisos de menú de la cuenta -->
+    <BaseModal :model-value="cuentaMenus !== null" :title="`Menús de ${cuentaMenus?.nombre ?? ''}`" @update:model-value="cuentaMenus = null">
+      <div v-if="cargandoMenus" class="loading-state">Cargando menús…</div>
+      <div v-else-if="datosMenus" class="space-y-3">
+        <p class="text-sm text-gray-600">
+          Marca los menús que ve esta cuenta. Lo que se quite desaparece de su menú y el sistema rechaza esas
+          acciones. {{ datosMenus.rol === 'mesero' ? 'Pedidos' : 'Dashboard' }} no se puede quitar.
+        </p>
+        <ul class="divide-y divide-gray-100 rounded-xl border border-gray-200">
+          <li v-for="m in datosMenus.catalogo" :key="m.clave">
+            <label class="flex items-center gap-3 px-3 py-2.5 text-sm" :class="m.fijo ? 'text-gray-500' : 'cursor-pointer text-ink'">
+              <input
+                type="checkbox"
+                class="size-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                :checked="m.fijo || menusElegidos.includes(m.clave)"
+                :disabled="m.fijo"
+                @change="alternarMenu(m.clave)"
+              />
+              <span class="flex-1">{{ m.nombre }}</span>
+              <span v-if="m.fijo" class="text-xs text-gray-400">siempre</span>
+            </label>
+          </li>
+        </ul>
+      </div>
+      <p v-if="errorMenus" class="alert-error mt-3">{{ errorMenus }}</p>
+      <div class="mt-4 flex justify-end gap-2">
+        <BaseButton variant="ghost" type="button" @click="cuentaMenus = null">Cancelar</BaseButton>
+        <BaseButton variant="primary" type="button" :disabled="guardandoMenus || !datosMenus" @click="guardarMenus">
+          {{ guardandoMenus ? 'Guardando…' : 'Guardar menús' }}
+        </BaseButton>
       </div>
     </BaseModal>
 
@@ -536,7 +650,10 @@ onMounted(cargar)
 
         <div>
           <p class="field-label">Rol</p>
-          <div class="grid grid-cols-3 gap-2">
+          <div v-if="editandoPropia" class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm font-semibold text-gray-600">
+            {{ ROLES[formEditar.role].texto }}
+          </div>
+          <div v-else class="grid gap-2" :class="OPCIONES_ROL_EDITAR.length === 3 ? 'grid-cols-3' : 'grid-cols-2'">
             <button
               v-for="rol in OPCIONES_ROL_EDITAR"
               :key="rol"
@@ -552,7 +669,7 @@ onMounted(cargar)
           </div>
           <span v-if="erroresEditar.role" class="mt-1 block text-xs text-red-600">{{ erroresEditar.role }}</span>
           <p v-if="editandoPropia" class="mt-2 text-xs text-gray-500">
-            No puedes cambiar tu propio rol; otro Administrador puede hacerlo.
+            {{ auth.esSuperAdmin ? 'El rol de SuperAdmin se cambia en el servidor.' : 'No puedes cambiar tu propio rol; el SuperAdmin puede hacerlo.' }}
           </p>
           <p v-else-if="cambiaRol" class="mt-2 alert-info">
             Al guardar, {{ usuarioEditando.nombre }} pasa de {{ ROLES[usuarioEditando.role].texto }} a

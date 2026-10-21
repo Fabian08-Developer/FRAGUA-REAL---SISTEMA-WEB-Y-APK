@@ -132,7 +132,7 @@ onMounted(cargar)
           </div>
         </div>
         <div v-else class="mt-2 flex flex-wrap gap-2">
-          <BaseButton
+          <BaseButton v-escritura
             v-if="tx.reembolso_estado === 'fallido'"
             size="sm"
             variant="secondary"
@@ -141,7 +141,7 @@ onMounted(cargar)
           >
             Reintentar reembolso
           </BaseButton>
-          <BaseButton size="sm" variant="secondary" @click="(abierta = tx.id), (nota = '')">Marcar como revisado</BaseButton>
+          <BaseButton v-escritura size="sm" variant="secondary" @click="(abierta = tx.id), (nota = '')">Marcar como revisado</BaseButton>
         </div>
       </li>
     </ul>

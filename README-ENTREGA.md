@@ -6,7 +6,7 @@ sistema y dónde está cada documento, empieza por [`README.md`](README.md); la 
 backend está en [`README-BACKEND.md`](README-BACKEND.md), la base de datos en
 [`BASE-DE-DATOS.md`](BASE-DE-DATOS.md) y los endpoints en [`API.md`](API.md).
 
-**Estado al 16/10/2026**: plan de implementación completo (Fases 0 a 7) y mejoras del 16/10/2026, 344 pruebas automáticas que
+**Estado al 20/10/2026**: plan de implementación completo (Fases 0 a 7), mejoras del 16/10/2026, correcciones y datos del negocio del 19/10/2026 el rol SuperAdmin con permisos de menú (M09), el rol Soporte de solo consulta (M10) y las notificaciones del personal (M11), 386 pruebas automáticas que
 pasan en SQLite y PostgreSQL. Falta solo lo que no es código: la cuenta comercial de Wompi, el
 proveedor de SMS y el agente local de impresión (ver «Qué falta a propósito»).
 
@@ -27,11 +27,14 @@ proveedor de SMS y el agente local de impresión (ver «Qué falta a propósito�
 Sistema de restaurante de una sede (sin multi-tenant) para Fragua Real Burger: pedidos locales (en la
 mesa o por QR), a domicilio y para recoger; reservas con depósito obligatorio; caja y cobros; catálogo
 de productos, combos y promociones; compras y gastos con cierre diario; reportes; y gestión de
-usuarios con auditoría. Cubre los 9 módulos (M00 a M08) de los documentos oficiales de requisitos, con
-tres roles: **Cliente** (web pública, con o sin cuenta), **Mesero** y **Administrador**.
+usuarios con auditoría. Cubre los 12 módulos (M00 a M11) de los documentos oficiales de requisitos, con
+tres roles: **Cliente** (web pública, con o sin cuenta), **Mesero** y **Administrador**, y el
+**SuperAdmin** (M09), dueño del sistema, que puede todo lo del Administrador y es el único que gestiona
+las cuentas de Administrador y el nombre y NIT del negocio. Aparte, **Soporte** (M10) es la cuenta
+técnica del desarrollador: ve todo el panel sin cambiar nada del negocio.
 
 - **Backend**: PHP 8.3, Laravel 13, Sanctum (token), PostgreSQL, dompdf, PhpSpreadsheet.
-- **Frontend**: Vue 3 con TypeScript, Vite, Pinia, Tailwind.
+- **Frontend**: Vue 3 con TypeScript, Vite, Pinia, Tailwind y Leaflet (mapa del local con OpenStreetMap).
 
 ## Correrlo en el equipo de desarrollo
 
@@ -203,9 +206,15 @@ sudo -u www-data php artisan db:seed --force
 sudo -u www-data php artisan config:cache && sudo -u www-data php artisan route:cache
 ```
 
-Las tres cuentas sembradas tienen la contraseña `password`: entrar como `admin` de inmediato y, desde
-Usuarios, cambiar la del Administrador y la del Mesero (o crear las cuentas reales) y desactivar la del
-Cliente de demostración. `db:seed` no se vuelve a correr en producción.
+Las cuentas sembradas tienen la contraseña `password`. En producción, crear de inmediato la cuenta del
+dueño con `sudo -u www-data php artisan fragua:crear-superadmin correo-del-dueño@dominio.com` (pide la
+contraseña sin mostrarla); entrar con ella y, desde Usuarios, cambiar la del Administrador y la del
+Mesero (o crear las cuentas reales) y desactivar la del Cliente de demostración. La cuenta de prueba
+`superadmin` del sembrado no se gestiona desde la pantalla: volver SuperAdmin la cuenta real y dejar la
+de prueba sin uso (o cambiar su contraseña con el mismo comando y `--cambiar-clave`). La cuenta
+`soporte` del sembrado (M10) tampoco se gestiona desde la pantalla: crear la real del desarrollador con
+`sudo -u www-data php artisan fragua:crear-soporte correo-del-desarrollador@dominio.com` y pedirle al
+SuperAdmin que desactive la de prueba desde Usuarios. `db:seed` no se vuelve a correr en producción.
 
 ### 6. Nginx y HTTPS
 
@@ -741,6 +750,75 @@ Al escribir `QA-CLIENTE.md` y `QA-MESERO.md` se cruzó cada pantalla con el cód
   `LOG_STACK=daily` (leía el canal equivocado).
 - En el servidor: `php artisan migrate --force` (tres migraciones `2026_10_23_*`); las fotos de las
   presentaciones quedan en `storage/app/private/variantes`, dentro del respaldo diario.
+
+### Correcciones del 19/10/2026
+
+- Reservas solo de 4:00 p. m. a 11:00 p. m. y con al menos 3 horas de anticipación, también las que
+  registra el personal por teléfono. La pantalla Reservar ofrece las horas cada 30 minutos y marca
+  «no disponible» las que ya no alcanzan; si hoy no queda ninguna, el primer día es mañana. Para
+  cambiar el horario: `FRAGUA_REAL_RESERVA_HORA_INICIO`, `FRAGUA_REAL_RESERVA_HORA_FIN` y
+  `FRAGUA_REAL_RESERVA_ANTICIPACION_MINUTOS` en el `.env` (y `php artisan config:cache`).
+- Descripción opcional en la reserva («es un cumpleaños», «silla para bebé»): el personal la ve en
+  Reservas y al cliente le llega en el correo de confirmación.
+- El Mesero ya no ve las mesas dadas de baja (en Mesas, en Nuevo pedido ni en Reservas).
+- En el servidor: `php artisan migrate --force` (migración `2026_10_26_000001`).
+- **Rol SuperAdmin (M09, 20/10/2026)**: el dueño del sistema. Puede todo lo del Administrador y es el
+  único que crea, edita, cambia de rol o desactiva cuentas de Administrador y que cambia el nombre y el
+  NIT del negocio. Su cuenta no se crea desde la aplicación. En el VPS, después de desplegar:
+
+  ```bash
+  sudo -u www-data php artisan migrate --force
+  sudo -u www-data php artisan fragua:crear-superadmin correo-del-dueño@dominio.com
+  ```
+
+  Si el correo ya es de una cuenta (por ejemplo, el Administrador de siempre), pide confirmación y la
+  vuelve SuperAdmin conservando su contraseña. `--cambiar-clave` pone una contraseña nueva. La
+  revisión antes de producción avisa si no hay SuperAdmin.
+- **Permisos de menú por cuenta (M09, 20/10/2026)**: en Usuarios, el SuperAdmin abre «Permisos» de un
+  Administrador o un Mesero y marca los menús que verá. Dashboard (Administrador) y Pedidos (Mesero) no se
+  quitan. Lo quitado desaparece del menú lateral (en el Dashboard su acceso rápido sale bloqueado, con
+  candado y «Sin permiso»), la dirección escrita a mano lleva al inicio de la
+  cuenta y el servidor rechaza esas acciones. Por defecto toda cuenta ve todos los menús de su rol; al
+  cambiar de rol vuelve a ver todos. La cuenta ve el cambio al navegar (se revisa cada minuto) o al
+  volver a entrar. Hay una migración nueva: `php artisan migrate --force`.
+- Datos del negocio: en Configuración > «Datos del negocio» el Administrador cambia la dirección, el
+  teléfono (con él se arma el botón de WhatsApp) y el logo. Salen en el Inicio, el pie de página,
+  Reservar, los encabezados de las pantallas, el menú del personal y los PDF (comprobante, cierre
+  diario y reportes; el ticket térmico no lleva logo). Sin logo se ve el círculo «FR» de siempre.
+  El logo queda en `storage/app/private/negocio`, dentro del respaldo diario. Mientras no se cambien,
+  dirección y teléfono salen de `FRAGUA_REAL_DIRECCION` y `FRAGUA_REAL_TELEFONO` del `.env`.
+- Ubicación del local (M09, 20/10/2026): en la misma tarjeta, el SuperAdmin marca el punto exacto en un
+  mapa (tocándolo, arrastrando el marcador o pegando el enlace de «Compartir» de Google Maps). El Inicio
+  muestra un mapa pequeño y «Cómo llegar» abre Google Maps en ese punto. El mapa usa OpenStreetMap: no
+  necesita clave de Google ni cuesta nada, y la política de seguridad de nginx ya lo permite (son
+  imágenes). Para leer un enlace corto, el servidor consulta solo páginas de Google; si el VPS no tiene
+  salida a internet, se pueden pegar las coordenadas («1.6144, -75.6062»). Sin migración.
+- **Rol Soporte (M10, 20/10/2026)**: la cuenta técnica del desarrollador. Entra al panel del
+  Administrador con la franja «Modo soporte: solo consulta» y ve todo (también Revisión antes de
+  producción, tareas automáticas y Auditoría), pero el servidor le rechaza cualquier cambio del negocio.
+  Abrir un comprobante o un cierre no cuenta como impresión (sale «COPIA DE CONSULTA · SOPORTE») y no
+  puede imprimir comandas. Se crea solo en el servidor:
+
+  ```bash
+  sudo -u www-data php artisan migrate --force
+  sudo -u www-data php artisan fragua:crear-soporte correo-del-desarrollador@dominio.com --nombre="Nombre"
+  ```
+
+  El comando no convierte en Soporte una cuenta del negocio; con el correo de la cuenta de Soporte
+  cambia el nombre o, con `--cambiar-clave`, la contraseña. En Usuarios solo la ve el SuperAdmin, que
+  puede desactivarla (sus sesiones se cierran al momento), reactivarla y cerrar sus sesiones; el
+  Administrador no la ve.
+- **Notificaciones del personal (M11, 21/10/2026)**: una campana en el panel del Mesero y del
+  Administrador (en el teléfono, en la barra de arriba) con el contador de no leídas. Avisa de pedidos
+  nuevos por la web o el QR, pedidos listos o cancelados por el cliente, pagos en línea, reservas
+  (nueva, depósito pagado, cancelada, empieza en 30 min, no-show), caja y dinero (pago por revisar o
+  anulado, caja abierta a las 11:30 p. m., cierre diario de ayer pendiente a las 10:00 a. m.),
+  agotados, comandas que no salieron y avisos del sistema (tareas detenidas, trabajos fallidos,
+  revisión antes de producción con errores; estos también le llegan a Soporte). Cada aviso le llega a
+  quien le toca según su rol y sus menús, nunca a quien hizo la acción. La campana pregunta cada 20 s;
+  no hace falta configurar nada nuevo en nginx. En el servidor: `php artisan migrate --force`; las
+  tareas `notificaciones:revisar` (cada minuto) y `notificaciones:limpiar` (cada noche) ya entran con
+  el cron de siempre. Las horas se cambian con `FRAGUA_REAL_NOTIF_*` en el `.env`.
 
 ## Datos de prueba en la base de desarrollo
 

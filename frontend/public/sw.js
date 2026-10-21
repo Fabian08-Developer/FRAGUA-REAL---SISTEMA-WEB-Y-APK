@@ -9,7 +9,7 @@
 //  - Las páginas (index.html): primero la red, para tener siempre la última versión; sin conexión se
 //    muestra /offline.html.
 // Al publicar una versión nueva del service worker, VERSION cambia y se borran las copias anteriores.
-const VERSION = 'fragua-real-v1'
+const VERSION = 'fragua-real-v2'
 const CACHE_APP = `${VERSION}-app`
 const CACHE_FOTOS = `${VERSION}-fotos`
 const MAX_FOTOS = 150
@@ -28,7 +28,8 @@ self.addEventListener('activate', (evento) => {
   )
 })
 
-const FOTO = /^\/api\/(productos|variantes)\/\d+\/foto$/
+// Mejora (19/10/2026): también el logo del negocio (/api/negocio/logo?v=…), versionado igual.
+const FOTO = /^\/api\/((productos|variantes)\/\d+\/foto|negocio\/logo)$/
 
 self.addEventListener('fetch', (evento) => {
   const peticion = evento.request

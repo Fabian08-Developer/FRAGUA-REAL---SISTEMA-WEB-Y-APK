@@ -110,7 +110,7 @@ onBeforeUnmount(() => {
   <div class="mb-5 space-y-2">
     <p v-if="ultima" class="flex flex-wrap items-center gap-2 rounded-xl bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
       {{ titulo(ultima) }} enviada a imprimir.
-      <button type="button" class="font-medium text-red-700 underline" @click="noSalio">¿No salió?</button>
+      <button v-escritura type="button" class="font-medium text-red-700 underline" @click="noSalio">¿No salió?</button>
       <button type="button" class="ml-auto text-xs text-emerald-700 underline" @click="ultima = null">Cerrar</button>
     </p>
 
@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
                 <template v-if="c.estado_impresion === 'fallida'"> · <span class="text-red-700">No salió: {{ c.ultimo_error }}</span></template>
               </p>
             </div>
-            <BaseButton size="sm" variant="primary" class="shrink-0" :disabled="imprimiendo === c.id" @click="imprimir(c)">
+            <BaseButton v-escritura size="sm" variant="primary" class="shrink-0" :disabled="imprimiendo === c.id" @click="imprimir(c)">
               <ChefHat :size="14" /> {{ imprimiendo === c.id ? 'Abriendo…' : 'Imprimir' }}
             </BaseButton>
           </li>

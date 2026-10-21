@@ -2,7 +2,10 @@
 // (app/Models/*.php). Se amplían a medida que cada vista los necesita —
 // esto es un punto de partida, no el modelo completo de cada tabla.
 
-export type Rol = 'administrador' | 'mesero' | 'cliente'
+// M09 (19/10/2026): el SuperAdmin es el dueño del sistema; puede todo lo del Administrador.
+// M10 (20/10/2026): Soporte es la cuenta técnica del desarrollador: ve el panel del Administrador
+// sin cambiar nada del negocio.
+export type Rol = 'superadmin' | 'administrador' | 'soporte' | 'mesero' | 'cliente'
 
 // Espeja app/Models/User.php: los nombres de campo son los del backend
 // (role, email, nombre, telefono, activo) — no se traducen en el frontend
@@ -20,6 +23,11 @@ export interface Usuario {
   puede_registrar_gastos?: boolean
   // Solo en GET /usuarios (Fase 3, tarea 4): cuántas sesiones vigentes tiene.
   sesiones_activas?: number
+  // Solo en GET /usuarios (M09, 19/10/2026): si quien mira puede editarla, desactivarla o cerrar sus
+  // sesiones (las cuentas de Administrador solo las gestiona el SuperAdmin).
+  gestionable?: boolean
+  // M09 (20/10/2026): los menús que ve esta cuenta (los decide el SuperAdmin; por defecto, todos los de su rol).
+  menus?: string[]
 }
 
 // Espeja app/Models/Mesa.php. OJO: el backend usa "nombre" y "qr_code" (no
@@ -450,6 +458,8 @@ export interface Reserva {
   cliente_nombre: string
   cliente_telefono: string
   cliente_correo: string
+  // Corrección (19/10/2026): nota opcional del cliente para el restaurante.
+  descripcion?: string | null
   fecha_hora: string
   estado: EstadoReserva
   deposito_valor: number
@@ -501,6 +511,7 @@ export interface ReservaAviso {
 export interface ReservaPublica {
   cliente_nombre: string
   mesa: string | null
+  descripcion?: string | null
   fecha_hora: string
   estado: EstadoReserva
   deposito_valor: number

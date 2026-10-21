@@ -8,6 +8,12 @@
       "port": 5173
     },
     {
+      "name": "backend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd /d backend && php artisan serve --port 8000"],
+      "port": 8000
+    },
+    {
       "name": "frontend-compilado",
       "runtimeExecutable": "cmd",
       "runtimeArgs": ["/c", "cd /d frontend && npm run build && npx vite preview --port 4173 --strictPort"],

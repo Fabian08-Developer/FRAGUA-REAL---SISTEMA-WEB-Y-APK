@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   LayoutDashboard,
@@ -19,12 +19,20 @@ import {
 } from 'lucide-vue-next'
 import { useAuth } from '@/composables/useAuth'
 import BotonInstalarApp from '@/components/common/BotonInstalarApp.vue'
+import BotonNotificaciones from '@/components/common/BotonNotificaciones.vue'
+import PanelNotificaciones from '@/components/common/PanelNotificaciones.vue'
+import { useNotificacionesStore } from '@/stores/notificaciones'
+import LogoNegocio from '@/components/common/LogoNegocio.vue'
 
 // Navegación por rol — cada entrada referencia el módulo que implementa,
 // igual que la tabla de README.md de esta carpeta.
 const props = defineProps<{ variant: 'admin' | 'mesero' }>()
 
-const { usuario, logout } = useAuth()
+const { usuario, esSuperAdmin, esSoporte, logout } = useAuth()
+// M11 (21/10/2026): la campana pregunta por notificaciones mientras el panel esté abierto.
+const notificaciones = useNotificacionesStore()
+onMounted(() => notificaciones.iniciar())
+onBeforeUnmount(() => notificaciones.detener())
 const router = useRouter()
 const route = useRoute()
 
@@ -63,34 +71,43 @@ interface Enlace {
   // Rutas hijas que también cuentan como "estar en esta sección" (p. ej. Reservas vive
   // dentro de "Mesas y Reservas"; "Nuevo pedido" dentro de "Pedidos").
   tambien?: string[]
+  // M09 (20/10/2026): la clave del permiso de menú (MenusPorRol del servidor).
+  menu: string
 }
 
 const enlacesAdmin: Enlace[] = [
-  { to: '/admin', label: 'Dashboard', corto: 'Inicio', icon: LayoutDashboard },
-  { to: '/admin/usuarios', label: 'Usuarios', corto: 'Usuarios', icon: Users }, // M01
-  { to: '/admin/pedidos', label: 'Pedidos', corto: 'Pedidos', icon: ClipboardList }, // M02
-  { to: '/admin/compras-gastos', label: 'Compras y Gastos', corto: 'Gastos', icon: Receipt }, // M03
-  { to: '/admin/catalogo', label: 'Catálogo', corto: 'Catálogo', icon: UtensilsCrossed, tambien: ['/admin/disponibilidad'] }, // M04
-  { to: '/admin/mesas', label: 'Mesas y Reservas', corto: 'Mesas', icon: Armchair, tambien: ['/admin/reservas'] }, // M05
-  { to: '/admin/caja', label: 'Caja', corto: 'Caja', icon: Wallet }, // M06
-  { to: '/admin/reportes', label: 'Reportes', corto: 'Reportes', icon: BarChart3 }, // M08
-  { to: '/admin/auditoria', label: 'Auditoría', corto: 'Auditoría', icon: ShieldCheck }, // M01 (Fase 3)
-  { to: '/admin/configuracion', label: 'Configuración', corto: 'Ajustes', icon: Settings }, // M05/M07
+  { to: '/admin', label: 'Dashboard', corto: 'Inicio', icon: LayoutDashboard, menu: 'dashboard' },
+  { to: '/admin/usuarios', label: 'Usuarios', corto: 'Usuarios', icon: Users, menu: 'usuarios' }, // M01
+  { to: '/admin/pedidos', label: 'Pedidos', corto: 'Pedidos', icon: ClipboardList, menu: 'pedidos' }, // M02
+  { to: '/admin/compras-gastos', label: 'Compras y Gastos', corto: 'Gastos', icon: Receipt, menu: 'compras_gastos' }, // M03
+  { to: '/admin/catalogo', label: 'Catálogo', corto: 'Catálogo', icon: UtensilsCrossed, tambien: ['/admin/disponibilidad'], menu: 'catalogo' }, // M04
+  { to: '/admin/mesas', label: 'Mesas y Reservas', corto: 'Mesas', icon: Armchair, tambien: ['/admin/reservas'], menu: 'mesas' }, // M05
+  { to: '/admin/caja', label: 'Caja', corto: 'Caja', icon: Wallet, menu: 'caja' }, // M06
+  { to: '/admin/reportes', label: 'Reportes', corto: 'Reportes', icon: BarChart3, menu: 'reportes' }, // M08
+  { to: '/admin/auditoria', label: 'Auditoría', corto: 'Auditoría', icon: ShieldCheck, menu: 'auditoria' }, // M01 (Fase 3)
+  { to: '/admin/configuracion', label: 'Configuración', corto: 'Ajustes', icon: Settings, menu: 'configuracion' }, // M05/M07
 ]
 
 const enlacesMesero: Enlace[] = [
-  { to: '/mesero', label: 'Pedidos', corto: 'Pedidos', icon: ClipboardList, tambien: ['/mesero/pedidos'] }, // M02
-  { to: '/mesero/mesas', label: 'Mesas', corto: 'Mesas', icon: Armchair }, // M05
-  { to: '/mesero/reservas', label: 'Reservas', corto: 'Reservas', icon: CalendarClock }, // M05 (Fase 1)
-  { to: '/mesero/menu', label: 'Menú', corto: 'Menú', icon: UtensilsCrossed }, // M04 (Fase 1)
-  { to: '/mesero/caja', label: 'Cobrar', corto: 'Cobrar', icon: Wallet }, // M06
+  { to: '/mesero', label: 'Pedidos', corto: 'Pedidos', icon: ClipboardList, tambien: ['/mesero/pedidos'], menu: 'pedidos' }, // M02
+  { to: '/mesero/mesas', label: 'Mesas', corto: 'Mesas', icon: Armchair, menu: 'mesas' }, // M05
+  { to: '/mesero/reservas', label: 'Reservas', corto: 'Reservas', icon: CalendarClock, menu: 'reservas' }, // M05 (Fase 1)
+  { to: '/mesero/menu', label: 'Menú', corto: 'Menú', icon: UtensilsCrossed, menu: 'menu' }, // M04 (Fase 1)
+  { to: '/mesero/caja', label: 'Cobrar', corto: 'Cobrar', icon: Wallet, menu: 'cobrar' }, // M06
 ]
 // Fase 7, tarea 2 (RF-M03-32): solo el Mesero con permiso de compras y gastos.
-const enlaceGastos: Enlace = { to: '/mesero/gastos', label: 'Gastos', corto: 'Gastos', icon: Receipt }
+const enlaceGastos: Enlace = { to: '/mesero/gastos', label: 'Gastos', corto: 'Gastos', icon: Receipt, menu: 'gastos' }
+
+// M09 (20/10/2026): solo los menús que el SuperAdmin le habilitó a esta cuenta (el SuperAdmin ve todos).
+function habilitados(lista: Enlace[]) {
+  const permitidos = usuario.value?.menus
+  if (esSuperAdmin.value || esSoporte.value || !permitidos) return lista
+  return lista.filter((e) => permitidos.includes(e.menu))
+}
 
 const enlaces = computed(() => {
-  if (props.variant === 'admin') return enlacesAdmin
-  return usuario.value?.puede_registrar_gastos ? [...enlacesMesero, enlaceGastos] : enlacesMesero
+  if (props.variant === 'admin') return habilitados(enlacesAdmin)
+  return habilitados(usuario.value?.puede_registrar_gastos ? [...enlacesMesero, enlaceGastos] : enlacesMesero)
 })
 
 // "/admin" y "/mesero" son el índice de cada zona pero también el PREFIJO de todas las demás
@@ -108,7 +125,10 @@ function esActivo(item: Enlace) {
 // categorías y barra del carrito) esconden la barra superior/inferior en teléfono.
 const pantallaCompleta = computed(() => !!route.meta.pantallaCompleta)
 
-const rolTexto = computed(() => (props.variant === 'admin' ? 'Administrador' : 'Mesero'))
+// M10 (20/10/2026): la cuenta del desarrollador se ve como «Soporte».
+const rolTexto = computed(() =>
+  props.variant === 'admin' ? (esSuperAdmin.value ? 'SuperAdmin' : esSoporte.value ? 'Soporte' : 'Administrador') : 'Mesero',
+)
 const iniciales = computed(() =>
   (usuario.value?.nombre ?? rolTexto.value)
     .split(/\s+/)
@@ -135,19 +155,21 @@ const iniciales = computed(() =>
     >
       <Menu :size="22" />
     </button>
-    <span
+    <LogoNegocio
       v-else
-      class="ml-1 flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-300 to-brand-600 font-display text-base font-semibold text-ink"
-      aria-hidden="true"
-    >
-      FR
-    </span>
+      class="ml-1"
+      tamano="size-9"
+      texto="text-base font-semibold"
+      fondo="bg-gradient-to-br from-brand-300 to-brand-600"
+      color="text-ink"
+    />
 
     <div class="min-w-0 flex-1 leading-tight">
       <p class="truncate font-display text-lg font-medium text-white">Fragua Real</p>
       <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-400">{{ rolTexto }}</p>
     </div>
 
+    <BotonNotificaciones variante="barra" />
     <button
       type="button"
       class="flex size-10 shrink-0 items-center justify-center rounded-xl text-white/70 transition hover:bg-white/10 hover:text-white active:bg-white/15"
@@ -182,12 +204,13 @@ const iniciales = computed(() =>
   >
     <div class="flex items-center justify-between gap-3 px-5 pb-4 pt-6 md:justify-center md:px-2 lg:justify-start lg:px-5">
       <div class="flex items-center gap-3">
-        <span
-          class="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-300 to-brand-600 font-display text-lg font-semibold text-ink shadow-gold"
-          aria-hidden="true"
-        >
-          FR
-        </span>
+        <LogoNegocio
+          class="shadow-gold"
+          tamano="size-10"
+          texto="text-lg font-semibold"
+          fondo="bg-gradient-to-br from-brand-300 to-brand-600"
+          color="text-ink"
+        />
         <div class="leading-tight md:hidden lg:block">
           <p class="font-display text-lg font-medium text-white">Fragua Real</p>
           <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-400">{{ rolTexto }}</p>
@@ -234,6 +257,8 @@ const iniciales = computed(() =>
     <div class="space-y-1 border-t border-white/10 p-3 md:px-2 lg:px-3">
       <!-- Mejora (16/10/2026): instalar la app (PWA) en la tableta o el teléfono del personal. -->
       <div class="md:hidden lg:block"><BotonInstalarApp tono="oscuro" /></div>
+      <!-- M11: en el teléfono la campana está en la barra de arriba. -->
+      <div class="hidden md:block"><BotonNotificaciones variante="lateral" /></div>
       <router-link
         to="/perfil"
         class="flex items-center gap-3 rounded-xl p-2 transition hover:bg-white/5 md:justify-center lg:justify-start"
@@ -292,4 +317,6 @@ const iniciales = computed(() =>
       </router-link>
     </div>
   </nav>
+
+  <PanelNotificaciones />
 </template>

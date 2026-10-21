@@ -46,23 +46,25 @@
 <body>
 <div class="pie">
     <table><tr>
-        <td>{{ $negocio['nombre'] ?? 'Fragua Real Burger' }} · Cierre diario del {{ $cierre->fecha->format('d/m/Y') }} · impreso por {{ $impresoPor }} el {{ $fechaHora(now()) }}@if ($reimpresion) · REIMPRESIÓN copia {{ $reimpresion['vez'] }}@endif</td>
+        <td>{{ $negocio['nombre'] ?? 'Fragua Real Burger' }} · Cierre diario del {{ $cierre->fecha->format('d/m/Y') }} · impreso por {{ $impresoPor }} el {{ $fechaHora(now()) }}@if ($reimpresion) · {{ ! empty($reimpresion['consulta']) ? 'COPIA DE CONSULTA · SOPORTE' : 'REIMPRESIÓN copia '.$reimpresion['vez'] }}@endif</td>
     </tr></table>
 </div>
 
 <table class="encabezado">
     <tr>
         <td>
+            @if (! empty($negocio['logo']))<img src="{{ $negocio['logo'] }}" alt="" style="max-height: 46px; max-width: 140px; margin-bottom: 4px;">@endif
             <h1>{{ $negocio['nombre'] ?? 'Fragua Real Burger' }}</h1>
             @if (! empty($negocio['nit']))<div>NIT {{ $negocio['nit'] }}</div>@endif
             <div class="quieto">{{ $negocio['direccion'] ?? '' }}</div>
+            @if (! empty($negocio['telefono']))<div class="quieto">Tel. / WhatsApp {{ $negocio['telefono'] }}</div>@endif
         </td>
         <td class="derecha">
             <div style="font-size: 13px; font-weight: bold;">Cierre diario</div>
             <div style="font-size: 11px;">{{ \Illuminate\Support\Str::ucfirst($dia) }}</div>
             <div class="quieto">Cerrado por {{ $cierre->cerradoPorUsuario?->nombre ?? '—' }} el {{ $fechaHora($cierre->created_at) }}</div>
             @if ($reimpresion)
-                <div class="reimpresion">REIMPRESIÓN · copia {{ $reimpresion['vez'] }}</div>
+                <div class="reimpresion">{{ ! empty($reimpresion['consulta']) ? 'COPIA DE CONSULTA · SOPORTE' : 'REIMPRESIÓN · copia '.$reimpresion['vez'] }}</div>
             @endif
         </td>
     </tr>

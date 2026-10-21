@@ -190,7 +190,7 @@ async function cobrar() {
           {{ pendientesDePreparar }} {{ pendientesDePreparar === 1 ? 'pedido aún no pasa' : 'pedidos aún no pasan' }} a preparación:
           quedan pagados y se finalizan después.
         </p>
-        <BaseButton class="mt-4 w-full" :disabled="cobrando" @click="cobrar">
+        <BaseButton v-escritura class="mt-4 w-full" :disabled="cobrando" @click="cobrar">
           {{ cobrando ? 'Registrando…' : `Cobrar ${formatoPrecio(monto || 0)}` }}
         </BaseButton>
       </div>

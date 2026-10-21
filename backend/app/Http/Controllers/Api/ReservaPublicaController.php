@@ -92,6 +92,7 @@ class ReservaPublicaController extends Controller
         return [
             'cliente_nombre' => $reserva->cliente_nombre,
             'mesa' => $reserva->mesa?->nombre,
+            'descripcion' => $reserva->descripcion,
             'fecha_hora' => $reserva->fecha_hora->toIso8601String(),
             'estado' => $reserva->estado,
             'deposito_valor' => (float) $reserva->deposito_valor,

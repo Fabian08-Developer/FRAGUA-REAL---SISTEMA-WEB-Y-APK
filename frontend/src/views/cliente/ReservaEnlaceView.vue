@@ -124,6 +124,7 @@ onMounted(cargar)
         <p><span class="text-[#6c655c]">Estado:</span> <strong>{{ ESTADOS[reserva.estado] }}</strong></p>
         <p class="first-letter:uppercase"><span class="text-[#6c655c]">Fecha:</span> {{ fechaTexto }}</p>
         <p v-if="reserva.mesa"><span class="text-[#6c655c]">Mesa:</span> {{ reserva.mesa }}</p>
+        <p v-if="reserva.descripcion" class="whitespace-pre-line"><span class="text-[#6c655c]">Tu descripción:</span> {{ reserva.descripcion }}</p>
         <p>
           <span class="text-[#6c655c]">Depósito:</span> {{ formatoPrecio(reserva.deposito_valor) }}
           <template v-if="reserva.deposito_reembolsado"> — se te devuelve completo</template>

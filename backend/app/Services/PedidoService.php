@@ -47,7 +47,7 @@ class PedidoService
     {
         $this->validarReglasDeCanal($data);
 
-        return DB::transaction(function () use ($data) {
+        $pedido = DB::transaction(function () use ($data) {
             $pedido = new Pedido();
             $pedido->tipo = $data['tipo'];
             $pedido->origen = $data['origen'];
@@ -113,6 +113,11 @@ class PedidoService
 
             return $pedido->fresh(['detalles.extras', 'mesa']);
         });
+
+        // M11 (21/10/2026): un pedido que llega por la web o por el QR avisa al personal.
+        app(NotificacionService::class)->pedidoNuevo($pedido);
+
+        return $pedido;
     }
 
     private function validarReglasDeCanal(array $data): void
@@ -844,6 +849,7 @@ class PedidoService
             $pedido->detalles()->where('preparado', false)->update(['preparado' => true]);
             $pedido->forceFill(['listo_at' => now(), 'listo_por' => $actor->id])->save();
             app(AvisoPedidoService::class)->programar($pedido->fresh('cliente'), 'listo_para_recoger');
+            app(NotificacionService::class)->pedidoListo($pedido, $actor); // M11
 
             return $pedido->fresh();
         });
@@ -999,6 +1005,7 @@ class PedidoService
             'autorizado_por' => $autorizadoPor?->id,
             'por_el_cliente' => $actor === null || $actor->esCliente(),
         ], $actor);
+        app(NotificacionService::class)->pedidoCanceladoPorCliente($pedido, $actor); // M11
 
         if ($pedido->esLocal() && $pedido->mesa_id) {
             $mesa = Mesa::find($pedido->mesa_id);
@@ -1018,7 +1025,7 @@ class PedidoService
             return null;
         }
 
-        return User::where('role', 'administrador')->where('activo', true)->get()
+        return User::whereIn('role', User::ROLES_ADMINISTRACION)->where('activo', true)->get()
             ->first(fn (User $admin) => \Illuminate\Support\Facades\Hash::check($password, $admin->password));
     }
 }

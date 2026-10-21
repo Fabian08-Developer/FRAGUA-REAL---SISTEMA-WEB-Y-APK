@@ -16,8 +16,11 @@ import CuentaMesaModal from '@/components/pedidos/CuentaMesaModal.vue'
 import { mesaService } from '@/services/mesa.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import type { Mesa } from '@/types/models'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+// M09 (20/10/2026): sin el menú Cobrar o Reservas, sus botones no se muestran (el servidor también lo bloquea).
+const auth = useAuthStore()
 
 const mesas = ref<Mesa[]>([])
 const cargando = ref(true)
@@ -60,7 +63,10 @@ async function cargar() {
   error.value = ''
   try {
     const { data } = await mesaService.index()
-    mesas.value = data.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }))
+    // Corrección (19/10/2026): una mesa dada de baja no se opera (también si entra el Administrador).
+    mesas.value = data
+      .filter((m) => m.activa !== false)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }))
   } catch (e) {
     error.value = mensajeDeError(e, 'No pudimos cargar las mesas.')
   } finally {
@@ -253,7 +259,7 @@ onMounted(cargar)
           </button>
 
           <router-link
-            v-if="mesa.estado === 'reservada'"
+            v-if="mesa.estado === 'reservada' && auth.tieneMenu('reservas')"
             :to="{ name: 'mesero-reservas', query: { mesa_id: mesa.id, mesa_nombre: mesa.nombre } }"
             class="text-xs font-medium text-brand-700 underline-offset-2 hover:underline"
           >
@@ -263,7 +269,7 @@ onMounted(cargar)
       </div>
     </div>
 
-    <CuentaMesaModal :mesa-id="cuentaDe" :puede-cobrar="true" @cerrar="cuentaDe = null" @cobrado="cargar" />
+    <CuentaMesaModal :mesa-id="cuentaDe" :puede-cobrar="auth.tieneMenu('cobrar')" @cerrar="cuentaDe = null" @cobrado="cargar" />
 
     <!-- Liberación forzada (RF-M05-011) -->
     <BaseModal :model-value="!!mesaForzada" title="Liberación forzada" @update:model-value="mesaForzada = null">

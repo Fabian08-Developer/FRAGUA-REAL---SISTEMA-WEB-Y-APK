@@ -42,6 +42,7 @@
 <table>
     <tr>
         <td>
+            @if (! empty($negocio['logo']))<img src="{{ $negocio['logo'] }}" alt="" style="max-height: 46px; max-width: 140px; margin-bottom: 4px;">@endif
             <h1>{{ $negocio['nombre'] ?? 'Fragua Real Burger' }}</h1>
             <div class="quieto">Reporte para el Administrador</div>
         </td>

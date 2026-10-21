@@ -44,6 +44,23 @@ class RevisionProduccionService
 
         $r[] = $this->cuentasDePrueba();
 
+        // M09 (19/10/2026): sin SuperAdmin nadie puede crear ni recuperar cuentas de Administrador.
+        $superadmins = User::where('role', 'superadmin')->where('activo', true)->count();
+        $r[] = $this->item('superadmin', $superadmins > 0 ? 'ok' : 'aviso', 'Cuenta de SuperAdmin',
+            $superadmins > 0
+                ? ($superadmins === 1 ? 'Hay un SuperAdmin activo.' : "Hay {$superadmins} SuperAdmin activos.")
+                : 'No hay SuperAdmin: sin él nadie puede crear o cambiar cuentas de Administrador. Créalo con php artisan fragua:crear-superadmin.');
+
+        // M10 (20/10/2026): informativo; la cuenta de Soporte es opcional y solo consulta.
+        $soportes = User::where('role', 'soporte')->get(['activo']);
+        $activas = $soportes->where('activo', true)->count();
+        $r[] = $this->item('soporte', 'ok', 'Cuenta de Soporte',
+            $soportes->isEmpty()
+                ? 'No hay cuenta de Soporte (es opcional; se crea con php artisan fragua:crear-soporte).'
+                : ($activas > 0
+                    ? ($activas === 1 ? 'Hay una cuenta de Soporte activa (solo consulta).' : "Hay {$activas} cuentas de Soporte activas (solo consulta).")
+                    : 'La cuenta de Soporte está desactivada.'));
+
         $correo = (string) config('mail.default');
         $r[] = $this->item('correo', in_array($correo, ['log', 'array'], true) ? 'error' : 'ok', 'Correo que sale de verdad',
             in_array($correo, ['log', 'array'], true) ? "MAIL_MAILER={$correo}: los correos no salen. Configura el SMTP." : "MAIL_MAILER={$correo}.");
@@ -108,7 +125,7 @@ class RevisionProduccionService
         // El personal (pocas cuentas) y las cuentas de demostración del sembrado; las contraseñas de
         // los clientes son de ellos y no se revisan (además, comprobar cada una tomaría mucho).
         $conPruebas = User::where('activo', true)
-            ->where(fn ($q) => $q->whereIn('role', ['administrador', 'mesero'])->orWhere('email', 'like', '%@fraguareal.com'))
+            ->where(fn ($q) => $q->whereIn('role', ['superadmin', 'administrador', 'soporte', 'mesero'])->orWhere('email', 'like', '%@fraguareal.com'))
             ->limit(30)
             ->get(['id', 'email', 'password'])
             ->filter(fn (User $u) => $this->usaContrasenaDePrueba((string) $u->password))

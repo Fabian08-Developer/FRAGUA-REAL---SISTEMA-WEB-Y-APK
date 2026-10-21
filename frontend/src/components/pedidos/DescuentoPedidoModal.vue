@@ -117,7 +117,7 @@ async function quitar() {
       <div v-if="pedido.descuento_manual" class="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
         <p class="font-semibold">{{ pedido.descuento_manual.nombre }}: −{{ formatoPrecio(pedido.descuento ?? 0) }}</p>
         <p class="mt-0.5 text-xs">Motivo: {{ pedido.descuento_manual_motivo }}<template v-if="pedido.descuento_manual_por"> · {{ pedido.descuento_manual_por.nombre }}</template></p>
-        <BaseButton class="mt-3" variant="secondary" :disabled="guardando" @click="quitar">Quitar descuento</BaseButton>
+        <BaseButton v-escritura class="mt-3" variant="secondary" :disabled="guardando" @click="quitar">Quitar descuento</BaseButton>
         <p class="mt-2 text-xs">Si aplicas otro, reemplaza a este.</p>
       </div>
       <p v-else-if="tieneAutomaticas" class="rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
@@ -158,7 +158,7 @@ async function quitar() {
 
       <div class="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <BaseButton variant="ghost" @click="emit('cerrar')">Volver</BaseButton>
-        <BaseButton :disabled="guardando" @click="aplicar">{{ guardando ? 'Guardando…' : 'Aplicar descuento' }}</BaseButton>
+        <BaseButton v-escritura :disabled="guardando" @click="aplicar">{{ guardando ? 'Guardando…' : 'Aplicar descuento' }}</BaseButton>
       </div>
     </template>
   </BaseModal>

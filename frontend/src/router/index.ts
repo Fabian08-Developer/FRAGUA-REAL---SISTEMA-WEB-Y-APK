@@ -111,30 +111,33 @@ const router = createRouter({
       component: () => import('@/layouts/AdminLayout.vue'),
       meta: { requiereAuth: true, roles: ['administrador'] as Rol[] },
       children: [
-        { path: '', name: 'admin-dashboard', component: () => import('@/views/admin/DashboardView.vue') },
-        { path: 'usuarios', name: 'admin-usuarios', component: () => import('@/views/admin/UsuariosView.vue') },
-        { path: 'pedidos', name: 'admin-pedidos', component: () => import('@/views/admin/PedidosView.vue') },
+        { path: '', name: 'admin-dashboard', meta: { menu: 'dashboard' }, component: () => import('@/views/admin/DashboardView.vue') },
+        { path: 'usuarios', name: 'admin-usuarios', meta: { menu: 'usuarios' }, component: () => import('@/views/admin/UsuariosView.vue') },
+        { path: 'pedidos', name: 'admin-pedidos', meta: { menu: 'pedidos' }, component: () => import('@/views/admin/PedidosView.vue') },
         {
           path: 'compras-gastos',
           name: 'admin-compras-gastos',
+          meta: { menu: 'compras_gastos' },
           component: () => import('@/views/admin/ComprasGastosView.vue'),
         },
-        { path: 'catalogo', name: 'admin-catalogo', component: () => import('@/views/admin/CatalogoView.vue') },
+        { path: 'catalogo', name: 'admin-catalogo', meta: { menu: 'catalogo' }, component: () => import('@/views/admin/CatalogoView.vue') },
         // Fase 1, tarea 5: la misma pantalla de disponibilidad del Mesero (RF-M04-016/017).
         {
           path: 'disponibilidad',
           name: 'admin-disponibilidad',
+          meta: { menu: 'catalogo' },
           component: () => import('@/views/mesero/DisponibilidadView.vue'),
         },
-        { path: 'mesas', name: 'admin-mesas', component: () => import('@/views/admin/MesasView.vue') },
-        { path: 'reservas', name: 'admin-reservas', component: () => import('@/views/admin/ReservasView.vue') },
-        { path: 'caja', name: 'admin-caja', component: () => import('@/views/admin/CajaView.vue') },
-        { path: 'reportes', name: 'admin-reportes', component: () => import('@/views/admin/ReportesView.vue') },
+        { path: 'mesas', name: 'admin-mesas', meta: { menu: 'mesas' }, component: () => import('@/views/admin/MesasView.vue') },
+        { path: 'reservas', name: 'admin-reservas', meta: { menu: 'mesas' }, component: () => import('@/views/admin/ReservasView.vue') },
+        { path: 'caja', name: 'admin-caja', meta: { menu: 'caja' }, component: () => import('@/views/admin/CajaView.vue') },
+        { path: 'reportes', name: 'admin-reportes', meta: { menu: 'reportes' }, component: () => import('@/views/admin/ReportesView.vue') },
         // Fase 3, tarea 1 (RF-M01-025, HU-M01-020): auditoría y eventos de seguridad, solo lectura.
-        { path: 'auditoria', name: 'admin-auditoria', component: () => import('@/views/admin/AuditoriaView.vue') },
+        { path: 'auditoria', name: 'admin-auditoria', meta: { menu: 'auditoria' }, component: () => import('@/views/admin/AuditoriaView.vue') },
         {
           path: 'configuracion',
           name: 'admin-configuracion',
+          meta: { menu: 'configuracion' },
           component: () => import('@/views/admin/ConfiguracionView.vue'),
         },
       ],
@@ -155,19 +158,19 @@ const router = createRouter({
           // esconde la barra superior/inferior de móvil y no le pone márgenes (MeseroLayout).
           meta: { pantallaCompleta: true },
         },
-        { path: 'mesas', name: 'mesero-mesas', component: () => import('@/views/mesero/MesasView.vue') },
-        { path: 'caja', name: 'mesero-caja', component: () => import('@/views/mesero/CajaView.vue') },
+        { path: 'mesas', name: 'mesero-mesas', meta: { menu: 'mesas' }, component: () => import('@/views/mesero/MesasView.vue') },
+        { path: 'caja', name: 'mesero-caja', meta: { menu: 'cobrar' }, component: () => import('@/views/mesero/CajaView.vue') },
         // Fase 1, tarea 4 (HU-M05-009/010): la misma pantalla de Reservas del Administrador,
         // que se adapta al rol (el Mesero no ve los depósitos retenidos, RF-M05-035).
-        { path: 'reservas', name: 'mesero-reservas', component: () => import('@/views/admin/ReservasView.vue') },
+        { path: 'reservas', name: 'mesero-reservas', meta: { menu: 'reservas' }, component: () => import('@/views/admin/ReservasView.vue') },
         // Fase 1, tarea 5 (HU-M04-009/010/013): agotado/disponible y búsqueda del menú.
-        { path: 'menu', name: 'mesero-menu', component: () => import('@/views/mesero/DisponibilidadView.vue') },
+        { path: 'menu', name: 'mesero-menu', meta: { menu: 'menu' }, component: () => import('@/views/mesero/DisponibilidadView.vue') },
         // Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32): solo con el permiso de compras y gastos.
         {
           path: 'gastos',
           name: 'mesero-gastos',
           component: () => import('@/views/mesero/GastosView.vue'),
-          meta: { permisoGastos: true },
+          meta: { permisoGastos: true, menu: 'gastos' },
         },
       ],
     },
@@ -188,7 +191,7 @@ router.beforeEach(async (to) => {
   if (to.query.origen === 'app') {
     const { origen: _origen, ...resto } = to.query
     if (to.path === '/' && auth.rol === 'mesero') return { name: 'mesero-pedidos', replace: true }
-    if (to.path === '/' && auth.rol === 'administrador') return { name: 'admin-dashboard', replace: true }
+    if (to.path === '/' && auth.esAdministrador) return { name: 'admin-dashboard', replace: true }
     return { path: to.path, query: resto, hash: to.hash, replace: true }
   }
 
@@ -206,8 +209,16 @@ router.beforeEach(async (to) => {
   // usuario aún no cargó) — una ruta con roles restringidos requiere un rol conocido y
   // permitido, nunca "sin rol = dejar pasar".
   const rolesPermitidos = to.meta.roles as Rol[] | undefined
-  if (rolesPermitidos && !(auth.rol && rolesPermitidos.includes(auth.rol))) {
+  // M09 (19/10/2026): el SuperAdmin entra a las zonas del Administrador (rolDeZona).
+  if (rolesPermitidos && !(auth.rolDeZona && rolesPermitidos.includes(auth.rolDeZona))) {
     return { name: 'home' }
+  }
+
+  // M09 (20/10/2026): un menú que el SuperAdmin le quitó a esta cuenta no se abre ni escribiendo la
+  // dirección (el servidor también rechaza sus acciones).
+  const menuRuta = to.meta.menu as string | undefined
+  if (menuRuta && !auth.esSuperAdmin && !auth.esSoporte && auth.usuario?.menus && !auth.usuario.menus.includes(menuRuta)) {
+    return { name: auth.rolDeZona === 'mesero' ? 'mesero-pedidos' : 'admin-dashboard' }
   }
 
   // Fase 7, tarea 2: la pestaña Gastos del Mesero exige el permiso (el servidor también lo revisa).
@@ -216,6 +227,16 @@ router.beforeEach(async (to) => {
   }
 
   return true
+})
+
+// M09 (20/10/2026): si el SuperAdmin cambia los menús de una cuenta, el menú lateral se pone al día
+// sin cerrar sesión: al navegar dentro del panel se vuelve a pedir la cuenta, como mucho cada minuto.
+let ultimaRevisionMenus = Date.now()
+router.afterEach((to) => {
+  const auth = useAuthStore()
+  if (!to.meta.menu || !auth.estaAutenticado || Date.now() - ultimaRevisionMenus < 60_000) return
+  ultimaRevisionMenus = Date.now()
+  auth.cargarUsuarioActual().catch(() => {})
 })
 
 export default router

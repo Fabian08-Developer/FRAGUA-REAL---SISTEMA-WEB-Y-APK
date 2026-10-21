@@ -117,7 +117,9 @@ async function cargarMesas() {
   cargandoMesas.value = true
   errorMesas.value = ''
   try {
-    const { data } = await mesaService.index()
+    const { data: todas } = await mesaService.index()
+    // Corrección (19/10/2026): una mesa dada de baja no recibe pedidos.
+    const data = todas.filter((m) => m.activa !== false)
     mesas.value = data
     const mesaQuery = Number(route.query.mesa)
     if (mesaQuery) {

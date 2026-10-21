@@ -1,6 +1,6 @@
 # Base de datos — Fragua Real Burger
 
-PostgreSQL en producción; SQLite en memoria para las pruebas automáticas. 39 tablas propias del sistema más la de control de migraciones, creadas por 59 migraciones de Laravel en `backend/database/migrations`. Este documento describe cómo está hoy la base; la lógica que la usa está en [`README-BACKEND.md`](README-BACKEND.md) y los endpoints en [`API.md`](API.md).
+PostgreSQL en producción; SQLite en memoria para las pruebas automáticas. 40 tablas propias del sistema más la de control de migraciones, creadas por 64 migraciones de Laravel en `backend/database/migrations`. Este documento describe cómo está hoy la base; la lógica que la usa está en [`README-BACKEND.md`](README-BACKEND.md) y los endpoints en [`API.md`](API.md).
 
 ## Contenido
 
@@ -30,7 +30,7 @@ La fecha del nombre de cada migración solo fija el orden en que corren; no es l
 
 | Tabla | Columnas | Qué guarda |
 |---|---|---|
-| `users` | 12 | Cuentas de los tres roles (`role`: administrador, mesero, cliente), con `username` opcional y único y el permiso `puede_registrar_gastos` del Mesero autorizado. |
+| `users` | 12 | Cuentas de los roles (`role`: superadmin, administrador, soporte, mesero, cliente; superadmin desde el 19/10/2026, M09, y soporte desde el 20/10/2026, M10), `menus_permitidos` (json, los menús que el SuperAdmin le habilitó; vacío = todos los de su rol), con `username` opcional y único y el permiso `puede_registrar_gastos` del Mesero autorizado. |
 | `personal_access_tokens` | 12 | Sesiones (tokens de Sanctum) con IP y dispositivo; vencen por inactividad o duración máxima. |
 | `password_reset_tokens` | 3 | Enlaces de recuperación de contraseña (guardados con hash, vencen a la hora). |
 | `auditorias` | 9 | Historial de acciones críticas: quién, qué, sobre qué registro, antes y después, IP y navegador. Triggers de PostgreSQL impiden cambiarlo o borrarlo. |
@@ -55,7 +55,7 @@ La fecha del nombre de cada migración solo fija el orden en que corren; no es l
 | Tabla | Columnas | Qué guarda |
 |---|---|---|
 | `mesas` | 8 | Mesas del local con su QR y su estado (libre, ocupada o reservada). `ocupada_desde` marca el inicio de la visita. |
-| `reservas` | 30 | Reservas con el depósito: método, estado, en qué turno de caja se recibió o devolvió, abono al pedido, no-show y enlace secreto para el cliente. |
+| `reservas` | 31 | Reservas con el depósito: método, estado, en qué turno de caja se recibió o devolvió, abono al pedido, no-show y enlace secreto para el cliente. `descripcion` es la nota opcional del cliente (hasta 500 caracteres). |
 | `reserva_avisos` | 11 | Cada correo de una reserva (confirmación, recordatorio, cancelación, no-show): destino, estado, intentos y error. |
 
 ### Pedidos (M02, M07)
@@ -92,7 +92,13 @@ La fecha del nombre de cada migración solo fija el orden en que corren; no es l
 | Tabla | Columnas | Qué guarda |
 |---|---|---|
 | `reporte_exportaciones` | 14 | Reportes exportados (PDF o Excel) guardados para volver a descargarlos tal cual. |
-| `configuraciones` | 6 | Valores que edita el Administrador: valor del domicilio, depósito de reserva y tiempos de las reservas. |
+| `configuraciones` | 6 | Valores que edita el Administrador: valor del domicilio, depósito de reserva, tiempos de las reservas y datos del negocio (`negocio_direccion`, `negocio_telefono`, `negocio_logo_path` y, del SuperAdmin, `negocio_nombre`, `negocio_nit`, `negocio_latitud` y `negocio_longitud` (el punto del local en el mapa); la ruta del logo en `storage/app/private/negocio`). |
+
+### Notificaciones (M11)
+
+| Tabla | Columnas | Qué guarda |
+|---|---|---|
+| `notificaciones` | 10 | La campana del personal: una fila por persona que debe enterarse (`user_id`), con `tipo`, `categoria` (pedidos, reservas, caja, operacion o sistema), `titulo`, `texto`, `enlace` a la pantalla del panel, `leida_at` y `created_at`. `clave` es única por persona (`user_id` + `clave`) para que el mismo aviso no se repita. Se borran solas a los 30 días (`notificaciones:limpiar`). |
 
 ### Tablas de Laravel
 
@@ -100,7 +106,7 @@ La fecha del nombre de cada migración solo fija el orden en que corren; no es l
 
 ## Relaciones
 
-Cada diagrama muestra las tablas de un módulo y las llaves foráneas que salen de ellas (generado desde el esquema real). Las referencias a `users` que solo dicen quién hizo una acción (`*_por`, `user_id`) se omiten para que el diagrama se lea; están en las tablas de arriba. El diagrama completo, con las 39 tablas y todas sus columnas, tipos, llaves y valores permitidos, está en la carpeta «Documentacion Fragua Real» como `er_diagram.png` y `er_diagram.pdf` (el PDF se puede ampliar sin perder nitidez).
+Cada diagrama muestra las tablas de un módulo y las llaves foráneas que salen de ellas (generado desde el esquema real). Las referencias a `users` que solo dicen quién hizo una acción (`*_por`, `user_id`) se omiten para que el diagrama se lea; están en las tablas de arriba. El diagrama completo, con las 40 tablas y todas sus columnas, tipos, llaves y valores permitidos, está en la carpeta «Documentacion Fragua Real» como `er_diagram.png` y `er_diagram.pdf` (el PDF se puede ampliar sin perder nitidez).
 
 `}o--||` = muchas a una obligatoria; `}o--o|` = muchas a una opcional (la columna puede quedar vacía).
 
@@ -214,6 +220,11 @@ Además, `transacciones_pasarela` se enlaza con un pago o con una reserva por `p
 | `2026_10_23_000001` | 16/10/2026 | Asocia los extras generales sin productos a los de tipo Alimento (desde aquí un general solo se ofrece donde se asocia). | — |
 | `2026_10_23_000002` | 16/10/2026 | `variantes.descripcion`, `imagen_url` e `imagen_path`. | — |
 | `2026_10_23_000003` | 16/10/2026 | `promociones.variante_id` y `promociones.es_oferta`. | — |
+| `2026_10_26_000001` | 19/10/2026 | `reservas.descripcion`: nota opcional del cliente en su reserva. | — |
+| `2026_10_29_000001` | 21/10/2026 | Tabla `notificaciones` (M11): la campana del personal, con índice único `user_id` + `clave` y los índices para contar las no leídas y limpiar las viejas. | — |
+| `2026_10_28_000001` | 20/10/2026 | `users.role` acepta `soporte` (M10). En PostgreSQL cambia la restricción `users_role_check`; al deshacerla, una cuenta de Soporte queda como Cliente desactivada y sin sesiones (nunca como Administrador). | — |
+| `2026_10_27_000001` | 20/10/2026 | `users.menus_permitidos`: permisos de menú por cuenta (M09). | — |
+| `2026_10_26_000002` | 20/10/2026 | `users.role` acepta `superadmin` (M09). En PostgreSQL cambia la restricción `users_role_check`; al deshacerla, un SuperAdmin vuelve a Administrador. | — |
 ## Decisiones de diseño (ADR)
 
 ### ADR-001 — Una sola tabla `pedidos` para Local, QR, Domicilio y Recogida

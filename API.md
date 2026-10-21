@@ -1,6 +1,6 @@
 # API — Fragua Real Burger
 
-Referencia de los 157 endpoints de `backend/routes/api.php`, agrupados por módulo. Todas las rutas van bajo `/api` y responden JSON, salvo los PDF, tickets, fotos y archivos exportados.
+Referencia de los 168 endpoints de `backend/routes/api.php`, agrupados por módulo. Donde dice «Administrador» entra también el SuperAdmin (M09) y, solo para consultar, la cuenta de Soporte (M10): a ella el servidor le rechaza con 403 «La cuenta de Soporte solo puede consultar.» toda escritura (POST, PUT, PATCH o DELETE), salvo las de su propia cuenta (`/auth/*`, `/perfil`), `POST /reportes/exportar`, `POST /pedidos/cotizacion` y marcar sus notificaciones como leídas, y también `GET /comandas/{comanda}/ticket`, que marca la comanda como impresa. Las rutas del personal llevan además el permiso de menú de la cuenta (M09): si el SuperAdmin le quitó ese menú, responden 403 «Esta opción no está habilitada para tu cuenta…». Todas las rutas van bajo `/api` y responden JSON, salvo los PDF, tickets, fotos y archivos exportados.
 
 Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). Si cambia una ruta, actualiza esta tabla.
 
@@ -24,6 +24,7 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 - [Caja y pagos (M06)](#caja-y-pagos-m06) (22)
 - [Compras, gastos y cierre diario (M03)](#compras-gastos-y-cierre-diario-m03) (12)
 - [Reportes (M08)](#reportes-m08) (9)
+- [Notificaciones del personal (M11)](#notificaciones-del-personal-m11) (4)
 - [Configuración, sistema y tablero](#configuración-sistema-y-tablero) (6)
 
 ## Cuenta y sesión (M01)
@@ -49,13 +50,15 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 |---|---|---|---|---|
 | `GET` | `/auditorias` | Administrador | Historial de auditoría con filtros (fechas, usuario, grupo, acción, registro, IP, texto). Solo lectura. |  |
 | `GET` | `/auditorias/opciones` | Administrador | Listas para los filtros de Auditoría y resumen de seguridad (intentos fallidos). |  |
-| `GET` | `/usuarios` | Administrador | Usuarios con filtros por rol y texto (nombre, correo o usuario). |  |
-| `POST` | `/usuarios` | Administrador | Crea una cuenta de Mesero o Administrador. |  |
-| `PUT` | `/usuarios/{usuario}` | Administrador | Edita datos, rol y el permiso de compras y gastos (cambiar el rol cierra sus sesiones). |  |
+| `GET` | `/usuarios` | Administrador | Usuarios con filtros por rol y texto (nombre, correo o usuario). Cada cuenta trae `gestionable`: si quien mira puede modificarla (M09). La cuenta de Soporte solo la ven el SuperAdmin y ella misma (M10). |  |
+| `POST` | `/usuarios` | Administrador | Crea una cuenta de Mesero; la de Administrador, solo el SuperAdmin (403 para el Administrador). El rol `superadmin` no se crea aquí. |  |
+| `PUT` | `/usuarios/{usuario}` | Administrador | Edita datos, rol y el permiso de compras y gastos (cambiar el rol cierra sus sesiones). Una cuenta de Administrador solo la edita el SuperAdmin y la del SuperAdmin no se edita aquí (403). |  |
 | `POST` | `/usuarios/{usuario}/activar` | Administrador | Activa una cuenta. |  |
 | `POST` | `/usuarios/{usuario}/desactivar` | Administrador | Desactiva una cuenta y cierra sus sesiones. |  |
 | `POST` | `/usuarios/{usuario}/revocar-sesiones` | Administrador | Cierra todas las sesiones de una cuenta. |  |
 | `GET` | `/usuarios/{usuario}/sesiones` | Administrador | Sesiones abiertas de una cuenta. |  |
+| `GET` | `/usuarios/{usuario}/menus` | SuperAdmin | Menús de una cuenta de Administrador o Mesero: el catálogo del rol (con los fijos) y los habilitados (M09). |  |
+| `PUT` | `/usuarios/{usuario}/menus` | SuperAdmin | Cambia los menús de esa cuenta (`menus`: claves del rol; Dashboard o Pedidos siempre quedan). Queda en Auditoría. |  |
 | `DELETE` | `/usuarios/{usuario}/sesiones/{sesion}` | Administrador | Cierra una sesión de una cuenta. |  |
 
 ## Catálogo (M04)
@@ -135,7 +138,7 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 
 | Método | Ruta | Quién | Para qué | Límite |
 |---|---|---|---|---|
-| `GET` | `/mesas` | Pública | Mesas con su estado. Sin sesión, solo las activas; el personal ve también las inactivas. |  |
+| `GET` | `/mesas` | Pública | Mesas con su estado. Solo las activas; el Administrador ve también las dadas de baja, para reactivarlas (corregido el 19/10/2026: el Mesero también las veía). |  |
 | `POST` | `/mesas` | Administrador | Crea una mesa con su QR. |  |
 | `GET` | `/mesas/qr/{qr_code}` | Pública | Mesa por el código de su QR (para el pedido desde la mesa). |  |
 | `PUT` | `/mesas/{mesa}` | Administrador | Cambia el nombre de la mesa (el QR no cambia). |  |
@@ -154,7 +157,7 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 |---|---|---|---|---|
 | `GET` | `/mesas/disponibles` | Pública | Mesas libres a una fecha y hora (sin datos de nadie). | 60/min |
 | `GET` | `/mis-reservas` | Cliente | Reservas del Cliente (por su correo). |  |
-| `POST` | `/reservas` | Pública | Crea una reserva (web o del personal); devuelve el enlace secreto. | 30/min |
+| `POST` | `/reservas` | Pública | Crea una reserva (web o del personal) con `descripcion` opcional (hasta 500 caracteres); solo de 4:00 p. m. a 11:00 p. m. y con al menos 3 horas de anticipación (422 si no). Devuelve el enlace secreto. | 30/min |
 | `GET` | `/reservas` | Administrador, Mesero | Reservas con filtros, sus avisos y su depósito. |  |
 | `GET` | `/reservas/depositos-retenidos` | Administrador | Depósitos retenidos por no-show. |  |
 | `GET` | `/reservas/enlace/{token}` | Pública | Reserva por su enlace secreto (sin cuenta). | 30/min |
@@ -227,11 +230,27 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 | `GET` | `/reportes/ventas-por-tipo-y-metodo` | Administrador | Ventas por tipo de venta y por método de pago. |  |
 | `GET` | `/reportes/ventas-totales` | Administrador | Monto y cantidad de pedidos finalizados del periodo. |  |
 
+## Notificaciones del personal (M11)
+
+La campana del Mesero y del Administrador (también del SuperAdmin y de Soporte). Cada cuenta ve y marca solo las suyas; las crea el sistema según el rol y los menús de la cuenta, nunca para quien hizo la acción, y se borran solas a los 30 días.
+
+| Método | Ruta | Quién | Para qué | Límite |
+|---|---|---|---|---|
+| `GET` | `/notificaciones` | Administrador, Mesero | Las 30 más recientes de la cuenta (`tipo`, `categoria`: pedidos, reservas, caja, operacion o sistema; `titulo`, `texto`, `enlace` a la pantalla del panel, `leida_at`, `created_at`) y `no_leidas`. |  |
+| `GET` | `/notificaciones/contador` | Administrador, Mesero | `no_leidas` y `ultima_id`; la campana lo pide cada 20 segundos. Si la cuenta recibe los avisos del sistema y el programador de tareas dejó de latir, crea ese aviso (una vez al día). |  |
+| `POST` | `/notificaciones/{notificacion}/leida` | Administrador, Mesero | Marca una como leída; 404 si no es de la cuenta. Devuelve `no_leidas`. |  |
+| `POST` | `/notificaciones/leidas` | Administrador, Mesero | Marca todas las de la cuenta como leídas. |  |
+
 ## Configuración, sistema y tablero
 
 | Método | Ruta | Quién | Para qué | Límite |
 |---|---|---|---|---|
-| `GET` | `/configuracion` | Pública | Valores públicos: valor del domicilio, depósito de reserva y tiempos de reserva. |  |
+| `GET` | `/configuracion` | Pública | Valores públicos: valor del domicilio, depósito de reserva, tiempos de reserva y su horario (`reserva_hora_inicio`, `reserva_hora_fin`, `reserva_anticipacion_minutos`) y `negocio` (nombre, dirección, teléfono, enlace de WhatsApp, `latitud`/`longitud` del local, `mapa_url` de «Cómo llegar» y `logo_url`). |  |
+| `GET` | `/negocio/logo` | Pública | El logo del negocio (PNG). 404 si no hay. | 600/min |
+| `PUT` | `/negocio` | Administrador | Cambia la dirección y el teléfono (también el de WhatsApp) del negocio; `nombre`, `nit`, `latitud` y `longitud` (punto del local en el mapa; los dos o ninguno, `null` lo quita), solo el SuperAdmin (403 si los manda el Administrador). Queda en Auditoría. |  |
+| `POST` | `/negocio/ubicacion-desde-enlace` | SuperAdmin | Lee el punto de un enlace de Google Maps (`enlace`: el de «Compartir», `maps.app.goo.gl`, uno largo con `@lat,lng` o `!3d…!4d…`, o «lat, lng»). Los enlaces cortos se siguen solo hasta páginas de Google. Devuelve `{latitud, longitud}` sin guardar nada; 422 si no encuentra el punto. | 20/min |
+| `POST` | `/negocio/logo` | Administrador | Sube o cambia el logo (`logo`: PNG, JPG o WebP, mínimo 64 × 64 px, hasta 5 MB); se guarda en PNG de 512 px. Queda en Auditoría. |  |
+| `DELETE` | `/negocio/logo` | Administrador | Quita el logo; vuelve el círculo «FR». Queda en Auditoría. |  |
 | `GET` | `/configuraciones` | Administrador | Valores editables del sistema. |  |
 | `PUT` | `/configuraciones` | Administrador | Edita domicilio, depósito y tiempos de reserva. Queda en Auditoría. |  |
 | `GET` | `/dashboard/resumen` | Administrador | Resumen del día para el Administrador. |  |

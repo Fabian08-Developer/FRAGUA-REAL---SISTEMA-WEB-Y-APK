@@ -37,8 +37,8 @@
 <div class="centro"><strong>COMPROBANTE DE PAGO {{ $c['numero'] }}</strong></div>
 @if ($anulado)<div class="centro grande">*** ANULADO ***</div>@endif
 @if ($reimpresion)
-    <div class="centro"><strong>*** REIMPRESIÓN · COPIA {{ $reimpresion['vez'] }} ***</strong></div>
-    <div class="centro">Impresa el {{ $fecha($reimpresion['fecha']) }}</div>
+    <div class="centro"><strong>*** {{ ! empty($reimpresion['consulta']) ? 'COPIA DE CONSULTA · SOPORTE' : 'REIMPRESIÓN · COPIA '.$reimpresion['vez'] }} ***</strong></div>
+    <div class="centro">{{ ! empty($reimpresion['consulta']) ? 'Consultada' : 'Impresa' }} el {{ $fecha($reimpresion['fecha']) }}</div>
 @endif
 <div>{{ $fecha($c['fecha']) }}</div>
 <div>Pedido #{{ $p['id'] }} · {{ $p['canal'] }}@if (! empty($p['mesa'])) · {{ $p['mesa'] }}@endif</div>

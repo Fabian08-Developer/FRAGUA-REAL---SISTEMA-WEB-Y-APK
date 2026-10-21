@@ -17,7 +17,9 @@ import fotoBacon from '@/assets/img/platos/hamburguesa-bacon-cheddar.jpg'
 import fotoSalchipapa from '@/assets/img/platos/salchipapa.jpg'
 import fotoSandwich from '@/assets/img/platos/sandwich-platano.jpg'
 import fotoDuo1 from '@/assets/img/platos/duo-hamburguesas-1.jpg'
+import MapaUbicacion from '@/components/common/MapaUbicacion.vue'
 import { catalogoService } from '@/services/catalogo.service'
+import { useNegocioStore } from '@/stores/negocio'
 import { iconoPorNombre } from '@/utils/iconoCategoria'
 import type { Categoria, Producto } from '@/types/models'
 
@@ -46,10 +48,16 @@ function formatoPrecio(valor: number) {
 }
 
 // Datos de contacto reales del negocio (no se inventan): dirección y WhatsApp.
-const direccion = 'Esquina frente al malecón turístico, etapa 1.'
-const telefono = '322 725 9965'
-const whatsappUrl = `https://wa.me/57${telefono.replace(/\s+/g, '')}`
-const mapaUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`
+// Mejora (19/10/2026): dirección, teléfono y WhatsApp salen de Configuración (los cambia el Administrador).
+const negocio = useNegocioStore()
+negocio.cargar()
+const direccion = computed(() => negocio.datos.direccion)
+const telefono = computed(() => negocio.datos.telefono)
+const whatsappUrl = computed(() => negocio.whatsappUrl)
+const mapaUrl = computed(() => negocio.mapaUrl)
+// M09 (20/10/2026): mapa pequeño con el punto que marcó el SuperAdmin (solo si hay punto).
+const latitud = computed(() => negocio.datos.latitud ?? null)
+const longitud = computed(() => negocio.datos.longitud ?? null)
 
 const beneficios = [
   { icono: ChefHat, titulo: 'Hecho al momento', texto: 'Preparamos tu pedido al confirmarlo.' },
@@ -344,6 +352,13 @@ const beneficios = [
             </div>
           </div>
         </div>
+        <MapaUbicacion
+          v-if="negocio.tienePunto"
+          class="mt-8 h-56 sm:h-64"
+          :latitud="latitud"
+          :longitud="longitud"
+          etiqueta="Mapa con la ubicación de Fragua Real"
+        />
       </div>
     </section>
   </div>

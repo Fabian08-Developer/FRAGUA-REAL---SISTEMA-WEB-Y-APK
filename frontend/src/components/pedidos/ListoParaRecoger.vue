@@ -30,7 +30,7 @@ function hora(valor: string | null | undefined) {
         <template v-if="correo">¿Ya está listo? Al marcarlo le avisamos por correo a <strong>{{ correo }}</strong>.</template>
         <template v-else>Este pedido no tiene correo: después de marcarlo, llama al cliente para avisarle.</template>
       </p>
-      <BaseButton variant="primary" size="sm" :disabled="procesando" @click="$emit('marcar')">
+      <BaseButton v-escritura variant="primary" size="sm" :disabled="procesando" @click="$emit('marcar')">
         <BellRing :size="15" /> {{ procesando ? 'Marcando…' : 'Listo para recoger' }}
       </BaseButton>
     </div>
@@ -44,7 +44,7 @@ function hora(valor: string | null | undefined) {
       <p v-else-if="aviso.estado === 'pendiente'">Aviso en cola para {{ aviso.destino }}…</p>
       <div v-else class="flex flex-col gap-1.5 text-red-800 sm:flex-row sm:items-center sm:justify-between">
         <span>No se pudo enviar el aviso a {{ aviso.destino }}<template v-if="aviso.error">: {{ aviso.error }}</template>. Llama al cliente o reinténtalo.</span>
-        <BaseButton variant="secondary" size="sm" :disabled="procesando" @click="$emit('reintentar', aviso)">
+        <BaseButton v-escritura variant="secondary" size="sm" :disabled="procesando" @click="$emit('reintentar', aviso)">
           <RotateCcw :size="14" /> Reintentar aviso
         </BaseButton>
       </div>

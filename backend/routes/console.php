@@ -39,6 +39,22 @@ Artisan::command('reservas:procesar', function (\App\Services\ReservaAutomaticaS
 
 \Illuminate\Support\Facades\Schedule::command('reservas:procesar')->everyMinute()->withoutOverlapping(5);
 
+// M11 (21/10/2026): notificaciones del personal que dependen de la hora: la reserva empieza pronto, la
+// caja sigue abierta de noche, falta el cierre diario de ayer, la cola de trabajos se detuvo y la
+// revisión antes de producción diaria. Cada aviso sale una sola vez (clave única por persona).
+Artisan::command('notificaciones:revisar', function (\App\Services\NotificacionService $servicio) {
+    $r = $servicio->revisar();
+    $this->info("Reservas próximas: {$r['reservas_proximas']} · caja abierta: {$r['caja_abierta']} · cierre pendiente: {$r['cierre_pendiente']} · sistema: {$r['sistema']}");
+})->purpose('Crea las notificaciones del personal que dependen de la hora');
+
+\Illuminate\Support\Facades\Schedule::command('notificaciones:revisar')->everyMinute()->withoutOverlapping(5);
+
+Artisan::command('notificaciones:limpiar', function (\App\Services\NotificacionService $servicio) {
+    $this->info('Notificaciones borradas: '.$servicio->limpiar());
+})->purpose('Borra las notificaciones más viejas que los días configurados (30 por defecto)');
+
+\Illuminate\Support\Facades\Schedule::command('notificaciones:limpiar')->dailyAt('03:40')->timezone('America/Bogota');
+
 // Fase 6, tarea 1 (RF-M06-006, D4): por si un evento de la pasarela se pierde, cada 5 minutos se
 // pregunta por los pagos en línea que siguen pendientes y se cierran los que vencieron sin pagarse.
 // No hace nada mientras la pasarela esté en modo manual.
@@ -48,6 +64,81 @@ Artisan::command('pasarela:conciliar', function (\App\Services\PasarelaPagoServi
 })->purpose('Concilia con la pasarela los pagos en línea pendientes');
 
 \Illuminate\Support\Facades\Schedule::command('pasarela:conciliar')->everyFiveMinutes()->withoutOverlapping(10);
+
+// M09 (19/10/2026): crea la cuenta del SuperAdmin, el dueño del sistema, o vuelve SuperAdmin a una
+// cuenta que ya existe (por ejemplo, el Administrador de siempre). Pide la contraseña sin mostrarla.
+// Uso en el VPS: sudo -u www-data php artisan fragua:crear-superadmin correo@dominio.com
+Artisan::command('fragua:crear-superadmin {correo} {--nombre= : Nombre de la persona} {--cambiar-clave : Pide una contraseña nueva aunque la cuenta ya exista}',
+    function (\App\Services\SuperAdminService $servicio) {
+        $correo = (string) $this->argument('correo');
+        $existe = \App\Models\User::where('email', mb_strtolower(trim($correo)))->first();
+        if ($existe && $existe->role !== 'superadmin'
+            && ! $this->confirm("Ya existe la cuenta {$existe->email} ({$existe->role}). ¿La vuelvo SuperAdmin?", true)) {
+            $this->warn('No se cambió nada.');
+
+            return 1;
+        }
+
+        $password = null;
+        if (! $existe || $this->option('cambiar-clave')) {
+            $password = (string) $this->secret('Contraseña (mínimo 8 caracteres)');
+            if ($password !== (string) $this->secret('Repite la contraseña')) {
+                $this->error('Las contraseñas no coinciden. No se cambió nada.');
+
+                return 1;
+            }
+        }
+
+        try {
+            $r = $servicio->crearOAsignar($correo, $this->option('nombre'), $password);
+        } catch (\RuntimeException $e) {
+            $this->error($e->getMessage());
+
+            return 1;
+        }
+        $this->info(($r['creada'] ? 'Cuenta SuperAdmin creada: ' : 'Ahora es SuperAdmin: ').$r['usuario']->email);
+
+        return 0;
+    })->purpose('Crea la cuenta del SuperAdmin o vuelve SuperAdmin a una cuenta existente');
+
+// M10 (20/10/2026): crea la cuenta de Soporte (el desarrollador), que ve todo el panel del
+// Administrador sin cambiar nada del negocio. Con el correo de una cuenta que ya es de Soporte,
+// cambia el nombre o, con --cambiar-clave, la contraseña. No activa ni desactiva: eso lo decide el
+// SuperAdmin en Usuarios. Uso en el VPS: sudo -u www-data php artisan fragua:crear-soporte correo@dominio.com
+Artisan::command('fragua:crear-soporte {correo} {--nombre= : Nombre de la persona} {--cambiar-clave : Pide una contraseña nueva aunque la cuenta ya exista}',
+    function (\App\Services\SoporteService $servicio) {
+        $correo = (string) $this->argument('correo');
+        $existe = \App\Models\User::where('email', mb_strtolower(trim($correo)))->first();
+        if ($existe && ! $existe->esSoporte()) {
+            $this->error("Ese correo ya es de una cuenta de {$existe->role}. Usa otro correo para Soporte. No se cambió nada.");
+
+            return 1;
+        }
+
+        $password = null;
+        if (! $existe || $this->option('cambiar-clave')) {
+            $password = (string) $this->secret('Contraseña (mínimo 8 caracteres)');
+            if ($password !== (string) $this->secret('Repite la contraseña')) {
+                $this->error('Las contraseñas no coinciden. No se cambió nada.');
+
+                return 1;
+            }
+        }
+
+        try {
+            $r = $servicio->crearOActualizar($correo, $this->option('nombre'), $password);
+        } catch (\RuntimeException $e) {
+            $this->error($e->getMessage());
+
+            return 1;
+        }
+        $this->info(($r['creada'] ? 'Cuenta de Soporte creada: ' : 'Cuenta de Soporte actualizada: ').$r['usuario']->email);
+        if (! $r['usuario']->activo) {
+            $this->warn('La cuenta está desactivada: solo el SuperAdmin puede reactivarla, en Usuarios.');
+        }
+
+        return 0;
+    })->purpose('Crea la cuenta de Soporte (solo consulta) o le cambia el nombre o la contraseña');
 
 // Endurecimiento (13/10/2026): revisión antes de abrir al público (APP_DEBUG, HTTPS, cuentas de prueba,
 // correo, cola, pasarela, CORS). Sale con código 1 si hay algo grave. Correrlo en el VPS después de

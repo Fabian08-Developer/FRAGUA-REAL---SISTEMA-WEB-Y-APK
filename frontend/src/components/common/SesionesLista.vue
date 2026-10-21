@@ -14,8 +14,10 @@ const props = withDefaults(
     procesando?: number | null
     // false = no ofrecer "Cerrar" en la sesión actual (Mi perfil ya tiene "Cerrar sesión").
     permitirCerrarActual?: boolean
+    // M10 (20/10/2026): Soporte consulta las sesiones de otras cuentas sin poder cerrarlas.
+    soloVer?: boolean
   }>(),
-  { politica: null, procesando: null, permitirCerrarActual: false },
+  { politica: null, procesando: null, permitirCerrarActual: false, soloVer: false },
 )
 
 defineEmits<{ (e: 'cerrar', sesion: SesionAbierta): void }>()
@@ -72,7 +74,7 @@ const textoPolitica = computed(() =>
           </div>
         </div>
         <BaseButton
-          v-if="!sesion.actual || permitirCerrarActual"
+          v-if="!soloVer && (!sesion.actual || permitirCerrarActual)"
           variant="ghost"
           size="sm"
           :disabled="procesando === sesion.id"

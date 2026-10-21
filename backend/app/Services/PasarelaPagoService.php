@@ -478,6 +478,7 @@ class PasarelaPagoService
         app(AuditoriaService::class)->registrar('pago_pasarela_por_revisar', $this->entidadAuditoria($tx), $tx->pagable_id, [
             'referencia' => $tx->referencia, 'estado' => $tx->estado, 'monto' => (float) $tx->monto, 'motivo' => $motivo,
         ]);
+        app(NotificacionService::class)->pagoPorRevisar($tx); // M11
     }
 
     private function entidadAuditoria(TransaccionPasarela $tx): string

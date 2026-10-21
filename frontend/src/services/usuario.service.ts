@@ -38,7 +38,23 @@ export interface UsuariosPaginados {
   total: number
 }
 
+// M09 (20/10/2026): permisos de menú de una cuenta de Administrador o Mesero (solo SuperAdmin).
+export interface MenusDeCuenta {
+  usuario_id: number
+  rol: Rol
+  catalogo: { clave: string; nombre: string; fijo: boolean }[]
+  menus: string[]
+  // true = sin restricción: ve todos los menús de su rol.
+  todos: boolean
+}
+
 export const usuarioService = {
+  menus(id: number) {
+    return api.get<MenusDeCuenta>(`/usuarios/${id}/menus`)
+  },
+  actualizarMenus(id: number, menus: string[]) {
+    return api.put<MenusDeCuenta>(`/usuarios/${id}/menus`, { menus })
+  },
   index(params?: { rol?: Rol; busqueda?: string }) {
     return api.get<UsuariosPaginados>('/usuarios', { params })
   },

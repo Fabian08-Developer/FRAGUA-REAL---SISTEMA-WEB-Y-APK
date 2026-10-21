@@ -19,7 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
             'activo' => \App\Http\Middleware\EnsureUserIsActive::class,
+            // M09 (20/10/2026): permisos de menú por cuenta.
+            'menu' => \App\Http\Middleware\EnsureMenuPermitido::class,
         ]);
+        // M10 (20/10/2026): la cuenta de Soporte solo consulta. En toda la API, porque las rutas
+        // públicas (crear un pedido, reservar) también reconocen la sesión si llega el token.
+        $middleware->api(append: [\App\Http\Middleware\SoporteSoloConsulta::class]);
         // Endurecimiento (13/10/2026): cabeceras de seguridad en toda respuesta de la API.
         // Global (no solo en el grupo api) para que también vayan en los errores, como un 401 sin sesión.
         $middleware->append(\App\Http\Middleware\CabecerasSeguridad::class);

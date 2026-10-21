@@ -23,7 +23,7 @@ armado el backend hoy y guarda el historial de los 60 cambios técnicos que lo l
 
 Cada petición pasa por las mismas capas:
 
-1. **Ruta** (`routes/api.php`): 157 endpoints bajo `/api`, agrupados por nivel de acceso con los
+1. **Ruta** (`routes/api.php`): 168 endpoints bajo `/api`, agrupados por nivel de acceso con los
    middleware `auth:sanctum`, `activo` y `role:...`, y límites de peticiones en las rutas públicas.
 2. **Form Request** (`app/Http/Requests/Api`, 38 clases): valida los datos y devuelve los mensajes
    en español (`lang/es/validation.php`).
@@ -65,8 +65,14 @@ mensajes de validación o de la regla de negocio, y 429 por exceso de intentos.
   guarda el token en `localStorage` (decisión del 13/10/2026). Cada sesión guarda su IP y su
   dispositivo y vence tras 7 días sin uso o a los 30 días (`SesionService`, configurable en `.env`).
 - **Middleware** (registrados en `bootstrap/app.php`):
-  - `role:administrador,mesero` (`EnsureUserHasRole`) deja pasar solo esos roles;
+  - `role:administrador,mesero` (`EnsureUserHasRole`) deja pasar solo esos roles; donde entra
+    `administrador` también entran `superadmin` (M09) y `soporte` (M10);
+  - `menu:catalogo` (`EnsureMenuPermitido`, M09) rechaza la acción si el SuperAdmin le quitó ese menú a
+    la cuenta (basta con tener uno de los menús listados);
   - `activo` (`EnsureUserIsActive`) responde 403 a una cuenta desactivada en cualquier ruta con sesión;
+  - `SoporteSoloConsulta` (M10), en toda la API, rechaza con 403 «La cuenta de Soporte solo puede
+    consultar.» cualquier escritura de la cuenta de Soporte (también en las rutas públicas que reconocen
+    la sesión) y la impresión de comandas; deja pasar su propia cuenta, exportar reportes y cotizar;
   - `CabecerasSeguridad`, global, pone en toda respuesta de `/api` las cabeceras de seguridad
     (`nosniff`, `X-Frame-Options`, CSP, `Referrer-Policy` y `Cache-Control: no-store`; la foto
     pública de un producto lleva caché larga).
@@ -91,6 +97,8 @@ En el servidor, cron corre `php artisan schedule:run` cada minuto y Supervisor m
 | Comando | Cuándo | Qué hace |
 |---|---|---|
 | `reservas:procesar` | Cada minuto | No-show automático al vencer la tolerancia, mesa Reservada desde la ventana previa y recordatorios por correo |
+| `notificaciones:revisar` | Cada minuto | Notificaciones del personal que dependen de la hora: reserva que empieza pronto, caja abierta de noche, cierre diario pendiente, cola detenida o con trabajos fallidos y la revisión antes de producción diaria (M11) |
+| `notificaciones:limpiar` | 3:40 a. m., hora de Colombia | Borra las notificaciones de más de 30 días (M11) |
 | `pasarela:conciliar` | Cada 5 minutos | Pregunta a Wompi por los pagos pendientes, por si un evento se perdió |
 | `fragua:latido` | Cada minuto | Deja el latido del programador y encola el de la cola (Configuración > Tareas automáticas) |
 | `sesiones:limpiar` | 3:30 a. m., hora de Colombia | Borra las sesiones vencidas |
@@ -144,7 +152,7 @@ partir de la copia guardada en la base, así una reimpresión dice exactamente l
 
 ## Pruebas automáticas
 
-`backend/tests/Feature` tiene 47 archivos y 343 pruebas; `tests/Unit` tiene la de ejemplo de Laravel.
+`backend/tests/Feature` tiene 54 archivos y 385 pruebas; `tests/Unit` tiene la de ejemplo de Laravel.
 En total son 344.
 
 ```bash
@@ -1555,4 +1563,164 @@ inconsistencias con lo que existía o era correcto en Laravel:
       `promociones.variante_id`), Cronograma (hoja «Mejoras en producción»), Catálogo de Pantallas
       (historias por pantalla) y Flujos por rol (34 páginas: app instalable, carrito, Reportes y
       Catálogo corregidos, ofertas, importación y caja del turno).
+62. **Correcciones de reservas y mesas (19/10/2026, M05).** Migración `2026_10_26_000001`.
+    - Horario de reservas: de 4:00 p. m. a 11:00 p. m. (hora de Colombia, la última a las 11:00 en
+      punto) y con al menos 3 horas de anticipación, en la web y por teléfono.
+      `PoliticaReservas::motivoHoraNoPermitida()` lo valida en `StoreReservaRequest` (422 en
+      `fecha_hora`); los valores salen de `config/fragua_real.php` (`reservas.hora_inicio`,
+      `hora_fin`, `anticipacion_minutos`, con variables `FRAGUA_REAL_RESERVA_*`) y se publican en
+      `GET /configuracion`. Reservar y «Nueva reserva» ofrecen las horas cada 30 minutos y marcan
+      «no disponible» las que no cumplen la anticipación (`utils/horarioReservas.ts`).
+    - `reservas.descripcion` (hasta 500 caracteres, opcional): la escribe el cliente al reservar o el
+      personal al registrarla; se ve en Reservas, en el enlace de la reserva y en el correo de
+      confirmación.
+    - Corregido: `MesaController::index()` solo filtraba las mesas inactivas para el Cliente, así que
+      el Mesero seguía viendo (y podía abrir o pedir en) las mesas dadas de baja. Ahora solo el
+      Administrador las ve. Mesero > Mesas y Nuevo pedido también las descartan.
+    - `ReservaHorarioYMesasTest` (6 pruebas). `DiaCompletoTest`: la reserva pasa de la 1:00 p. m. a
+      las 4:00 p. m.
+    - Documentación oficial: M05 versión 1.2 (RF-M05-039 a 042, RN-M05-21 a 23, HU-M05-018), diagrama
+      entidad-relación (`reservas.descripcion`, 60 migraciones), Cronograma, Catálogo de Pantallas,
+      Estructura técnica y Flujos por rol (Cliente, Flujo 5).
+63. **Datos del negocio editables (19/10/2026, M01).** Sin migración (tabla `configuraciones`).
+    - `NegocioService`: dirección (`negocio_direccion`), teléfono (`negocio_telefono`) y logo
+      (`negocio_logo_path`); sin valor guardado, los de `config/fragua_real.php` (`negocio`). El logo
+      se reduce a 512 px y se guarda en PNG en `storage/app/private/negocio`; se sirve por
+      `GET /negocio/logo` con `?v=…` y el service worker lo guarda como las fotos del menú
+      (`VERSION` pasa a `fragua-real-v2`). Los PDF lo reciben como data URI (`datos()['logo']`); la
+      copia guardada de cada comprobante no lo incluye.
+    - `NegocioController`: `PUT /negocio`, `POST` y `DELETE /negocio/logo` (Administrador) y
+      `GET /negocio/logo` (pública). `GET /configuracion` trae `negocio` (con `whatsapp_url`; un número
+      de 10 dígitos se toma como de Colombia). Cada cambio queda en Auditoría (`editar_datos_negocio`,
+      `cambiar_logo_negocio`, `quitar_logo_negocio`).
+    - Frontend: `stores/negocio.ts` y `LogoNegocio.vue` (logo o «FR») en el encabezado, el menú del
+      celular y el pie de página del cliente, Ingresar, el QR de mesa y la barra lateral del personal;
+      Inicio, pie de página y Reservar toman dirección, teléfono y WhatsApp del servidor. Configuración
+      tiene la tarjeta «Datos del negocio» (`components/configuracion/DatosNegocio.vue`).
+    - `DatosNegocioTest` (5 pruebas).
+64. **Rol SuperAdmin (20/10/2026, M09).** Migración `2026_10_26_000002`.
+    - `users.role` acepta `superadmin`. `User::esSuperAdmin()`; `esAdministrador()` también es verdadero
+      para el SuperAdmin, así entra a todo lo del Administrador sin tocar cada Policy o Controller.
+      `EnsureUserHasRole` deja pasar al SuperAdmin donde la ruta pide `administrador`.
+    - `GestionCuentas`: las cuentas de Administrador solo las gestiona el SuperAdmin; la del SuperAdmin no
+      se gestiona desde Usuarios; cada quien corrige sus propios datos. Lo aplican `UsuarioController`
+      (crear, editar, activar, desactivar, sesiones) y `UpdateUsuarioRequest`; `GET /usuarios` trae
+      `gestionable`.
+    - `SuperAdminService` y el comando `fragua:crear-superadmin {correo} {--nombre=} {--cambiar-clave}`
+      (routes/console.php): crea la cuenta o vuelve SuperAdmin una existente, cierra sus sesiones y deja
+      `crear_superadmin` o `asignar_superadmin` en Auditoría.
+    - `NegocioService`: `negocio_nombre` y `negocio_nit` (solo el SuperAdmin, `PUT /negocio`).
+    - `RevisionProduccionService`: aviso «Cuenta de SuperAdmin» si no hay uno activo.
+    - Una reserva del SuperAdmin queda con `creado_por = administrador`; la clave del SuperAdmin también
+      autoriza cancelar un pedido en preparación.
+    - Sembrado local: cuenta `superadmin` / `password`.
+    - Frontend: `Rol` incluye `superadmin`; el store de sesión tiene `esSuperAdmin`, `esAdministrador` y
+      `rolDeZona` (las guardas de ruta usan este); Usuarios muestra «Solo la gestiona el SuperAdmin» o
+      «Se cambia en el servidor» y solo el SuperAdmin ve la opción Administrador; Configuración muestra
+      nombre y NIT solo al SuperAdmin.
+    - `SuperAdminTest` (9 pruebas); `EditarUsuarioTest` ajustada (el Administrador ya no asciende a
+      Administrador). Documentación oficial: M09 nuevo, M00 (RNF-TRANS-011, mapa de módulos), M01
+      (RN-USR-19/20, matriz de permisos), Catálogo de Pantallas, Estructura técnica, Cronograma,
+      diagrama entidad-relación y Flujos por rol (permisos por rol con la columna SuperAdmin y el
+      Flujo 12 del Administrador; 35 páginas).
+65. **Permisos de menú por cuenta (20/10/2026, M09).** Migración `2026_10_27_000001`.
+    - `users.menus_permitidos` (json; null = todos los menús del rol). `MenusPorRol` tiene el catálogo
+      de menús por rol, los fijos (Dashboard del Administrador, Pedidos del Mesero) y los efectivos de
+      cada cuenta; `User` los expone como `menus` (en `/auth/me` y `/usuarios`).
+    - Middleware `menu` (`EnsureMenuPermitido`) en 112 rutas del personal de `routes/api.php`, más
+      `POST /reservas` del personal y cancelar un pedido; el SuperAdmin y el Cliente no se filtran.
+      Las claves del Administrador y del Mesero no se cruzan, así una ruta compartida lista las de los
+      dos (por ejemplo `menu:compras_gastos,gastos`). Reservas también se permite con Mesas, porque el
+      Mesero confirma llegadas desde sus mesas.
+    - `UsuarioController::menus()` y `actualizarMenus()` (`GET`/`PUT /usuarios/{usuario}/menus`, solo
+      SuperAdmin y solo de Administrador o Mesero); con todos marcados se guarda null; al cambiar de rol
+      se borra. Auditoría `cambiar_menus` con los quitados y los agregados.
+    - Frontend: el menú lateral filtra por `menus`; las rutas llevan `meta.menu` y la guarda manda al
+      inicio si no está habilitado; `auth.tieneMenu()` esconde los botones que llevan a otro menú
+      (Cobrar en Mesas, Ver reservas, Actividad en Usuarios) y, en el Dashboard, los accesos rápidos sin
+      permiso se ven bloqueados (gris, candado y «Sin permiso») y no abren nada; la cuenta se vuelve a pedir al navegar,
+      como mucho cada minuto. Usuarios tiene el botón «Permisos» y su ventana; las acciones de cada
+      cuenta bajan a otra línea en tablet.
+    - `MenusPorCuentaTest` (6 pruebas). Documentación oficial: M09 v1.1 (RF-M09-011 a 015, RN-M09-08
+      a 10, HU-M09-008/009), M00 (RNF-TRANS-013), M01 (RN-USR-21 y matriz de permisos), Catálogo de
+      Pantallas, Estructura técnica, Cronograma, diagrama entidad-relación y Flujos por rol.
+
+66. **Ubicación del local en el mapa (20/10/2026, M09).** Sin migración (tabla `configuraciones`).
+    - `NegocioService`: claves `negocio_latitud` y `negocio_longitud` (7 decimales; las dos o ninguna).
+      `publico()` agrega `latitud`, `longitud` y `mapa_url` («Cómo llegar»: Google Maps en el punto o,
+      sin punto, buscando la dirección). `coordenadasDeEnlace()` lee el punto de un enlace de Google
+      Maps (`!3d…!4d…`, `?q=`/`query=`/`ll=`, `@lat,lng` o «lat, lng»); los enlaces cortos
+      (`maps.app.goo.gl`, `goo.gl`) se siguen con un tiempo límite de 8 s y solo mientras las
+      redirecciones vayan a hosts de Google.
+    - `PUT /negocio` acepta `latitud` y `longitud` solo del SuperAdmin (403 al Administrador).
+      `POST /negocio/ubicacion-desde-enlace` (SuperAdmin, 20 por minuto) devuelve el punto sin guardar.
+      Queda en Auditoría dentro de `editar_datos_negocio`.
+    - Frontend: `MapaUbicacion.vue` con Leaflet y teselas de OpenStreetMap, cargado aparte (import
+      dinámico; el Inicio sin punto no lo descarga). En Configuración el SuperAdmin toca el mapa, arrastra
+      el marcador o pega un enlace; el Administrador lo ve sin poder moverlo. El Inicio muestra el mapa
+      pequeño en Contacto; «Cómo llegar» del Inicio y del pie de página usa `mapa_url`. No se usa la
+      ubicación del teléfono (Permissions-Policy la bloquea) ni ningún servicio externo desde el navegador.
+    - `UbicacionNegocioTest` (3 pruebas). Además, `follow-redirects` (dependencia de axios) subió a
+      1.16.1 por un aviso de seguridad de npm. Documentación oficial: M09 (RF-M09-016 a 018, RN-M09-11,
+      HU-M09-010), Catálogo de Pantallas, Estructura técnica y Cronograma.
+
+67. **Rol Soporte, solo consulta (20/10/2026, M10).** Migración `2026_10_28_000001`.
+    - `users.role` acepta `soporte`. `User::esSoporte()`; `esAdministrador()` es verdadero también para
+      Soporte (ROLES_PANEL_ADMINISTRADOR), así ve lo mismo que el Administrador; no está en
+      `ROLES_ADMINISTRACION`, así que no recibe los avisos del negocio ni su contraseña autoriza al Mesero.
+      `EnsureUserHasRole` lo deja entrar donde entra `administrador`; `MenusPorRol` le da todos los menús.
+    - `SoporteSoloConsulta`, agregado al grupo `api` en `bootstrap/app.php` (corre en toda la API y pide
+      la sesión a Sanctum, porque las rutas públicas de pedidos y reservas también la reconocen): 403
+      «La cuenta de Soporte solo puede consultar.» a toda escritura, salvo `/auth/*`, `/perfil`,
+      `/perfil/password`, `POST /reportes/exportar` y `POST /pedidos/cotizacion`; también bloquea
+      `GET /comandas/{comanda}/ticket`, que marca la comanda como impresa.
+    - `RegistroImpresiones::registrar()`: con Soporte no suma impresión, audita `consultar_documento` y
+      devuelve la marca `consulta`; las plantillas del comprobante (ticket y PDF) y del cierre dicen
+      «COPIA DE CONSULTA · SOPORTE».
+    - Cuentas: `GestionCuentas::CUENTA_SOPORTE` y `motivoNoEdita()` (nadie la edita ni le cambia el rol;
+      `UpdateUsuarioRequest` lo usa); solo el SuperAdmin la activa, la desactiva o le cierra sesiones;
+      `UsuarioController::index()` se la esconde al Administrador; Soporte ve las sesiones de cualquier
+      cuenta sin cerrarlas. `SoporteService::crearOActualizar()` y el comando
+      `fragua:crear-soporte {correo} {--nombre=} {--cambiar-clave}` (no convierte cuentas del negocio ni
+      cambia `activo`); auditoría `crear_soporte` y `actualizar_soporte`. La revisión antes de producción
+      informa la cuenta de Soporte y la incluye en las contraseñas de prueba. Sembrado:
+      `soporte@fraguareal.com` (usuario `soporte`).
+    - Frontend: rol `soporte` en `types/models.ts`; `auth.esSoporte` (zona del Administrador y todos los
+      menús); franja «Modo soporte: solo consulta» en `AdminLayout`; directiva global `v-escritura`
+      (`directives/escritura.ts`) que esconde a Soporte los botones que cambian algo en Usuarios,
+      Catálogo, Mesas, Reservas, Caja, Pedidos, Compras y gastos, Configuración y sus componentes;
+      `SesionesLista` con `solo-ver`; en Usuarios, la cuenta de Soporte sale con «Se cambia en el
+      servidor», Sesiones y Desactivar o Activar (solo para el SuperAdmin).
+    - `SoporteTest` (7 pruebas). Documentación oficial: M10 nuevo (RF-M10-001 a 010, RNF-M10-001 a 005,
+      RN-M10-01 a 07, HU-M10-001 a 006), M00 v1.3 (RNF-TRANS-011 y mapa de módulos), M01 (RN-USR-22 y
+      matriz de permisos), M09 v1.2 (RN-M09-12), Catálogo de Pantallas, Estructura técnica, Cronograma,
+      diagrama entidad-relación y Flujos por rol (columna Soporte en Permisos y Flujo 13; 36 páginas).
+
+68. **Notificaciones del personal (21/10/2026, M11).** Migración `2026_10_29_000001`.
+    - Tabla `notificaciones` y modelo `Notificacion`. `NotificacionService` tiene el catálogo de tipos
+      (categoría, roles y menús que la reciben) y `notificar()`, que guarda una fila por destinatario
+      después del commit de la acción (`DB::afterCommit`, con `insertOrIgnore` sobre `user_id` + `clave`
+      para no repetir) y nunca rompe la acción: un error solo se reporta. No le llega a quien hizo la
+      acción, a cuentas inactivas ni a quien no tiene el menú (`MenusPorRol::permite`); Soporte solo
+      recibe las del sistema.
+    - Eventos: `PedidoService` (pedido nuevo por la web o el QR, listo para recoger, cancelado por el
+      cliente), `PagoService` (pago en línea aprobado o rechazado, pago anulado), `PasarelaPagoService`
+      (pago por revisar), `ReservaService` (nueva, depósito pagado en línea o a mano, cancelada por el
+      cliente, no-show automático), `ComandaService` (comanda que no salió) y `CatalogoController`
+      (producto o presentación agotada).
+    - `notificaciones:revisar` cada minuto: reserva que empieza en 30 min, caja abierta desde las
+      23:30, cierre diario de ayer pendiente desde las 10:00, cola detenida o con trabajos fallidos y la
+      revisión antes de producción a las 07:00. `notificaciones:limpiar` a las 3:40 a. m. borra las de
+      más de 30 días. El programador detenido lo detecta `GET /notificaciones/contador`. Horas en
+      `config/fragua_real.php` (`notificaciones`, `FRAGUA_REAL_NOTIF_*`).
+    - `NotificacionController`: `GET /notificaciones`, `GET /notificaciones/contador`,
+      `POST /notificaciones/{notificacion}/leida` y `POST /notificaciones/leidas` (personal; Soporte
+      también puede marcarlas).
+    - Frontend: `notificacion.service.ts`, store `notificaciones` (pregunta cada 20 s y al volver a la
+      pestaña), `BotonNotificaciones` (barra del teléfono y menú lateral) y `PanelNotificaciones` (lista,
+      ir a la pantalla, marcar todo).
+    - `NotificacionesTest` (6 pruebas). Documentación oficial: M11 nuevo (RF-M11-001 a 012,
+      RNF-M11-001 a 005, RN-M11-01 a 08, HU-M11-001 a 007), M00 v1.4, notas en M02 a M07, M09 y M10,
+      Catálogo de Pantallas, Estructura técnica, Cronograma, diagrama entidad-relación y Flujos por rol
+      (página «Notificaciones del personal» y fila en Permisos; 37 páginas).
 

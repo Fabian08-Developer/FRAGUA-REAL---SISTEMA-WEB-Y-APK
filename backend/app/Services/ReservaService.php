@@ -46,6 +46,8 @@ class ReservaService
         $reserva->cliente_nombre = $data['cliente_nombre'];
         $reserva->cliente_telefono = $data['cliente_telefono'];
         $reserva->cliente_correo = $data['cliente_correo'];
+        // Corrección (19/10/2026): nota opcional del cliente para el restaurante.
+        $reserva->descripcion = filled($data['descripcion'] ?? null) ? trim($data['descripcion']) : null;
         $reserva->fecha_hora = $data['fecha_hora'];
         $reserva->estado = 'pendiente_pago';
         $reserva->deposito_valor = $depositoVigente;
@@ -62,6 +64,7 @@ class ReservaService
                 'fecha_hora' => $reserva->fecha_hora->toIso8601String(),
             ], $registradaPor);
         }
+        app(NotificacionService::class)->reservaNueva($reserva->setRelation('mesa', $mesa), $registradaPor); // M11
 
         return $reserva;
     }
@@ -182,6 +185,7 @@ class ReservaService
         app(AuditoriaService::class)->registrar('confirmar_deposito_reserva', 'Reserva', $reserva->id, [
             'monto' => (float) $reserva->deposito_valor, 'pasarela' => $reserva->deposito_pasarela, 'via' => $via,
         ], $actor);
+        app(NotificacionService::class)->reservaConfirmada($reserva, $actor); // M11
 
         return $reserva;
     }
@@ -247,6 +251,7 @@ class ReservaService
         app(AuditoriaService::class)->registrar('registrar_deposito_reserva', 'Reserva', $reserva->id, [
             'monto' => (float) $reserva->deposito_valor, 'metodo' => $metodo, 'caja_turno_id' => $turno->id,
         ], $registradoPor);
+        app(NotificacionService::class)->reservaConfirmada($reserva, $registradoPor); // M11
 
         return $reserva;
     }
@@ -280,6 +285,10 @@ class ReservaService
         ], $actor);
         // Fase 4, tarea 4 (RF-M05-025): aviso de no-show al cliente.
         app(AvisoReservaService::class)->programar($reserva, 'no_show');
+        // M11: el no-show automático avisa al personal (el manual lo marcó alguien que ya lo sabe).
+        if ($automatico) {
+            app(NotificacionService::class)->reservaNoShow($reserva);
+        }
 
         return $reserva;
     }
@@ -405,6 +414,7 @@ class ReservaService
             'deposito_reembolsado' => $reserva->deposito_pagado ? (float) $reserva->deposito_valor : null,
         ], fn ($v) => $v !== null), $actor);
         app(AvisoReservaService::class)->programar($reserva, 'cancelacion');
+        app(NotificacionService::class)->reservaCanceladaPorCliente($reserva, $actor, $porEnlace); // M11
 
         // Fase 6, tarea 1 (RN-M05-17, RF-M06-017): el depósito pagado por la pasarela se devuelve por
         // la pasarela (si el medio lo permite; si no, la transacción dice cómo hacerlo).

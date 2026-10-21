@@ -12,6 +12,7 @@ export interface CrearReservaPayload {
   cliente_telefono: string
   cliente_correo: string
   fecha_hora: string
+  descripcion?: string | null
 }
 
 export interface DepositoEnLineaPayload {

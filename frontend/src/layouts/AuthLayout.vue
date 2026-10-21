@@ -9,6 +9,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
 import mascota from '@/assets/img/mascota-fragua-real.png'
+import LogoNegocio from '@/components/common/LogoNegocio.vue'
 
 const route = useRoute()
 
@@ -43,9 +44,7 @@ const contenido = computed(() => contenidoPorRuta[String(route.name)] ?? conteni
     <header class="border-b border-[#e9e3d8]">
       <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-5 sm:px-6">
         <router-link to="/" class="flex items-center gap-3">
-          <span class="flex size-11 items-center justify-center rounded-full bg-ink text-brand-500" aria-hidden="true">
-            <span class="font-display text-lg">FR</span>
-          </span>
+          <LogoNegocio />
           <span class="flex flex-col leading-tight">
             <span class="font-display text-lg font-medium text-ink">Fragua Real</span>
             <span class="text-[10px] font-medium tracking-[2.6px] text-brand-700">BURGER</span>

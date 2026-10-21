@@ -26,7 +26,10 @@ class MesaController extends Controller
         $query = Mesa::query();
 
         $usuario = $request->user('sanctum');
-        if (! $usuario || $usuario->esCliente()) {
+        // CORREGIDO (19/10/2026): el filtro solo se aplicaba al Cliente y al visitante, así que el
+        // Mesero seguía viendo (y podía abrir o pedir en) las mesas dadas de baja. Solo el
+        // Administrador ve las inactivas, para poder reactivarlas.
+        if (! $usuario || ! $usuario->esAdministrador()) {
             $query->where('activa', true);
         }
 

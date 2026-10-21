@@ -3,16 +3,22 @@
 Sistema de un restaurante de una sola sede: pedidos en la mesa (también por QR), a domicilio y para
 recoger; reservas con depósito; caja y cobros; catálogo con combos y promociones; compras, gastos y
 cierre diario; reportes; usuarios y auditoría. Lo usan tres roles: **Cliente** (en la web, con cuenta
-o como invitado), **Mesero** y **Administrador**.
+o como invitado), **Mesero** y **Administrador**, y por encima de ellos el **SuperAdmin**, el dueño del
+sistema (M09): puede todo lo del Administrador y es el único que gestiona las cuentas de Administrador.
+Aparte está **Soporte** (M10), la cuenta técnica del desarrollador: ve todo el panel del Administrador
+sin poder cambiar nada del negocio.
 
-Cubre los 9 módulos de los documentos oficiales de requisitos (M00 a M08). Este repositorio tiene el
+Cubre los 12 módulos de los documentos oficiales de requisitos (M00 a M11). Este repositorio tiene el
 backend (API en Laravel) y el frontend (aplicación web en Vue).
 
 ## Estado al 16/10/2026
 
 - El plan de implementación está completo: Fases 0 a 7, más el endurecimiento de seguridad, la prueba
   de un día completo de operación y las listas de revisión manual por rol.
-- 344 pruebas automáticas, que pasan en SQLite y en PostgreSQL.
+- 386 pruebas automáticas, que pasan en SQLite y en PostgreSQL.
+- Campana de notificaciones para el personal (M11, 21/10/2026): pedidos nuevos por la web o el QR,
+  reservas, caja y dinero, agotados, comandas que no salieron y avisos del sistema, según el rol y los
+  menús de cada cuenta.
 - Se instala en el teléfono como app desde el navegador (PWA): ícono en la pantalla de inicio y pantalla
   completa, sin Play Store (ver «App instalable» en `README-ENTREGA.md`).
 - Mejoras del 16/10/2026 después de la revisión en producción: guía de despliegue en el VPS, extras
@@ -45,7 +51,7 @@ backend (API en Laravel) y el frontend (aplicación web en Vue).
 | Parte | Tecnología |
 |---|---|
 | Backend | PHP 8.3, Laravel 13, Laravel Sanctum (token), PostgreSQL, dompdf (PDF), PhpSpreadsheet (Excel), GD (fotos) |
-| Frontend | Vue 3 con TypeScript, Vite 6, Vue Router, Pinia, Tailwind CSS 3, Lucide; app instalable (PWA) con manifiesto y service worker propios |
+| Frontend | Vue 3 con TypeScript, Vite 6, Vue Router, Pinia, Tailwind CSS 3, Lucide, Leaflet (mapa con OpenStreetMap); app instalable (PWA) con manifiesto y service worker propios |
 | Servidor | VPS de Hostinger con Nginx, PHP-FPM, cron (programador de tareas) y Supervisor (cola) |
 | Pagos en línea | Wompi (Nequi y botón Bancolombia), con aprobación manual de respaldo |
 
@@ -59,7 +65,7 @@ FRAGUA-REAL---SISTEMA-WEB-Y-APK/
 ├── README-ENTREGA.md        Cómo correrlo, cómo ponerlo en el servidor y qué cambió por fase
 ├── README-BACKEND.md        Arquitectura del backend e historial técnico de cambios
 ├── BASE-DE-DATOS.md         Tablas, relaciones, migraciones y decisiones de diseño
-├── API.md                   Los 157 endpoints, por módulo, con quién puede usarlos
+├── API.md                   Los 168 endpoints, por módulo, con quién puede usarlos
 ├── PRUEBA-DIA-COMPLETO.md   Recorrido a mano de un día de operación, con las cifras esperadas
 └── QA-CLIENTE.md, QA-MESERO.md, QA-ADMINISTRADOR.md
                              Listas de revisión manual por rol
@@ -94,7 +100,7 @@ con la contraseña `password`. El detalle, la puesta en producción y la configu
 
 ```bash
 cd backend
-php artisan test              # 344 pruebas (SQLite en memoria)
+php artisan test              # 386 pruebas (SQLite en memoria)
 ```
 
 Cada prueba lleva en su nombre o en su comentario el requisito que cubre. `DiaCompletoTest` recorre un
@@ -109,8 +115,8 @@ QA por rol.
 |---|---|
 | [`README-ENTREGA.md`](README-ENTREGA.md) | Instalar, poner en producción en el VPS, decisiones del negocio y cambios de comportamiento por fase |
 | [`README-BACKEND.md`](README-BACKEND.md) | Cómo está armado el backend (capas, módulos, tareas programadas, configuración) y el historial de los 60 cambios |
-| [`BASE-DE-DATOS.md`](BASE-DE-DATOS.md) | Las 39 tablas, sus relaciones, las 59 migraciones y las decisiones de diseño (ADR) |
-| [`API.md`](API.md) | Los 157 endpoints con rol, uso y límite de peticiones |
+| [`BASE-DE-DATOS.md`](BASE-DE-DATOS.md) | Las 40 tablas, sus relaciones, las 64 migraciones y las decisiones de diseño (ADR) |
+| [`API.md`](API.md) | Los 168 endpoints con rol, uso y límite de peticiones |
 | [`PRUEBA-DIA-COMPLETO.md`](PRUEBA-DIA-COMPLETO.md) | Prueba manual de un día completo |
 | [`QA-CLIENTE.md`](QA-CLIENTE.md), [`QA-MESERO.md`](QA-MESERO.md), [`QA-ADMINISTRADOR.md`](QA-ADMINISTRADOR.md) | Revisión manual pantalla por pantalla |
 | [`backend/README.md`](backend/README.md), [`frontend/README.md`](frontend/README.md) | Notas de cada proyecto |
@@ -119,12 +125,12 @@ QA por rol.
 
 | Documento | Para qué sirve |
 |---|---|
-| M00 a M08 y Idea de Negocio | Requisitos oficiales (RF, RNF, reglas, historias, criterios y trazabilidad, también los de las mejoras del 16/10/2026); al final de cada uno, el estado de la implementación |
+| M00 a M11 y Idea de Negocio | Requisitos oficiales (RF, RNF, reglas, historias, criterios y trazabilidad, también los de las mejoras del 16/10/2026); al final de cada uno, el estado de la implementación |
 | Catálogo de pantallas | Cada pantalla construida, con su ruta, su rol y lo que cubre |
 | Estructura técnica (docx) | Resumen técnico del proyecto para entregar |
-| Flujos por rol (PDF) | Diagramas de los flujos de cada rol y sus reglas (34 páginas, con la app instalable, el carrito, las ofertas, la importación y la caja del turno) |
+| Flujos por rol (PDF) | Diagramas de los flujos de cada rol y sus reglas (37 páginas, con la app instalable, las notificaciones, el SuperAdmin, Soporte, el carrito, las ofertas, la importación y la caja del turno) |
 | Cronograma (xlsx) | Tareas, fechas y estado de cada fase; la hoja «Mejoras en producción» tiene el despliegue y las mejoras del 15 y 16/10/2026 |
-| `er_diagram.png` y `er_diagram.pdf` | Diagrama completo de la base de datos (59 migraciones) |
+| `er_diagram.png` y `er_diagram.pdf` | Diagrama completo de la base de datos (64 migraciones) |
 
 El documento **«Plan de implementación — Fragua Real Burger»** (en Claude) tiene el plan por fases, las
 decisiones D1 a D7 y el estado de cada tarea.

@@ -45,14 +45,66 @@ final class PoliticaReservas
         return self::leer(self::VENTANA, 'ventana_reservada_minutos', 60);
     }
 
-    /** @return array<string, int> */
+    /** @return array<string, int|string> */
     public static function valores(): array
     {
         return [
             self::TOLERANCIA => self::toleranciaMinutos(),
             self::RECORDATORIO => self::recordatorioMinutos(),
             self::VENTANA => self::ventanaReservadaMinutos(),
+            // Corrección (19/10/2026): horario y anticipación, para que Reservar ofrezca solo horas válidas.
+            'reserva_hora_inicio' => self::horaInicio(),
+            'reserva_hora_fin' => self::horaFin(),
+            'reserva_anticipacion_minutos' => self::anticipacionMinutos(),
         ];
+    }
+
+    /** Primera hora del día a la que se puede reservar ("HH:MM", hora de Colombia). */
+    public static function horaInicio(): string
+    {
+        return (string) config('fragua_real.reservas.hora_inicio', '16:00');
+    }
+
+    /** Última hora del día a la que se puede reservar ("HH:MM", hora de Colombia, incluida). */
+    public static function horaFin(): string
+    {
+        return (string) config('fragua_real.reservas.hora_fin', '23:00');
+    }
+
+    /** Con cuántos minutos de anticipación, como mínimo, se puede hacer una reserva. */
+    public static function anticipacionMinutos(): int
+    {
+        return max(0, (int) config('fragua_real.reservas.anticipacion_minutos', 180));
+    }
+
+    /**
+     * Por qué no se puede reservar a esa hora, o null si sí se puede (horario del negocio y
+     * anticipación mínima). Recibe el instante en cualquier zona; se mira en hora de Colombia.
+     */
+    public static function motivoHoraNoPermitida(\Carbon\CarbonInterface $fechaHora, ?\Carbon\CarbonInterface $ahora = null): ?string
+    {
+        $local = $fechaHora->copy()->setTimezone(self::ZONA);
+        $hora = $local->format('H:i');
+        if ($hora < self::horaInicio() || $hora > self::horaFin()) {
+            return 'Las reservas son de '.self::horaLegible(self::horaInicio()).' a '.self::horaLegible(self::horaFin()).'.';
+        }
+        $minimo = ($ahora ?? now())->copy()->addMinutes(self::anticipacionMinutos());
+        if ($fechaHora->lt($minimo)) {
+            $horas = intdiv(self::anticipacionMinutos(), 60);
+            $texto = self::anticipacionMinutos() % 60 === 0 ? ($horas === 1 ? '1 hora' : "{$horas} horas") : self::anticipacionMinutos().' minutos';
+
+            return "La reserva se hace con al menos {$texto} de anticipación.";
+        }
+
+        return null;
+    }
+
+    private const ZONA = 'America/Bogota';
+
+    private static function horaLegible(string $hhmm): string
+    {
+        return \Carbon\Carbon::createFromFormat('H:i', $hhmm, self::ZONA)->format('g:i').' '
+            .(((int) substr($hhmm, 0, 2)) < 12 ? 'a. m.' : 'p. m.');
     }
 
     private static function leer(string $clave, string $claveConfig, int $porDefecto): int

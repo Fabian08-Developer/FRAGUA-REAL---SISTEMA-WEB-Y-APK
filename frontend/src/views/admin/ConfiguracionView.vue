@@ -13,6 +13,7 @@ import BaseInput from '@/components/common/BaseInput.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import EstadoTareasAutomaticas from '@/components/configuracion/EstadoTareasAutomaticas.vue'
 import RevisionProduccion from '@/components/configuracion/RevisionProduccion.vue'
+import DatosNegocio from '@/components/configuracion/DatosNegocio.vue'
 import { configuracionService, RANGOS_TIEMPOS_RESERVA } from '@/services/configuracion.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 
@@ -139,7 +140,12 @@ onMounted(cargar)
 
     <div v-if="cargando" class="loading-state">Cargando configuración…</div>
 
-    <form v-else class="mt-6 max-w-2xl space-y-4" novalidate @submit.prevent="guardar">
+    <!-- Mejora (19/10/2026): dirección, teléfono y logo del negocio (se guardan aparte). -->
+    <div v-if="!cargando" class="mt-6 max-w-2xl">
+      <DatosNegocio />
+    </div>
+
+    <form v-if="!cargando" class="mt-4 max-w-2xl space-y-4" novalidate @submit.prevent="guardar">
       <div class="card p-4 sm:p-5">
         <div class="flex items-start gap-3">
           <span class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
@@ -234,7 +240,7 @@ onMounted(cargar)
         <p class="text-xs text-gray-500">
           Los pedidos y reservas ya creados conservan el valor con que se hicieron.
         </p>
-        <BaseButton type="submit" variant="primary" :disabled="guardando || !hayCambios">
+        <BaseButton v-escritura type="submit" variant="primary" :disabled="guardando || !hayCambios">
           {{ guardando ? 'Guardando…' : 'Guardar cambios' }}
         </BaseButton>
       </div>

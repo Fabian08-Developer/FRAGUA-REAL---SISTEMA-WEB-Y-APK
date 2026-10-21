@@ -296,7 +296,7 @@ class CierreDiarioService
                 'total_gastos' => round((float) $cierre->total_gastos + $deltaGastos, 2),
                 'resultado_operativo' => round((float) $cierre->resultado_operativo - $deltaCompras - $deltaGastos, 2),
             ],
-            'negocio' => config('fragua_real.negocio'),
+            'negocio' => app(NegocioService::class)->datos(),
             'nota' => self::NOTA_RESULTADO,
             'impresoPor' => $actor->nombre,
             'reimpresion' => $reimpresion,

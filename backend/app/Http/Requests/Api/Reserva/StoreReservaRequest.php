@@ -57,6 +57,26 @@ class StoreReservaRequest extends FormRequest
             'cliente_telefono' => ['required', 'string', 'max:30', 'regex:'.\App\Http\Requests\Api\Pedido\StorePedidoRequest::FORMATO_TELEFONO], // RN-M05-12
             'cliente_correo' => ['required', 'email', 'max:255'],   // RN-M05-12
             'fecha_hora' => ['required', 'date', 'after:now'],
+            // Corrección (19/10/2026): una nota del cliente para el restaurante (cumpleaños, silla
+            // para bebé, cerca de la ventana…). Opcional.
+            'descripcion' => ['nullable', 'string', 'max:500'],
+        ];
+    }
+
+    // Corrección (19/10/2026): horario de reservas (4:00 p. m. a 11:00 p. m.) y al menos 3 horas
+    // de anticipación, para la web y para las que registra el personal (PoliticaReservas).
+    public function after(): array
+    {
+        return [
+            function (\Illuminate\Validation\Validator $validator) {
+                if ($validator->errors()->has('fecha_hora')) {
+                    return;
+                }
+                $motivo = \App\Support\Reservas\PoliticaReservas::motivoHoraNoPermitida(Carbon::parse($this->input('fecha_hora')));
+                if ($motivo) {
+                    $validator->errors()->add('fecha_hora', $motivo);
+                }
+            },
         ];
     }
 }

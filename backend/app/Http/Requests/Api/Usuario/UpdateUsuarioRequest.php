@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests\Api\Usuario;
 
+use App\Models\User;
+use App\Support\Usuarios\GestionCuentas;
 use App\Support\Usuarios\NombreUsuario;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -14,12 +17,23 @@ use Illuminate\Validation\Rule;
  */
 class UpdateUsuarioRequest extends FormRequest
 {
-    // Catálogo de roles del sistema (RNF-TRANS-011, RN-USR-01/14/15).
+    // Catálogo de roles que se asignan desde Usuarios (RNF-TRANS-011, RN-USR-01/14/15). El de
+    // SuperAdmin (M09) no se asigna desde la aplicación: se crea en el servidor.
     public const ROLES = ['administrador', 'mesero', 'cliente'];
 
     public function authorize(): bool
     {
-        return true; // la ruta ya exige role:administrador
+        // La ruta ya exige role:administrador. M09 (19/10/2026): además, las cuentas de Administrador
+        // solo las edita el SuperAdmin y la del SuperAdmin no se edita desde aquí. M10 (20/10/2026):
+        // la de Soporte tampoco (se cambia en el servidor).
+        $usuario = $this->route('usuario');
+
+        return ! $usuario instanceof User || GestionCuentas::motivoNoEdita($this->user(), $usuario) === null;
+    }
+
+    protected function failedAuthorization(): void
+    {
+        throw new AuthorizationException((string) GestionCuentas::motivoNoEdita($this->user(), $this->route('usuario')));
     }
 
     protected function prepareForValidation(): void

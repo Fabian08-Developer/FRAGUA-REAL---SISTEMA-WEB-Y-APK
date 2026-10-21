@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 class Reserva extends Model
 {
     protected $fillable = [
-        'mesa_id', 'cliente_nombre', 'cliente_telefono', 'cliente_correo', 'fecha_hora',
+        'mesa_id', 'cliente_nombre', 'cliente_telefono', 'cliente_correo', 'descripcion', 'fecha_hora',
         'estado', 'deposito_valor', 'deposito_pagado', 'deposito_metodo',
         'deposito_pasarela', 'deposito_estado', 'deposito_confirmado_via', 'deposito_pagado_at',
         'deposito_reembolsado', 'deposito_aplicado_abono', 'deposito_registrado_por',

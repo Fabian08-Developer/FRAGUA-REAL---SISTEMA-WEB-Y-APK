@@ -16,6 +16,8 @@ use App\Http\Controllers\Api\PagoController;
 use App\Http\Controllers\Api\PedidoController;
 use App\Http\Controllers\Api\PromocionController;
 use App\Http\Controllers\Api\ReporteController;
+use App\Http\Controllers\Api\NegocioController;
+use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\ReservaController;
 use App\Http\Controllers\Api\ReservaPublicaController;
 use App\Http\Controllers\Api\UsuarioController;
@@ -57,6 +59,8 @@ Route::get('/mesas/qr/{qr_code}', [MesaController::class, 'porQrCode']);
 // Valores vigentes de solo lectura (domicilio, depósito de reserva) que el frontend
 // necesita mostrar antes de crear el Pedido/la Reserva — ver CatalogoController::configuracion().
 Route::get('/configuracion', [CatalogoController::class, 'configuracion']);
+// Mejora (19/10/2026): el logo del negocio que sube el Administrador (público: lo ve el sitio sin sesión).
+Route::get('/negocio/logo', [NegocioController::class, 'logo'])->middleware('throttle:600,1');
 
 // Pedido de invitado (domicilio/recogida sin cuenta) y pago en línea de invitado.
 // El Controller distingue "cliente_id" (autenticado) de "cliente_invitado_*" — StorePedidoRequest
@@ -98,6 +102,8 @@ Route::middleware('throttle:30,1')->group(function () {
 });
 
 // 'activo' (Fase 0, tarea 6): una cuenta desactivada no usa ninguna ruta con sesión.
+// M10 (20/10/2026): la cuenta de Soporte solo consulta; SoporteSoloConsulta (en toda la API,
+// bootstrap/app.php) rechaza sus escrituras salvo las de su propia cuenta y exportar un reporte.
 Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     // RF-M01-010/023: cerrar sesión en todos los dispositivos (revoca todos los tokens).
@@ -125,48 +131,54 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::post('/pedidos/{pedido}/pagar-en-linea', [PagoController::class, 'pagarEnLinea']); // solo Cliente dueño (PagoPolicy)
         // RN-M07-04: el Cliente puede cancelar su propio domicilio mientras esté PENDIENTE
         // (PedidoPolicy::cancelar() filtra esto; Administrador/Mesero cancelan cualquiera).
-        Route::post('/pedidos/{pedido}/cancelar', [PedidoController::class, 'cancelar']);
+        Route::post('/pedidos/{pedido}/cancelar', [PedidoController::class, 'cancelar'])->middleware('menu:pedidos');
     });
 
     Route::middleware('role:administrador,mesero')->group(function () {
+        // M11 (21/10/2026): la campana de notificaciones del personal (cada cuenta, las suyas).
+        Route::get('/notificaciones', [NotificacionController::class, 'index']);
+        Route::get('/notificaciones/contador', [NotificacionController::class, 'contador']);
+        Route::post('/notificaciones/leidas', [NotificacionController::class, 'marcarTodas']);
+        Route::post('/notificaciones/{notificacion}/leida', [NotificacionController::class, 'marcarLeida'])->whereNumber('notificacion');
+
         // Fase 7, tarea 4 (RF-M06-023, HU-M06-009): estado de la caja de hoy para Cobrar.
         Route::get('/caja/estado', [CajaController::class, 'estado']);
         // Fase 7, tarea 2 (RNF-TRANS-012, RF-M03-32): compras y gastos para el Administrador y el
         // Mesero con permiso; el controlador y StoreCompraGastoRequest lo revisan, y el Mesero
         // solo ve lo suyo. Fase 2, tarea 4: categorías por tipo y soporte (RF-M03-07, RNF-M03-11).
-        Route::get('/compras-gastos', [CompraGastoController::class, 'index']);
-        Route::get('/compras-gastos/categorias', [CompraGastoController::class, 'categorias']);
-        Route::post('/compras-gastos/{compraGasto}/soporte', [CompraGastoController::class, 'adjuntarSoporte']);
-        Route::get('/compras-gastos/{compraGasto}/soporte', [CompraGastoController::class, 'verSoporte']);
-        Route::post('/compras-gastos', [CompraGastoController::class, 'store']);
+        Route::get('/compras-gastos', [CompraGastoController::class, 'index'])->middleware('menu:compras_gastos,gastos');
+        Route::get('/compras-gastos/categorias', [CompraGastoController::class, 'categorias'])->middleware('menu:compras_gastos,gastos');
+        Route::post('/compras-gastos/{compraGasto}/soporte', [CompraGastoController::class, 'adjuntarSoporte'])->middleware('menu:compras_gastos,gastos');
+        Route::get('/compras-gastos/{compraGasto}/soporte', [CompraGastoController::class, 'verSoporte'])->middleware('menu:compras_gastos,gastos');
+        Route::post('/compras-gastos', [CompraGastoController::class, 'store'])->middleware('menu:compras_gastos,gastos');
 
-        Route::post('/pedidos/{pedido}/confirmar', [PedidoController::class, 'confirmar']);
-        Route::post('/pedidos/{pedido}/preparando', [PedidoController::class, 'marcarPreparando']);
+        Route::post('/pedidos/{pedido}/confirmar', [PedidoController::class, 'confirmar'])->middleware('menu:pedidos');
+        Route::post('/pedidos/{pedido}/preparando', [PedidoController::class, 'marcarPreparando'])->middleware('menu:pedidos');
         // Fase 4, tarea 5 (RF-M07-R-012): la recogida está lista y se avisa al cliente por correo.
-        Route::post('/pedidos/{pedido}/listo', [PedidoController::class, 'marcarListo']);
-        Route::post('/pedidos/{pedido}/avisos/{aviso}/reintentar', [PedidoController::class, 'reintentarAviso']);
-        Route::post('/pedidos/{pedido}/detalles/{detalle}/preparado', [PedidoController::class, 'marcarLineaPreparada']);
+        Route::post('/pedidos/{pedido}/listo', [PedidoController::class, 'marcarListo'])->middleware('menu:pedidos');
+        Route::post('/pedidos/{pedido}/avisos/{aviso}/reintentar', [PedidoController::class, 'reintentarAviso'])->middleware('menu:pedidos');
+        Route::post('/pedidos/{pedido}/detalles/{detalle}/preparado', [PedidoController::class, 'marcarLineaPreparada'])->middleware('menu:pedidos');
         // Fase 1, tarea 1: editar un pedido PENDIENTE o las líneas no preparadas de uno
         // CONFIRMADO (RN-PED-07/08/10), con historial (RN-PED-12, HU-M02-020).
-        Route::post('/pedidos/{pedido}/detalles', [PedidoController::class, 'agregarLinea']);
-        Route::patch('/pedidos/{pedido}/detalles/{detalle}', [PedidoController::class, 'actualizarLinea']);
-        Route::delete('/pedidos/{pedido}/detalles/{detalle}', [PedidoController::class, 'retirarLinea']);
-        Route::get('/pedidos/{pedido}/historial', [PedidoController::class, 'historial']);
+        Route::post('/pedidos/{pedido}/detalles', [PedidoController::class, 'agregarLinea'])->middleware('menu:pedidos');
+        Route::patch('/pedidos/{pedido}/detalles/{detalle}', [PedidoController::class, 'actualizarLinea'])->middleware('menu:pedidos');
+        Route::delete('/pedidos/{pedido}/detalles/{detalle}', [PedidoController::class, 'retirarLinea'])->middleware('menu:pedidos');
+        Route::get('/pedidos/{pedido}/historial', [PedidoController::class, 'historial'])->middleware('menu:pedidos');
         // Fase 2, tarea 1 (RF-M04-036/037, HU-M04-015): descuento manual con motivo, y las
         // promociones de tipo "manual" que el Administrador dejó listas para aplicar a mano.
-        Route::post('/pedidos/{pedido}/descuento', [PedidoController::class, 'aplicarDescuento']);
-        Route::delete('/pedidos/{pedido}/descuento', [PedidoController::class, 'quitarDescuento']);
-        Route::get('/promociones/manuales', [PromocionController::class, 'manuales']);
+        Route::post('/pedidos/{pedido}/descuento', [PedidoController::class, 'aplicarDescuento'])->middleware('menu:pedidos');
+        Route::delete('/pedidos/{pedido}/descuento', [PedidoController::class, 'quitarDescuento'])->middleware('menu:pedidos');
+        Route::get('/promociones/manuales', [PromocionController::class, 'manuales'])->middleware('menu:pedidos');
         // RN-PED-32: entregar, recoger y finalizar. PedidoPolicy deja estas tres solo al Mesero
         // (RF-M07-025, RF-M07-R-013, RF-M02-T-016); el Administrador recibe 403.
-        Route::post('/pedidos/{pedido}/entregar', [PedidoController::class, 'confirmarEntrega']);
-        Route::post('/pedidos/{pedido}/recoger', [PedidoController::class, 'confirmarRecogida']);
-        Route::post('/pedidos/{pedido}/finalizar', [PedidoController::class, 'finalizar']);
+        Route::post('/pedidos/{pedido}/entregar', [PedidoController::class, 'confirmarEntrega'])->middleware('menu:pedidos');
+        Route::post('/pedidos/{pedido}/recoger', [PedidoController::class, 'confirmarRecogida'])->middleware('menu:pedidos');
+        Route::post('/pedidos/{pedido}/finalizar', [PedidoController::class, 'finalizar'])->middleware('menu:pedidos');
 
         // RF-M06-003/004, RNF-M06-004: PedidoPolicy::cobrar() decide si este actor puede
         // cobrar ESTE pedido (siempre el Mesero; el grupo de rutas también deja pasar al
         // Administrador, pero la Policy lo rechaza — autorización fina en profundidad).
-        Route::post('/pedidos/{pedido}/cobrar', [PagoController::class, 'cobrar']);
+        Route::post('/pedidos/{pedido}/cobrar', [PagoController::class, 'cobrar'])->middleware('menu:cobrar,caja');
 
         // Fase 6, tarea 2 (RN-PED-06/09/17 a 19, D5): comandas de cocina impresas desde el navegador.
         Route::get('/comandas/pendientes', [ComandaController::class, 'pendientes']);
@@ -180,43 +192,43 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         // Pedido pagado en línea quedaba en "pendiente" para siempre: PedidoService::confirmar()
         // exige que no tenga un pago en línea sin aprobar (RN-M06-05) y no había forma de
         // aprobarlo.
-        Route::post('/pagos/{pago}/confirmar-en-linea', [PagoController::class, 'confirmarEnLinea']);
-        Route::post('/pagos/{pago}/rechazar-en-linea', [PagoController::class, 'rechazarEnLinea']);
+        Route::post('/pagos/{pago}/confirmar-en-linea', [PagoController::class, 'confirmarEnLinea'])->middleware('menu:pedidos,caja,cobrar');
+        Route::post('/pagos/{pago}/rechazar-en-linea', [PagoController::class, 'rechazarEnLinea'])->middleware('menu:pedidos,caja,cobrar');
 
         // M05 (Admin/Mesero): listado de reservas con filtro opcional ?estado=.
-        Route::get('/reservas', [ReservaController::class, 'index']);
+        Route::get('/reservas', [ReservaController::class, 'index'])->middleware('menu:mesas,reservas');
 
         // RN-M05-16: depósito de reserva — en línea (confirmar/rechazar, hoy manual hasta
         // que exista el webhook real; ver README-BACKEND.md) o manual (cualquier método de M06).
-        Route::post('/reservas/{reserva}/deposito/en-linea/confirmar', [ReservaController::class, 'confirmarDepositoEnLinea']);
-        Route::post('/reservas/{reserva}/deposito/en-linea/rechazar', [ReservaController::class, 'rechazarDepositoEnLinea']);
-        Route::post('/reservas/{reserva}/deposito/manual', [ReservaController::class, 'registrarDepositoManual']);
+        Route::post('/reservas/{reserva}/deposito/en-linea/confirmar', [ReservaController::class, 'confirmarDepositoEnLinea'])->middleware('menu:mesas,reservas');
+        Route::post('/reservas/{reserva}/deposito/en-linea/rechazar', [ReservaController::class, 'rechazarDepositoEnLinea'])->middleware('menu:mesas,reservas');
+        Route::post('/reservas/{reserva}/deposito/manual', [ReservaController::class, 'registrarDepositoManual'])->middleware('menu:mesas,reservas');
 
-        Route::post('/reservas/{reserva}/no-show', [ReservaController::class, 'marcarNoShow']);
-        Route::post('/reservas/{reserva}/completar', [ReservaController::class, 'completar']);
+        Route::post('/reservas/{reserva}/no-show', [ReservaController::class, 'marcarNoShow'])->middleware('menu:mesas,reservas');
+        Route::post('/reservas/{reserva}/completar', [ReservaController::class, 'completar'])->middleware('menu:mesas,reservas');
         // Fase 4, tarea 4 (RF-M05-027): volver a enviar un aviso que falló.
-        Route::post('/reservas/{reserva}/avisos/{aviso}/reintentar', [ReservaController::class, 'reintentarAviso']);
+        Route::post('/reservas/{reserva}/avisos/{aviso}/reintentar', [ReservaController::class, 'reintentarAviso'])->middleware('menu:mesas,reservas');
 
         // RF-M05-009/010: abrir/liberar una mesa manualmente (sin pedido de por medio).
-        Route::post('/mesas/{mesa}/abrir', [MesaController::class, 'abrir']);
-        Route::post('/mesas/{mesa}/liberar', [MesaController::class, 'liberar']);
+        Route::post('/mesas/{mesa}/abrir', [MesaController::class, 'abrir'])->middleware('menu:mesas');
+        Route::post('/mesas/{mesa}/liberar', [MesaController::class, 'liberar'])->middleware('menu:mesas');
         // RF-M05-011 / HU-M05-007: liberación forzada (salta la validación de pedidos activos),
         // con motivo obligatorio y auditoría — Mesero o Administrador (M05, tabla de actores).
-        Route::post('/mesas/{mesa}/liberar-forzada', [MesaController::class, 'liberarForzada']);
+        Route::post('/mesas/{mesa}/liberar-forzada', [MesaController::class, 'liberarForzada'])->middleware('menu:mesas');
         // Fase 1, tarea 3: cuenta acumulada de la mesa (RF-M02-L-019/020) y cobro por mesa
         // (solo el Mesero cobra, RF-M06-003; el Administrador recibe 403).
-        Route::get('/mesas/{mesa}/cuenta', [MesaController::class, 'cuenta']);
-        Route::post('/mesas/{mesa}/cobrar', [MesaController::class, 'cobrar']);
+        Route::get('/mesas/{mesa}/cuenta', [MesaController::class, 'cuenta'])->middleware('menu:mesas,cobrar');
+        Route::post('/mesas/{mesa}/cobrar', [MesaController::class, 'cobrar'])->middleware('menu:cobrar,caja');
 
         // RF-M04-016/017: alternar agotado/disponible no requiere el permiso de edición
         // completa de updateProducto() (exclusivo Administrador).
-        Route::post('/productos/{producto}/disponibilidad', [CatalogoController::class, 'toggleDisponible']);
+        Route::post('/productos/{producto}/disponibilidad', [CatalogoController::class, 'toggleDisponible'])->middleware('menu:catalogo,menu');
         // Fase 1, tarea 5: una variante agotada (RF-M04-016/017).
-        Route::post('/variantes/{variante}/disponibilidad', [CatalogoController::class, 'toggleDisponibleVariante']);
+        Route::post('/variantes/{variante}/disponibilidad', [CatalogoController::class, 'toggleDisponibleVariante'])->middleware('menu:catalogo,menu');
     });
 
     Route::middleware('role:administrador,mesero,cliente')->group(function () {
-        Route::post('/reservas/{reserva}/cancelar', [ReservaController::class, 'cancelar']);
+        Route::post('/reservas/{reserva}/cancelar', [ReservaController::class, 'cancelar'])->middleware('menu:mesas,reservas');
     });
 
     // "Mis pedidos y reservas" (Cliente): historial de reservas propias — identificadas por
@@ -229,125 +241,134 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     // ---- Exclusivo Administrador ----
     Route::middleware('role:administrador')->group(function () {
         // Fase 6, tarea 1: estado de la pasarela y los pagos en línea que hay que revisar.
-        Route::get('/pasarela/estado', [PasarelaController::class, 'estado']);
-        Route::get('/pasarela/transacciones', [PasarelaController::class, 'index']);
-        Route::post('/pasarela/transacciones/{transaccion}/revisada', [PasarelaController::class, 'revisada']);
-        Route::post('/pasarela/transacciones/{transaccion}/reembolsar', [PasarelaController::class, 'reembolsar']);
+        Route::get('/pasarela/estado', [PasarelaController::class, 'estado'])->middleware('menu:caja');
+        Route::get('/pasarela/transacciones', [PasarelaController::class, 'index'])->middleware('menu:caja');
+        Route::post('/pasarela/transacciones/{transaccion}/revisada', [PasarelaController::class, 'revisada'])->middleware('menu:caja');
+        Route::post('/pasarela/transacciones/{transaccion}/reembolsar', [PasarelaController::class, 'reembolsar'])->middleware('menu:caja');
 
         // Dashboard: KPIs resumen del día (ventas, pedidos activos, mesas ocupadas).
-        Route::get('/dashboard/resumen', [DashboardController::class, 'resumen']);
+        Route::get('/dashboard/resumen', [DashboardController::class, 'resumen'])->middleware('menu:dashboard');
 
         // Catálogo (M04)
-        Route::post('/categorias', [CatalogoController::class, 'storeCategoria']);
-        Route::put('/categorias/{categoria}', [CatalogoController::class, 'updateCategoria']);
+        Route::post('/categorias', [CatalogoController::class, 'storeCategoria'])->middleware('menu:catalogo');
+        Route::put('/categorias/{categoria}', [CatalogoController::class, 'updateCategoria'])->middleware('menu:catalogo');
         // Mejora (16/10/2026): importación masiva de productos desde Excel o CSV.
-        Route::get('/productos/importacion/plantilla', [ImportacionProductosController::class, 'plantilla']);
-        Route::post('/productos/importacion/vista-previa', [ImportacionProductosController::class, 'vistaPrevia']);
-        Route::post('/productos/importacion', [ImportacionProductosController::class, 'importar']);
-        Route::post('/productos', [CatalogoController::class, 'storeProducto']);
-        Route::put('/productos/{producto}', [CatalogoController::class, 'updateProducto']);
+        Route::get('/productos/importacion/plantilla', [ImportacionProductosController::class, 'plantilla'])->middleware('menu:catalogo');
+        Route::post('/productos/importacion/vista-previa', [ImportacionProductosController::class, 'vistaPrevia'])->middleware('menu:catalogo');
+        Route::post('/productos/importacion', [ImportacionProductosController::class, 'importar'])->middleware('menu:catalogo');
+        Route::post('/productos', [CatalogoController::class, 'storeProducto'])->middleware('menu:catalogo');
+        Route::put('/productos/{producto}', [CatalogoController::class, 'updateProducto'])->middleware('menu:catalogo');
         // Fase 7, tarea 3 (RF-M04-004, HU-M04-002): subir o quitar la foto del producto.
-        Route::post('/productos/{producto}/foto', [CatalogoController::class, 'subirFoto']);
-        Route::delete('/productos/{producto}/foto', [CatalogoController::class, 'quitarFoto']);
+        Route::post('/productos/{producto}/foto', [CatalogoController::class, 'subirFoto'])->middleware('menu:catalogo');
+        Route::delete('/productos/{producto}/foto', [CatalogoController::class, 'quitarFoto'])->middleware('menu:catalogo');
 
         // Catálogo (M04) parte 2: variantes, extras, combos y promociones.
-        Route::post('/variantes', [CatalogoController::class, 'storeVariante']);
-        Route::put('/variantes/{variante}', [CatalogoController::class, 'updateVariante']);
-        Route::post('/variantes/{variante}/foto', [CatalogoController::class, 'subirFotoVariante']);
-        Route::delete('/variantes/{variante}/foto', [CatalogoController::class, 'quitarFotoVariante']);
+        Route::post('/variantes', [CatalogoController::class, 'storeVariante'])->middleware('menu:catalogo');
+        Route::put('/variantes/{variante}', [CatalogoController::class, 'updateVariante'])->middleware('menu:catalogo');
+        Route::post('/variantes/{variante}/foto', [CatalogoController::class, 'subirFotoVariante'])->middleware('menu:catalogo');
+        Route::delete('/variantes/{variante}/foto', [CatalogoController::class, 'quitarFotoVariante'])->middleware('menu:catalogo');
 
-        Route::get('/extras', [CatalogoController::class, 'extras']);
-        Route::post('/extras', [CatalogoController::class, 'storeExtra']);
-        Route::put('/extras/{extra}', [CatalogoController::class, 'updateExtra']);
+        Route::get('/extras', [CatalogoController::class, 'extras'])->middleware('menu:catalogo');
+        Route::post('/extras', [CatalogoController::class, 'storeExtra'])->middleware('menu:catalogo');
+        Route::put('/extras/{extra}', [CatalogoController::class, 'updateExtra'])->middleware('menu:catalogo');
 
         // combos-admin trae TODOS los combos (incluidos inactivos/vencidos) para gestión —
         // distinto de GET /combos (público), que solo lista los disponibles hoy.
-        Route::get('/combos-admin', [CatalogoController::class, 'combosAdmin']);
-        Route::post('/combos', [CatalogoController::class, 'storeCombo']);
-        Route::put('/combos/{combo}', [CatalogoController::class, 'updateCombo']);
+        Route::get('/combos-admin', [CatalogoController::class, 'combosAdmin'])->middleware('menu:catalogo');
+        Route::post('/combos', [CatalogoController::class, 'storeCombo'])->middleware('menu:catalogo');
+        Route::put('/combos/{combo}', [CatalogoController::class, 'updateCombo'])->middleware('menu:catalogo');
 
         // RN-M04-19 a 23: fechas especiales (Navidad, Amor y Amistad, etc.) son solo una
         // promoción más con vigencia_inicio/vigencia_fin — no hay lógica especial por fecha.
-        Route::get('/promociones', [PromocionController::class, 'index']);
-        Route::post('/promociones', [PromocionController::class, 'store']);
-        Route::put('/promociones/{promocion}', [PromocionController::class, 'update']);
+        Route::get('/promociones', [PromocionController::class, 'index'])->middleware('menu:catalogo');
+        Route::post('/promociones', [PromocionController::class, 'store'])->middleware('menu:catalogo');
+        Route::put('/promociones/{promocion}', [PromocionController::class, 'update'])->middleware('menu:catalogo');
         // Mejora (16/10/2026): atajo «Poner en oferta» desde el producto (crea o reemplaza su oferta).
-        Route::post('/productos/{producto}/oferta', [PromocionController::class, 'ponerOferta']);
-        Route::delete('/productos/{producto}/oferta', [PromocionController::class, 'quitarOferta']);
+        Route::post('/productos/{producto}/oferta', [PromocionController::class, 'ponerOferta'])->middleware('menu:catalogo');
+        Route::delete('/productos/{producto}/oferta', [PromocionController::class, 'quitarOferta'])->middleware('menu:catalogo');
 
         // Mesas (M05)
-        Route::post('/mesas', [MesaController::class, 'store']);
+        Route::post('/mesas', [MesaController::class, 'store'])->middleware('menu:mesas');
         // Fase 1, tarea 6 (RF-M05-002): corregir el nombre de una mesa.
-        Route::put('/mesas/{mesa}', [MesaController::class, 'update']);
-        Route::post('/mesas/{mesa}/desactivar', [MesaController::class, 'desactivar']);
-        Route::post('/mesas/{mesa}/activar', [MesaController::class, 'activar']);
+        Route::put('/mesas/{mesa}', [MesaController::class, 'update'])->middleware('menu:mesas');
+        Route::post('/mesas/{mesa}/desactivar', [MesaController::class, 'desactivar'])->middleware('menu:mesas');
+        Route::post('/mesas/{mesa}/activar', [MesaController::class, 'activar'])->middleware('menu:mesas');
         // RF-M05-006: regenerar el QR de una mesa (invalida el anterior).
-        Route::post('/mesas/{mesa}/regenerar-qr', [MesaController::class, 'regenerarQr']);
+        Route::post('/mesas/{mesa}/regenerar-qr', [MesaController::class, 'regenerarQr'])->middleware('menu:mesas');
 
         // RF-M05-035, HU-M05-015: depósitos de reserva retenidos por no-show (RN-M05-18).
-        Route::get('/reservas/depositos-retenidos', [ReservaController::class, 'depositosRetenidos']);
+        Route::get('/reservas/depositos-retenidos', [ReservaController::class, 'depositosRetenidos'])->middleware('menu:mesas');
 
         // Usuarios (M01): listar, crear Mesero/Administrador, activar/desactivar, revocar sesiones.
-        Route::get('/usuarios', [UsuarioController::class, 'index']);
-        Route::post('/usuarios', [UsuarioController::class, 'store']);
+        Route::get('/usuarios', [UsuarioController::class, 'index'])->middleware('menu:usuarios');
+        Route::post('/usuarios', [UsuarioController::class, 'store'])->middleware('menu:usuarios');
         // Fase 3, tarea 2 (RF-M01-003/005): editar datos y rol de una cuenta.
-        Route::put('/usuarios/{usuario}', [UsuarioController::class, 'update']);
-        Route::post('/usuarios/{usuario}/activar', [UsuarioController::class, 'activar']);
-        Route::post('/usuarios/{usuario}/desactivar', [UsuarioController::class, 'desactivar']);
-        Route::post('/usuarios/{usuario}/revocar-sesiones', [UsuarioController::class, 'revocarSesiones']);
+        Route::put('/usuarios/{usuario}', [UsuarioController::class, 'update'])->middleware('menu:usuarios');
+        Route::post('/usuarios/{usuario}/activar', [UsuarioController::class, 'activar'])->middleware('menu:usuarios');
+        Route::post('/usuarios/{usuario}/desactivar', [UsuarioController::class, 'desactivar'])->middleware('menu:usuarios');
+        Route::post('/usuarios/{usuario}/revocar-sesiones', [UsuarioController::class, 'revocarSesiones'])->middleware('menu:usuarios');
         // Fase 3, tarea 4: ver y cerrar una sesión en particular de una cuenta.
-        Route::get('/usuarios/{usuario}/sesiones', [UsuarioController::class, 'sesiones']);
-        Route::delete('/usuarios/{usuario}/sesiones/{sesion}', [UsuarioController::class, 'revocarSesion'])->whereNumber('sesion');
+        Route::get('/usuarios/{usuario}/sesiones', [UsuarioController::class, 'sesiones'])->middleware('menu:usuarios');
+        Route::delete('/usuarios/{usuario}/sesiones/{sesion}', [UsuarioController::class, 'revocarSesion'])->whereNumber('sesion')->middleware('menu:usuarios');
+        // M09 (20/10/2026): los menús que ve cada Administrador o Mesero (solo el SuperAdmin los cambia).
+        Route::get('/usuarios/{usuario}/menus', [UsuarioController::class, 'menus'])->middleware('menu:usuarios');
+        Route::put('/usuarios/{usuario}/menus', [UsuarioController::class, 'actualizarMenus'])->middleware('menu:usuarios');
 
         // Fase 3, tarea 1 (RF-M01-025, HU-M01-020, RNF-TRANS-023): consulta de la auditoría y
         // de los eventos de seguridad. Solo lectura.
-        Route::get('/auditorias', [AuditoriaController::class, 'index']);
-        Route::get('/auditorias/opciones', [AuditoriaController::class, 'opciones']);
+        Route::get('/auditorias', [AuditoriaController::class, 'index'])->middleware('menu:auditoria');
+        Route::get('/auditorias/opciones', [AuditoriaController::class, 'opciones'])->middleware('menu:auditoria');
 
         // RF-M07-030, RN-M05-08 a 13: valor de domicilio y depósito de reserva, editables por
         // el Administrador "en cualquier momento" — tabla `configuraciones` (clave/valor).
-        Route::get('/configuraciones', [ConfiguracionController::class, 'index']);
-        Route::put('/configuraciones', [ConfiguracionController::class, 'update']);
+        Route::get('/configuraciones', [ConfiguracionController::class, 'index'])->middleware('menu:configuracion');
+        Route::put('/configuraciones', [ConfiguracionController::class, 'update'])->middleware('menu:configuracion');
+        // Mejora (19/10/2026): dirección, teléfono y logo del negocio (Inicio, pie de página y PDF).
+        Route::put('/negocio', [NegocioController::class, 'actualizar'])->middleware('menu:configuracion');
+        // M09 (20/10/2026): leer las coordenadas de un enlace de Google Maps (solo SuperAdmin; limitado).
+        Route::post('/negocio/ubicacion-desde-enlace', [NegocioController::class, 'ubicacionDesdeEnlace'])->middleware(['menu:configuracion', 'throttle:20,1']);
+        Route::post('/negocio/logo', [NegocioController::class, 'subirLogo'])->middleware('menu:configuracion');
+        Route::delete('/negocio/logo', [NegocioController::class, 'quitarLogo'])->middleware('menu:configuracion');
         // Fase 4, tarea 1: estado del programador de tareas y de la cola de trabajos.
-        Route::get('/sistema/estado', [ConfiguracionController::class, 'estadoSistema']);
+        Route::get('/sistema/estado', [ConfiguracionController::class, 'estadoSistema'])->middleware('menu:configuracion');
         // Endurecimiento (13/10/2026): revisión de seguridad antes de abrir al público.
-        Route::get('/sistema/revision-produccion', [ConfiguracionController::class, 'revisionProduccion']);
+        Route::get('/sistema/revision-produccion', [ConfiguracionController::class, 'revisionProduccion'])->middleware('menu:configuracion');
 
         // Caja (M06)
-        Route::get('/caja/turnos', [CajaController::class, 'index']);
-        Route::get('/caja/turnos/{turno}', [CajaController::class, 'show']);
-        Route::get('/caja/turno-actual', [CajaController::class, 'turnoActual']);
-        Route::post('/caja/abrir', [CajaController::class, 'abrir']);
-        Route::post('/caja/turnos/{turno}/cerrar', [CajaController::class, 'cerrar']);
+        Route::get('/caja/turnos', [CajaController::class, 'index'])->middleware('menu:caja');
+        Route::get('/caja/turnos/{turno}', [CajaController::class, 'show'])->middleware('menu:caja');
+        Route::get('/caja/turno-actual', [CajaController::class, 'turnoActual'])->middleware('menu:caja');
+        Route::post('/caja/abrir', [CajaController::class, 'abrir'])->middleware('menu:caja');
+        Route::post('/caja/turnos/{turno}/cerrar', [CajaController::class, 'cerrar'])->middleware('menu:caja');
 
         // Pagos: anular (control financiero)
-        Route::post('/pagos/{pago}/anular', [PagoController::class, 'anular']);
+        Route::post('/pagos/{pago}/anular', [PagoController::class, 'anular'])->middleware('menu:caja');
 
         // Compras/Gastos/Cierre Diario (M03). Registrar, consultar y el soporte están más arriba,
         // en el grupo del personal (Fase 7, tarea 2: también el Mesero con permiso).
         // RF-M03-14: editar un registro activo.
-        Route::put('/compras-gastos/{compraGasto}', [CompraGastoController::class, 'update']);
-        Route::post('/compras-gastos/{compraGasto}/anular', [CompraGastoController::class, 'anular']);
-        Route::post('/cierres-diarios', [CompraGastoController::class, 'generarCierreDiario']);
+        Route::put('/compras-gastos/{compraGasto}', [CompraGastoController::class, 'update'])->middleware('menu:compras_gastos,gastos');
+        Route::post('/compras-gastos/{compraGasto}/anular', [CompraGastoController::class, 'anular'])->middleware('menu:compras_gastos,gastos');
+        Route::post('/cierres-diarios', [CompraGastoController::class, 'generarCierreDiario'])->middleware('menu:compras_gastos');
         // Fase 2, tarea 5 (RF-M03-26/27, HU-M03-09): consulta previa, historial y detalle con ajustes.
-        Route::get('/cierres-diarios/previa', [CompraGastoController::class, 'previaCierre']);
-        Route::get('/cierres-diarios', [CompraGastoController::class, 'cierres']);
-        Route::get('/cierres-diarios/{cierre}', [CompraGastoController::class, 'verCierre']);
+        Route::get('/cierres-diarios/previa', [CompraGastoController::class, 'previaCierre'])->middleware('menu:compras_gastos');
+        Route::get('/cierres-diarios', [CompraGastoController::class, 'cierres'])->middleware('menu:compras_gastos');
+        Route::get('/cierres-diarios/{cierre}', [CompraGastoController::class, 'verCierre'])->middleware('menu:compras_gastos');
         // Fase 5, tarea 2 (RF-M03-28/29): el cierre en PDF, con reimpresión marcada y auditada.
-        Route::get('/cierres-diarios/{cierre}/pdf', [CompraGastoController::class, 'pdfCierre']);
+        Route::get('/cierres-diarios/{cierre}/pdf', [CompraGastoController::class, 'pdfCierre'])->middleware('menu:compras_gastos');
 
         // Reportes (M08) — los 6 reportes reales del documento (RF-M08-002 a 009), cada
         // uno con periodo (RF-M08-001), comparación (RF-M08-010) y exportación
         // (RF-M08-011/012/014) vía /reportes/exportar.
-        Route::get('/reportes/ventas-totales', [ReporteController::class, 'ventasTotales']);
-        Route::get('/reportes/ventas-por-producto', [ReporteController::class, 'ventasPorProducto']);
-        Route::get('/reportes/ventas-por-tipo-y-metodo', [ReporteController::class, 'ventasPorTipoYMetodo']);
-        Route::get('/reportes/compras-y-gastos', [ReporteController::class, 'comprasYGastos']);
-        Route::get('/reportes/resultado-operativo', [ReporteController::class, 'resultadoOperativo']);
-        Route::get('/reportes/uso-de-mesas', [ReporteController::class, 'usoDeMesas']);
-        Route::post('/reportes/exportar', [ReporteController::class, 'exportar']);
+        Route::get('/reportes/ventas-totales', [ReporteController::class, 'ventasTotales'])->middleware('menu:reportes');
+        Route::get('/reportes/ventas-por-producto', [ReporteController::class, 'ventasPorProducto'])->middleware('menu:reportes');
+        Route::get('/reportes/ventas-por-tipo-y-metodo', [ReporteController::class, 'ventasPorTipoYMetodo'])->middleware('menu:reportes');
+        Route::get('/reportes/compras-y-gastos', [ReporteController::class, 'comprasYGastos'])->middleware('menu:reportes');
+        Route::get('/reportes/resultado-operativo', [ReporteController::class, 'resultadoOperativo'])->middleware('menu:reportes');
+        Route::get('/reportes/uso-de-mesas', [ReporteController::class, 'usoDeMesas'])->middleware('menu:reportes');
+        Route::post('/reportes/exportar', [ReporteController::class, 'exportar'])->middleware('menu:reportes');
         // Fase 5, tarea 3 (RNF-M08-006): exportaciones guardadas y su descarga sin regenerar.
-        Route::get('/reportes/exportaciones', [ReporteController::class, 'exportaciones']);
-        Route::get('/reportes/exportaciones/{exportacion}/descargar', [ReporteController::class, 'descargar']);
+        Route::get('/reportes/exportaciones', [ReporteController::class, 'exportaciones'])->middleware('menu:reportes');
+        Route::get('/reportes/exportaciones/{exportacion}/descargar', [ReporteController::class, 'descargar'])->middleware('menu:reportes');
     });
 });

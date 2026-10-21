@@ -46,7 +46,11 @@ Al preparar la lista se revisó el código pantalla por pantalla y aparecieron c
   - el texto principal;
   - "Ver el menú" y "Reservar mesa";
   - las categorías y algunos productos;
-  - la dirección, el teléfono y "Escribir por WhatsApp" (abre WhatsApp con el número del local).
+  - la dirección, el teléfono y "Escribir por WhatsApp" (abre WhatsApp con el número del local);
+  - si el SuperAdmin marcó el punto del local (M09), un mapa pequeño con el marcador dorado debajo del
+    contacto. El mapa no se mueve al pasar el dedo para bajar la página; con los botones + y − se acerca.
+- [ ] «Cómo llegar» (en Contacto y en el pie de página) abre Google Maps justo en el punto marcado; sin
+      punto, busca la dirección escrita.
 - [ ] El menú de arriba lleva a Inicio, Menú y Reservar. "Contacto" baja a la sección de contacto.
 - [ ] En el teléfono (~390 px) el menú se abre con el botón de las tres rayas y no hay scroll horizontal en ninguna pantalla.
 - [ ] Tocar una categoría del Inicio abre el Menú en esa categoría.
@@ -285,4 +289,13 @@ En la ventana del invitado, Reservar:
 - [ ] Con la app instalada y sin internet (modo avión), abrirla muestra «Sin conexión» con
       «Reintentar»; con internet, vuelve a funcionar.
 - [ ] El Mesero con sesión abre la app desde el ícono y entra directo a Pedidos.
+
+## 14. Correcciones del 19/10/2026 (reservas)
+
+- [ ] Reservar: la hora es una lista de 4:00 p. m. a 11:00 p. m., cada 30 minutos; debajo dice «Las
+      reservas son de 4:00 p. m. a 11:00 p. m., con al menos 3 horas de anticipación».
+- [ ] Para hoy, las horas a menos de 3 horas salen «no disponible» y no se pueden elegir; tarde en la
+      noche, el primer día que deja elegir es mañana.
+- [ ] La «Descripción (opcional)» admite hasta 500 caracteres; aparece en el resumen de la reserva, en
+      el enlace de la reserva y en el correo de confirmación. Sin descripción también se puede reservar.
 

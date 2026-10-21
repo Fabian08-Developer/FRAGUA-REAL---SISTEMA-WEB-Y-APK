@@ -146,7 +146,7 @@ function alCambiarGrupo() {
   }
 }
 
-const ROLES: Record<Rol, string> = { administrador: 'Administrador', mesero: 'Mesero', cliente: 'Cliente' }
+const ROLES: Record<Rol, string> = { superadmin: 'SuperAdmin', administrador: 'Administrador', soporte: 'Soporte', mesero: 'Mesero', cliente: 'Cliente' }
 
 // Color por grupo; los intentos fallidos se marcan en rojo.
 function claseAccion(registro: RegistroAuditoria): string {

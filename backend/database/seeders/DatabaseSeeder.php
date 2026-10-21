@@ -40,8 +40,19 @@ class DatabaseSeeder extends Seeder
     {
         $clave = Hash::make('password');
 
-        // Contraseña de los 3 para pruebas: "password". Desde la Fase 3 también entran con su
-        // nombre de usuario: admin, mesero y cliente.
+        // Contraseña de los 5 para pruebas: "password". Desde la Fase 3 también entran con su
+        // nombre de usuario: superadmin (M09, 19/10/2026), soporte (M10, 20/10/2026), admin, mesero y cliente.
+        User::query()->firstOrCreate(
+            ['email' => 'superadmin@fraguareal.com'],
+            ['role' => 'superadmin', 'nombre' => 'SuperAdmin Fragua Real', 'username' => 'superadmin', 'password' => $clave, 'activo' => true]
+        );
+
+        // M10 (20/10/2026): la cuenta de Soporte para probar en local (solo consulta).
+        User::query()->firstOrCreate(
+            ['email' => 'soporte@fraguareal.com'],
+            ['role' => 'soporte', 'nombre' => 'Soporte Fragua Real', 'username' => 'soporte', 'password' => $clave, 'activo' => true]
+        );
+
         User::query()->firstOrCreate(
             ['email' => 'admin@fraguareal.com'],
             ['role' => 'administrador', 'nombre' => 'Admin Fragua Real', 'username' => 'admin', 'password' => $clave, 'activo' => true]

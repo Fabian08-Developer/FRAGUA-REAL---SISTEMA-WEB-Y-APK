@@ -180,7 +180,7 @@ async function confirmarRegenerar() {
       </div>
 
       <div class="mt-2 w-full border-t border-gray-100 pt-4">
-        <button
+        <button v-escritura
           v-if="!confirmandoRegenerar"
           type="button"
           class="mx-auto flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
