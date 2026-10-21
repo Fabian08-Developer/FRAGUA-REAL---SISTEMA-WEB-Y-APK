@@ -6,7 +6,7 @@
 // (RF-M07-016, RF-M07-R-009). La página se actualiza sola cada 30 segundos.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Bike, CheckCircle2, ShoppingBag, XCircle } from 'lucide-vue-next'
+import { Bike, CheckCircle2, ShoppingBag, XCircle, CircleX } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
@@ -240,10 +240,29 @@ async function cancelar() {
       </section>
 
       <!-- Cancelar -->
+      <!-- 21/10/2026: antes era un enlace rojo suelto; ahora una tarjeta como las demás, que dice hasta
+           cuándo se puede cancelar (RN-M07-04: solo mientras el pedido sigue pendiente). -->
       <section v-if="pedido.estado === 'pendiente'" class="mt-4">
-        <button v-if="!cancelarAbierto" type="button" class="text-sm font-medium text-red-700 underline-offset-2 hover:underline" @click="cancelarAbierto = true">
-          Cancelar mi pedido
-        </button>
+        <div
+          v-if="!cancelarAbierto"
+          class="flex flex-col gap-4 rounded-2xl border border-[#e2dbcf] bg-white p-5 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div class="flex items-start gap-3">
+            <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600" aria-hidden="true">
+              <CircleX :size="20" />
+            </span>
+            <div>
+              <p class="text-sm font-semibold text-ink">¿Cambiaste de opinión?</p>
+              <p class="mt-0.5 text-xs text-[#6c655c]">
+                Puedes cancelarlo mientras no lo hayamos confirmado.<template v-if="pagado > 0"> Si ya pagaste en línea, te devolvemos el dinero.</template>
+              </p>
+            </div>
+          </div>
+          <BaseButton variant="danger-soft" class="w-full shrink-0 sm:w-auto" @click="cancelarAbierto = true">
+            <CircleX :size="16" />
+            Cancelar mi pedido
+          </BaseButton>
+        </div>
         <div v-else class="rounded-2xl border border-red-200 bg-red-50/60 p-5">
           <label class="block">
             <span class="text-sm font-medium text-ink">¿Por qué cancelas?</span>
