@@ -20,7 +20,7 @@ class CambiarPasswordRequest extends FormRequest
     {
         return [
             'password_actual' => ['required', 'string'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()], // contraseña segura (RN-USR-23)
         ];
     }
 }

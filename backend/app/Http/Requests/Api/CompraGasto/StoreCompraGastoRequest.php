@@ -31,7 +31,7 @@ class StoreCompraGastoRequest extends FormRequest
             'descripcion' => ['required', 'string', 'max:255'],
             'cantidad' => ['nullable', 'numeric', 'gt:0', 'max:99999999'],
             'unidad' => ['nullable', 'string', 'max:50'],
-            'valor' => ['required', 'numeric', 'min:0.01'], // RN-M03-01
+            'valor' => ['required', 'numeric', 'min:0.01', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS], // RN-M03-01
             'metodo_pago' => ['required', 'in:efectivo,transferencia,tarjeta,otro'],
             'proveedor' => ['nullable', 'string', 'max:255'],
             'numero_factura' => ['nullable', 'string', 'max:255'],

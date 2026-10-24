@@ -122,7 +122,7 @@ class ReservaService
      *
      * @return array{0: Reserva, 1: array|null}
      */
-    public function iniciarDepositoEnLinea(Reserva $reserva, string $pasarela): array
+    public function iniciarDepositoEnLinea(Reserva $reserva, string $pasarela, ?\Illuminate\Http\UploadedFile $comprobante = null, ?string $referencia = null): array
     {
         $servicio = app(PasarelaPagoService::class);
 
@@ -133,6 +133,17 @@ class ReservaService
 
         $reserva = $this->registrarDepositoEnLinea($reserva, $pasarela);
         if (! $servicio->activa()) {
+            // Pago directo (22/10/2026, RF-M06-031/032): la captura queda con el depósito y avisa al personal.
+            if ($comprobante) {
+                $archivo = app(PagoDirectoService::class)->guardarComprobante($comprobante, "reserva-{$reserva->id}");
+                $reserva->forceFill([
+                    'deposito_comprobante_path' => $archivo['path'],
+                    'deposito_comprobante_mime' => $archivo['mime'],
+                    'deposito_referencia' => filled($referencia) ? trim($referencia) : null,
+                ])->save();
+                app(NotificacionService::class)->depositoPorConfirmar($reserva);
+            }
+
             return [$reserva, null];
         }
 
@@ -152,6 +163,11 @@ class ReservaService
         $reserva->deposito_pasarela = $pasarela;
         $reserva->deposito_estado = 'pendiente';
         $reserva->deposito_metodo = 'en_linea';
+        // Un intento nuevo empieza sin la captura ni el motivo de rechazo del anterior.
+        $reserva->deposito_comprobante_path = null;
+        $reserva->deposito_comprobante_mime = null;
+        $reserva->deposito_referencia = null;
+        $reserva->deposito_rechazo_motivo = null;
         $reserva->save();
 
         return $reserva;
@@ -192,7 +208,7 @@ class ReservaService
 
     // Rechaza el depósito en línea; la reserva sigue pendiente_pago para que el Cliente
     // pueda reintentar (mismo patrón de M06: confirmar/rechazar/reintentar).
-    public function rechazarDepositoEnLinea(Reserva $reserva, ?User $actor = null, string $via = 'manual'): Reserva
+    public function rechazarDepositoEnLinea(Reserva $reserva, ?User $actor = null, string $via = 'manual', ?string $motivo = null): Reserva
     {
         if ($reserva->estado !== 'pendiente_pago' || $reserva->deposito_estado !== 'pendiente') {
             throw new RuntimeException('Esta reserva no tiene un depósito en línea pendiente de rechazar.');
@@ -200,6 +216,8 @@ class ReservaService
 
         $reserva->deposito_estado = 'rechazado';
         $reserva->deposito_confirmado_via = $via;
+        // Pago directo (RF-M06-033): el Cliente ve el motivo en el enlace de su reserva.
+        $reserva->deposito_rechazo_motivo = filled($motivo) ? mb_substr(trim($motivo), 0, 255) : null;
         $reserva->save();
 
         app(AuditoriaService::class)->registrar('rechazar_deposito_reserva', 'Reserva', $reserva->id, [

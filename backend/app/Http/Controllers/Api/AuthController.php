@@ -12,6 +12,7 @@ use App\Http\Requests\Api\Auth\UpdatePerfilRequest;
 use App\Models\User;
 use App\Notifications\RecuperarPasswordNotification;
 use App\Services\AuditoriaService;
+use App\Services\BloqueoInicioSesionService;
 use App\Services\SesionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -49,10 +50,22 @@ class AuthController extends Controller
     // RF-M01-007 (Fase 3, tarea 3): con el correo o con el nombre de usuario. Si lo escrito lleva
     // "@" es un correo; si no, un nombre de usuario (se guarda en minúsculas, así que "Mario" y
     // "mario" son el mismo). El mensaje de error es el mismo en todos los casos.
-    public function login(LoginRequest $request)
+    public function login(LoginRequest $request, BloqueoInicioSesionService $bloqueo)
     {
         $identificador = $request->identificador();
         $esCorreo = $request->esCorreo();
+
+        // Seguridad (21/10/2026, RF-M01-029, RN-USR-24): con demasiados intentos fallidos de esta
+        // cuenta o de esta IP, ni siquiera se revisa la contraseña hasta que pase el bloqueo.
+        if ($minutos = $bloqueo->minutosBloqueado($identificador, $request)) {
+            app(AuditoriaService::class)->registrar('inicio_sesion_bloqueado', 'User', null, [
+                ($esCorreo ? 'correo' : 'usuario') => mb_substr($identificador, 0, 120),
+                'minutos_restantes' => $minutos,
+            ]);
+
+            return response()->json(['message' => $bloqueo->mensaje($minutos), 'bloqueado_minutos' => $minutos], 429);
+        }
+
         $user = $esCorreo
             ? User::where('email', $identificador)->first()
             : User::where('username', mb_strtolower($identificador))->first();
@@ -68,10 +81,18 @@ class AuthController extends Controller
                 'motivo' => $motivo,
             ]);
 
+            if ($bloqueo->fallido($identificador, $request, $user)) {
+                $minutos = (int) config('fragua_real.seguridad.bloqueo_minutos', 15);
+
+                return response()->json(['message' => $bloqueo->mensaje($minutos), 'bloqueado_minutos' => $minutos], 429);
+            }
+
             throw ValidationException::withMessages([
                 $request->campo() => ['Las credenciales no son válidas o el usuario está inactivo.'],
             ]);
         }
+
+        $bloqueo->limpiar($identificador);
 
         ['token' => $token, 'sesion' => $sesion] = app(SesionService::class)->abrir($user, $request);
         $this->auditar('inicio_sesion', $user, ['via' => $esCorreo ? 'correo' : 'usuario', 'sesion_id' => $sesion->id], $user);
@@ -231,6 +252,8 @@ class AuthController extends Controller
         // RF-M01-010: al cambiar la contraseña se revocan todas las sesiones activas —
         // quien tenía una sesión abierta con la contraseña vieja queda desconectado.
         $user->tokens()->delete();
+        // Seguridad (21/10/2026): con la contraseña nueva, la cuenta deja de estar bloqueada.
+        app(BloqueoInicioSesionService::class)->limpiarCuenta($user);
         $this->auditar('restablecer_contrasena', $user, ['sesiones_revocadas' => true], $user);
 
         return response()->json(['message' => 'Contraseña actualizada.']);

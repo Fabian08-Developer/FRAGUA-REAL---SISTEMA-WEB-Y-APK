@@ -4,6 +4,7 @@
 // enlace para llamar directo desde el celular. Un pedido local no muestra nada.
 import { computed } from 'vue'
 import { Mail, MapPin, MessageSquareText, Phone, User, Wallet } from 'lucide-vue-next'
+import { nombreMedio } from '@/utils/pasarela'
 import type { Pedido } from '@/types/models'
 
 const props = defineProps<{ pedido: Pedido }>()
@@ -16,7 +17,7 @@ const telefono = computed(
 const formaDePago = computed(() => {
   const p = props.pedido
   if (p.metodo_pago_preferido === 'en_linea') {
-    return `En línea${p.pasarela_preferida ? ` (${p.pasarela_preferida === 'nequi' ? 'Nequi' : 'Bancolombia'})` : ''}`
+    return `En línea${p.pasarela_preferida ? ` (${nombreMedio(p.pasarela_preferida)})` : ''}`
   }
   if (p.metodo_pago_preferido === 'contra_entrega') return p.tipo === 'domicilio' ? 'Contra entrega' : 'Al recoger'
   return null

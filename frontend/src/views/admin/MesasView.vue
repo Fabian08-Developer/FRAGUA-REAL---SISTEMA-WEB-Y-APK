@@ -298,7 +298,7 @@ onMounted(cargar)
       <form class="space-y-4" @submit.prevent="guardarNombre">
         <label class="block">
           <span class="field-label">Nombre</span>
-          <input v-model="nombreEditado" type="text" maxlength="255" class="field" />
+          <input v-formato="'nombre'" v-model="nombreEditado" type="text" maxlength="255" class="field" />
         </label>
         <p class="text-xs text-gray-500">El código QR no cambia: el que está impreso sigue funcionando.</p>
         <p v-if="errorEditar" class="alert-error">{{ errorEditar }}</p>
@@ -316,7 +316,7 @@ onMounted(cargar)
       <form class="space-y-4" @submit.prevent="confirmarNueva">
         <label class="block">
           <span class="field-label">Nombre</span>
-          <input
+          <input v-formato="'nombre'" maxlength="60"
             v-model="nombreNueva"
             type="text"
             placeholder="Ej. Mesa 7, Terraza 2…"
@@ -345,7 +345,7 @@ onMounted(cargar)
         </p>
         <label class="block">
           <span class="field-label">Motivo</span>
-          <textarea
+          <textarea v-formato="'texto'" maxlength="255"
             v-model="motivoForzada"
             rows="3"
             placeholder="Ej. El cliente se fue sin avisar y dejó el pedido sin cerrar."

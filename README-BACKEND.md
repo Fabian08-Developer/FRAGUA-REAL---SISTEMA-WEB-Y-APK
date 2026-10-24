@@ -23,7 +23,7 @@ armado el backend hoy y guarda el historial de los 60 cambios técnicos que lo l
 
 Cada petición pasa por las mismas capas:
 
-1. **Ruta** (`routes/api.php`): 168 endpoints bajo `/api`, agrupados por nivel de acceso con los
+1. **Ruta** (`routes/api.php`): 172 endpoints bajo `/api`, agrupados por nivel de acceso con los
    middleware `auth:sanctum`, `activo` y `role:...`, y límites de peticiones en las rutas públicas.
 2. **Form Request** (`app/Http/Requests/Api`, 38 clases): valida los datos y devuelve los mensajes
    en español (`lang/es/validation.php`).
@@ -85,6 +85,13 @@ mensajes de validación o de la regla de negocio, y 429 por exceso de intentos.
   ocultos en las respuestas; el enlace de seguimiento no trae datos de contacto ni del personal.
 - **Auditoría**: `AuditoriaService::registrar()` guarda cada acción crítica con IP y navegador; la
   base de datos no deja cambiar ni borrar ese historial (ADR-010 en `BASE-DE-DATOS.md`).
+- **Contraseña segura** (21/10/2026, RN-USR-23): `Password::defaults()` en `AppServiceProvider` (8 caracteres como mínimo, con al menos una mayúscula, una minúscula y un número;
+  en producción, además, `uncompromised()` contra «Have I Been Pwned», que solo recibe los 5 primeros
+  caracteres del hash y espera como mucho 5 s). La usan el registro, `POST /usuarios`, el cambio y la
+  recuperación de contraseña y los comandos `fragua:crear-superadmin` y `fragua:crear-soporte`.
+- **Bloqueo por intentos** (21/10/2026, RN-USR-24): `BloqueoInicioSesionService`. 5 fallos seguidos de una
+  cuenta (correo o usuario) o 20 de una IP bloquean 15 minutos desde el intento que lo activa; responde
+  429 con el mensaje en español. Además sigue el límite de la ruta (10 por minuto por IP).
 - **Revisión antes de producción**: `php artisan fragua:revisar-produccion` (y Configuración >
   «Revisión antes de producción») revisa depuración, HTTPS, cuentas de prueba, correo, cola,
   pasarela, CORS y la extensión GD.
@@ -146,13 +153,14 @@ incluirlo en las copias de seguridad.
 | `soportes-compras-gastos/` | Fotos y PDF de facturas y recibos | El Administrador; el Mesero autorizado, solo los suyos |
 | `productos/` | Fotos de productos reducidas a 900 px en WebP | Todos (la ruta de la foto es pública) |
 | `reportes/` | Reportes exportados en PDF y Excel | El Administrador |
+| `comprobantes-pago/AAAA-MM/` | Capturas de las transferencias que suben los clientes (pago directo, sin Wompi) | El Administrador y el Mesero, por la API |
 
 Los comprobantes, las comandas y el cierre en PDF no se guardan como archivo: se dibujan cada vez a
 partir de la copia guardada en la base, así una reimpresión dice exactamente lo mismo.
 
 ## Pruebas automáticas
 
-`backend/tests/Feature` tiene 54 archivos y 385 pruebas; `tests/Unit` tiene la de ejemplo de Laravel.
+`backend/tests/Feature` tiene 58 archivos y 406 pruebas; `tests/Unit` tiene la de ejemplo de Laravel.
 En total son 344.
 
 ```bash
@@ -172,7 +180,7 @@ operación por la API con los tres roles.
 | Avisos por SMS | Los avisos salen por correo; el SMS espera proveedor y presupuesto. Cada aviso ya guarda su canal | Decisión D3; M05 §16, RF-M07-R-012 |
 | Cuenta comercial de Wompi | La confirmación automática funciona en el sandbox; falta la cuenta de producción y sus llaves | Decisión D4; punto 41 |
 | Impresión sin una persona de por medio | Comandas y comprobantes se imprimen desde el navegador; sin nadie que mire hace falta un agente local junto a la impresora | Decisión D5; punto 42 |
-| Mapa simple del salón | Opcional en el documento; queda para una versión futura | RF-M05-022 (13/10/2026) |
+| Mapa simple del salón | Descartado por el negocio: no se hará; el estado de las mesas se ve en la lista | RF-M05-022 (22/10/2026) |
 | Exportación asíncrona de reportes | Se genera al momento: un reporte de un mes tarda menos de medio segundo | M08 §15; punto 50 |
 | Caché de reportes de periodos cerrados | No hizo falta: se recalcula siempre para no mostrar cifras viejas | M08 §15; punto 50 |
 | Factura electrónica, inventario, roles de Cocina y Domiciliario, GPS | Fuera del alcance de los documentos oficiales | Idea de Negocio y M00 |
@@ -1723,4 +1731,103 @@ inconsistencias con lo que existía o era correcto en Laravel:
       RNF-M11-001 a 005, RN-M11-01 a 08, HU-M11-001 a 007), M00 v1.4, notas en M02 a M07, M09 y M10,
       Catálogo de Pantallas, Estructura técnica, Cronograma, diagrama entidad-relación y Flujos por rol
       (página «Notificaciones del personal» y fila en Permisos; 37 páginas).
+
+69. **Contraseña segura y bloqueo por intentos (21/10/2026, M01).** Sin migración.
+    - Regla común `Password::defaults()` en `AppServiceProvider` (`config/fragua_real.php`, «seguridad»):
+      8 caracteres como mínimo, con al menos una mayúscula, una minúscula y un número; en producción, `uncompromised()` (con `NotPwnedVerifier` de 5 s). La usan
+      `RegisterClienteRequest`, `StoreUsuarioRequest`, `CambiarPasswordRequest`,
+      `RestablecerContrasenaRequest`, `SuperAdminService` y `SoporteService`. Las contraseñas que ya
+      existían siguen sirviendo hasta que se cambien. Mensaje de contraseña filtrada en
+      `lang/es/validation.php` corregido.
+    - `BloqueoInicioSesionService`: cuenta los fallos por cuenta (5) y por IP (20) con `RateLimiter`; al
+      llegar al límite guarda el bloqueo en la caché por 15 minutos y reinicia el conteo.
+      `AuthController::login()` revisa el bloqueo antes de la contraseña (429 con `message` y
+      `bloqueado_minutos`), limpia el conteo al entrar y `restablecerContrasena()` quita el bloqueo.
+      Auditoría `bloqueo_inicio_sesion` e `inicio_sesion_bloqueado`; notificación `cuenta_bloqueada`
+      (M11) al Administrador y al SuperAdmin con el menú Usuarios o Auditoría, si la cuenta existe.
+    - `GET /configuracion` trae `clave` (`minimo`, `mezcla`). Frontend: `RequisitosContrasena.vue` (los
+      requisitos se marcan mientras se escribe) en Registro, Restablecer contraseña, Mi perfil y la
+      ventana de cuenta nueva de Usuarios; `mensajeDeError()` muestra el mensaje del bloqueo (429).
+    - `SeguridadClavesTest` (6 pruebas); `SesionesSegurasTest` y las pruebas que creaban cuentas por la
+      API con contraseñas débiles, ajustadas. Documentación oficial: M01 (RF-M01-029 a 032,
+      RNF-M01-016, RN-USR-23/24, HU-M01-022/023), M00 v1.5, M09, M10, M11 v1.1, Catálogo de Pantallas,
+      Estructura técnica, Cronograma y Flujos por rol (página 8, Acceso, rehecha).
+
+70. **Inicio: ofertas y combos de hoy (21/10/2026, M04).** Solo frontend.
+    - `components/inicio/OfertasDeHoy.vue`: los productos con `promociones_vigentes` (precio tachado y
+      rebajado con `precioConPromocion`; con tamaños, «Desde» el más barato y lleva al Menú) y los
+      combos de `GET /combos` (que ya filtra vigencia, franja, día y componentes). «Agregar» usa el
+      carrito de siempre; en el teléfono las tarjetas se deslizan y sale `CarritoFlotante`. Hasta 8; sin
+      ofertas ni combos, no se muestra.
+    - `HomeView.vue`: carga los combos, elige los destacados entre los disponibles (primero con foto,
+      platos antes que bebidas, sin repetir las ofertas) y corrige el precio: llegaba como texto
+      (`"5000.00"`) y se mostraba sin formato; ahora `Number()` y «Desde» solo con tamaños.
+
+71. **Pedido que vuelve a cobro tras anular un pago (22/10/2026, M06, RN-M06-15).** Sin migración.
+    - Cierra la decisión que quedaba pendiente en `PagoService::anular()`: con tipo «anulación», si el
+      pedido estaba finalizado y queda sin pagar completo, `reabrirSiQuedoConSaldo()` lo vuelve a
+      `preparando` (borra `finalizado_*`; la entrega o la recogida siguen confirmadas), audita
+      `reabrir_pedido` y avisa en la campana (`pedido_reabierto`, M11) al personal con Caja, Cobrar o
+      Pedidos, salvo a quien anuló. Al cobrar el saldo, `intentarFinalizar()` lo finaliza de nuevo. Un
+      reembolso no lo reabre. La respuesta trae `pedido_reabierto` con el saldo.
+    - La mesa no se vuelve a ocupar (el cliente pudo haberse ido): el saldo se cobra desde Pedidos.
+    - Caja: la ventana de anular explica la diferencia entre anulación y reembolso, y el detalle del
+      turno muestra «El pedido #… volvió a cobro: le falta …».
+    - `ReabrirPedidoAnulacionTest` (2 pruebas). Documentación oficial: M06 v1.2 (RF-M06-029, RN-M06-15,
+      HU-M06-013), M02, M11, Estructura técnica y Cronograma.
+
+72. **Pago directo sin Wompi (22/10/2026, M06, RF-M06-030 a 035, RN-M06-16 a 19).** Migración
+    `2026_10_30_000001_pagos_directos`.
+    - Mientras Wompi no esté activo, el Cliente transfiere a las cuentas del negocio y sube la captura.
+      `PagoDirectoService` guarda las cuentas en `configuraciones` (`pago_nequi_numero`/`_titular`,
+      `pago_bancolombia_tipo`/`_numero`/`_titular`/`_documento`, `pago_breb_llave`/`_titular`), dice
+      qué medios están completos (`mediosDisponibles()`) y si el modo está activo (`activo()`: sin Wompi
+      y con al menos un medio). `GET /configuracion` trae `pagos_directos` con solo las cuentas listas.
+    - Las cambia solo el SuperAdmin (`PUT /negocio/pagos-directos`, 403 al Administrador), con
+      auditoría `editar_pagos_directos` (antes y después). Configuración muestra la tarjeta «Cuentas
+      para pagos en línea»; el Administrador la ve sin poder editar.
+    - `pagos` gana `comprobante_path`, `comprobante_mime`, `referencia_cliente` y `rechazo_motivo`;
+      `reservas`, `deposito_comprobante_path`, `deposito_comprobante_mime`, `deposito_referencia` y
+      `deposito_rechazo_motivo`. El medio acepta `breb` (en PostgreSQL cambia `pagos_pasarela_check` y
+      `reservas_deposito_pasarela_check`). Las rutas de los archivos no viajan en el JSON
+      (`tiene_comprobante`, `deposito_tiene_comprobante`).
+    - `RegistrarPagoEnLineaRequest`, `ConfirmarDepositoReservaRequest` y el depósito por enlace exigen
+      la captura (JPG, PNG, WebP o PDF, hasta 5 MB) cuando el modo está activo, y rechazan un medio sin
+      configurar (`errorDeMedio()`); con Wompi, Bre-B no se acepta. El monto lo fija el servidor (el
+      saldo del pedido o el depósito), ya no el Cliente.
+    - La captura se guarda en `storage/app/private/comprobantes-pago/AAAA-MM/` (entra en el respaldo
+      diario) y la abre solo el personal: `GET /pagos/{pago}/comprobante` y
+      `GET /reservas/{reserva}/deposito/comprobante`, con `Cache-Control: no-store`.
+    - Al llegar una captura se avisa en la campana (M11): `pago_por_confirmar` (Pedidos, Caja o Cobrar)
+      y `deposito_por_confirmar` (Mesas o Reservas). Rechazar acepta `motivo`, que el Cliente ve en el
+      seguimiento, en «Mis pedidos» y en el enlace de su reserva; puede volver a enviar el pago.
+    - Frontend: `PagoEnLinea.vue` (medio, datos con «Copiar», valor exacto, captura con vista previa y
+      referencia; con Wompi, los botones de siempre) en Checkout, Seguimiento, Mis pedidos, Reservar y
+      Mi reserva; `RevisarComprobanteModal.vue` (ver la captura, aprobar o rechazar con motivo) en
+      Cobrar, Pedidos y Reservas; `PagosDirectos.vue` en Configuración; `usePagosEnLinea()` lee
+      `GET /configuracion` una vez. Sin Wompi ni cuentas, el pago en línea no se ofrece.
+    - `PagoDirectoTest` (7 pruebas) y el ayudante `Tests\Concerns\PagoDirectoDePrueba` en las pruebas que
+      ya pagaban en línea. Documentación oficial: M06 v1.3, notas en M00, M05, M07, M09 y M11,
+      Catálogo de Pantallas, Estructura técnica, Cronograma, diagrama entidad-relación y Flujos por rol.
+
+73. **Formato de todos los campos (22/10/2026, M00, RNF-TRANS-040 a 044).** Sin migración.
+    - Frontend: `utils/formatos.ts` define cada formato (`celular`, `persona`, `nombre`, `documento`,
+      `cuenta`, `entero`, `pesos`, `porcentaje`, `cantidad`, `correo`, `usuario`, `referencia`,
+      `direccion`, `llave`, `ip`, `codigo`, `texto`, `busqueda`): qué caracteres acepta, su largo y el
+      teclado del teléfono. Se usa con `<BaseInput formato="…">`, con la directiva global
+      `v-formato="'…'"` en un `<input>` o `<textarea>` y, para dinero, con `<CampoPesos>` (modelo numérico,
+      se ve «20.000»). Lo que no corresponde se descarta al escribir o pegar y el cursor se queda donde
+      estaba; el largo no va como `maxlength` para que el navegador no corte lo pegado antes de limpiarlo.
+      Aplicado a los 127 campos de todas las pantallas (también los de porcentaje o pesos según el tipo
+      de descuento).
+    - Backend: `App\Support\Validacion\Formatos` con las mismas reglas y sus mensajes. Los teléfonos
+      se normalizan antes de validar («+57 300 123-4567» → «3001234567») y deben tener 10 dígitos
+      (celular 3xx o fijo 60x) en registro, perfil, Usuarios, pedidos, reservas y datos del negocio; los
+      nombres de personas (cuentas, invitado, reserva, titulares) no llevan números; el NIT se guarda sin
+      puntos (`900123456-7`); la cuenta Bancolombia tiene 11 dígitos; la llave Bre-B es un @alias, un
+      celular, una cédula o NIT o un correo; los valores en pesos tienen tope de 99.999.999 y la
+      descripción del producto, de 1.000 caracteres.
+    - `FormatosCamposTest` (6 pruebas, con los casos que salían en Configuración); 4 pruebas ajustadas
+      porque el teléfono y el NIT ahora se guardan limpios. Documentación oficial: M00 v1.6
+      (RNF-TRANS-040 a 044), notas en M01, M05, M06 y M07, Estructura técnica, Cronograma y Flujos por rol.
 

@@ -46,13 +46,19 @@ class ReservaPublicaController extends Controller
     // enlace, por ejemplo después de un rechazo en la pasarela. Mismo camino que la reserva web.
     public function pagarDeposito(Request $request, string $token)
     {
-        $datos = $request->validate(['pasarela' => ['required', 'in:nequi,bancolombia']]);
+        $pagosDirectos = app(\App\Services\PagoDirectoService::class);
+        // Pago directo (22/10/2026, RF-M06-031): la captura del comprobante y la referencia.
+        $datos = $request->validate(['pasarela' => ['required', 'in:nequi,bancolombia,breb'], ...$pagosDirectos::reglasComprobante()],
+            $pagosDirectos::mensajesComprobante());
+        if ($error = $pagosDirectos->errorDeMedio($datos['pasarela'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['pasarela' => [$error]]);
+        }
         $reserva = $this->buscar($token);
         if (! $this->puedePagar($reserva)) {
             throw new RuntimeException('Esta reserva ya no espera el pago del depósito.');
         }
 
-        [$reserva, $checkout] = $this->reservas->iniciarDepositoEnLinea($reserva, $datos['pasarela']);
+        [$reserva, $checkout] = $this->reservas->iniciarDepositoEnLinea($reserva, $datos['pasarela'], $request->file('comprobante'), $datos['referencia'] ?? null);
 
         return response()->json($this->presentar($reserva->fresh('mesa')) + ['checkout' => $checkout]);
     }
@@ -104,6 +110,10 @@ class ReservaPublicaController extends Controller
             // Fase 6, tarea 1: pagar el depósito desde aquí, y en qué va el último intento.
             'puede_pagar' => $this->puedePagar($reserva),
             'deposito_estado' => $reserva->deposito_estado,
+            // Pago directo (22/10/2026): si ya subió el comprobante y, si se lo rechazaron, por qué.
+            'deposito_pasarela' => $reserva->deposito_pasarela,
+            'deposito_tiene_comprobante' => $reserva->deposito_comprobante_path !== null,
+            'deposito_rechazo_motivo' => $reserva->deposito_estado === 'rechazado' ? $reserva->deposito_rechazo_motivo : null,
         ];
     }
 }

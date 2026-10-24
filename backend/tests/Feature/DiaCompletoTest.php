@@ -42,6 +42,7 @@ use Tests\TestCase;
 class DiaCompletoTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\PagoDirectoDePrueba;
 
     private const HOY = '2026-10-13';
 
@@ -126,7 +127,7 @@ class DiaCompletoTest extends TestCase
             'cliente_correo' => 'laura@correo.co', 'fecha_hora' => self::HOY.' 16:00',
         ])->assertCreated()->assertJsonPath('estado', 'pendiente_pago');
         $reservaId = $creada->json('id');
-        $this->postJson("/api/reservas/{$reservaId}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $creada->json('token_publico')])
+        $this->pagoDirecto("/api/reservas/{$reservaId}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $creada->json('token_publico')])
             ->assertOk()->assertJsonPath('checkout', null);
         $this->como($this->mesero);
         $this->postJson("/api/reservas/{$reservaId}/deposito/en-linea/confirmar")->assertOk()->assertJsonPath('estado', 'confirmada');
@@ -175,7 +176,7 @@ class DiaCompletoTest extends TestCase
             'tipo' => 'recogida', 'origen' => 'cliente_web', 'metodo_pago_preferido' => 'en_linea', 'pasarela_preferida' => 'nequi',
             'lineas' => $this->lineas([[$this->gaseosa, 2]]),
         ])->assertCreated()->json('id');
-        $pagoEnLinea = $this->postJson("/api/pedidos/{$recogida}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 8000])->assertCreated()->json('id');
+        $pagoEnLinea = $this->pagoDirecto("/api/pedidos/{$recogida}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 8000])->assertCreated()->json('id');
         $this->como($this->mesero);
         $this->postJson("/api/pedidos/{$recogida}/confirmar")->assertStatus(422); // RN-M06-05: el pago aún no está aprobado
         $this->postJson("/api/pagos/{$pagoEnLinea}/confirmar-en-linea")->assertOk();

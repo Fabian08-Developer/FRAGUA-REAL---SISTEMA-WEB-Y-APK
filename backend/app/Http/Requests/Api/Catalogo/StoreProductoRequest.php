@@ -18,9 +18,9 @@ class StoreProductoRequest extends FormRequest
             // RF-M04-028, RN-M04-14 (Fase 2, tarea 3): nombre único en todo el catálogo, con mensaje
             // claro (antes solo lo frenaba la base de datos con un error 500).
             'nombre' => ['required', 'string', 'max:255', \Illuminate\Validation\Rule::unique('productos', 'nombre')->ignore($this->route('producto'))],
-            'descripcion' => ['nullable', 'string'],
+            'descripcion' => ['nullable', 'string', 'max:1000'],
             // RF-M04-023, RN-M04-10: todo precio mayor a cero.
-            'precio_base' => ['required', 'numeric', 'gt:0'],
+            'precio_base' => ['required', 'numeric', 'gt:0', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS],
             'tipo_venta' => ['required', 'in:bebida,alimento,otro'],
             'disponible' => ['boolean'],
             'imagen_url' => ['nullable', 'string', 'max:255'],

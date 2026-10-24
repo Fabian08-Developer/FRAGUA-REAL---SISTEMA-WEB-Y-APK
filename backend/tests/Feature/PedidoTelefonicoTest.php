@@ -20,6 +20,7 @@ use Tests\TestCase;
 class PedidoTelefonicoTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\PagoDirectoDePrueba;
 
     private User $mesero;
     private Producto $hamburguesa;
@@ -53,7 +54,7 @@ class PedidoTelefonicoTest extends TestCase
         $pedido = Pedido::findOrFail($id);
         $this->assertSame('mesero', $pedido->origen);
         $this->assertSame('pendiente', $pedido->estado);
-        $this->assertSame('300 123 4567', $pedido->telefono_contacto);
+        $this->assertSame('3001234567', $pedido->telefono_contacto); // se guarda solo con números
         $this->assertSame('El Prado', $pedido->barrio);
         $this->assertSame('Casa esquinera azul', $pedido->referencia);
         $this->assertSame('Llamar al llegar, el timbre no sirve', $pedido->observaciones_entrega);
@@ -75,7 +76,7 @@ class PedidoTelefonicoTest extends TestCase
         $this->assertNull($pedido->barrio);
         $this->assertNull($pedido->valor_domicilio);
         $this->assertEquals(40000, $pedido->total);
-        $this->assertSame('300 123 4567', $pedido->telefono_contacto);
+        $this->assertSame('3001234567', $pedido->telefono_contacto); // se guarda solo con números
     }
 
     public function test_RN_M07_01_un_domicilio_exige_barrio_y_referencia(): void
@@ -167,7 +168,7 @@ class PedidoTelefonicoTest extends TestCase
             ->assertStatus(422)->assertJsonValidationErrors(['pasarela_preferida']);
 
         $respuesta = $this->postJson('/api/pedidos', $this->domicilio(['origen' => 'cliente_web']))->assertCreated();
-        $this->postJson("/api/pedidos/seguimiento/{$respuesta->json('token_publico')}/pagar-en-linea", [
+        $this->pagoDirecto("/api/pedidos/seguimiento/{$respuesta->json('token_publico')}/pagar-en-linea", [
             'pasarela' => 'nequi', 'monto' => $respuesta->json('total'),
         ])->assertSuccessful();
 

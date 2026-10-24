@@ -67,13 +67,13 @@ class AuditoriaConsultaTest extends TestCase
 
         $registro = $this->postJson('/api/auth/register', [
             'nombre' => 'Carla Cliente', 'email' => 'carla@test.co',
-            'password' => 'clave12345', 'password_confirmation' => 'clave12345',
+            'password' => 'Clave12345', 'password_confirmation' => 'Clave12345',
         ])->assertCreated();
         $cliente = User::where('email', 'carla@test.co')->sole();
         $token = $registro->json('token');
 
         $this->withToken($token)->postJson('/api/perfil/password', [
-            'password_actual' => 'clave12345', 'password' => 'nueva12345', 'password_confirmation' => 'nueva12345',
+            'password_actual' => 'Clave12345', 'password' => 'Nueva12345', 'password_confirmation' => 'Nueva12345',
         ])->assertOk();
         $this->withToken($token)->postJson('/api/auth/logout')->assertOk();
 
@@ -83,9 +83,9 @@ class AuditoriaConsultaTest extends TestCase
         // El token real solo viaja en el correo; para la prueba se fija uno conocido.
         $tokenPlano = 'token-de-prueba';
         DB::table('password_reset_tokens')->where('email', 'carla@test.co')->update(['token' => Hash::make($tokenPlano)]);
-        $this->postJson('/api/auth/restablecer', ['email' => 'carla@test.co', 'token' => 'malo', 'password' => 'otra12345', 'password_confirmation' => 'otra12345'])
+        $this->postJson('/api/auth/restablecer', ['email' => 'carla@test.co', 'token' => 'malo', 'password' => 'Otra12345', 'password_confirmation' => 'Otra12345'])
             ->assertStatus(422);
-        $this->postJson('/api/auth/restablecer', ['email' => 'carla@test.co', 'token' => $tokenPlano, 'password' => 'otra12345', 'password_confirmation' => 'otra12345'])
+        $this->postJson('/api/auth/restablecer', ['email' => 'carla@test.co', 'token' => $tokenPlano, 'password' => 'Otra12345', 'password_confirmation' => 'Otra12345'])
             ->assertOk();
 
         $acciones = Auditoria::where('entidad', 'User')->where('entidad_id', $cliente->id)->orderBy('id')->pluck('accion')->all();
@@ -106,7 +106,7 @@ class AuditoriaConsultaTest extends TestCase
 
         $this->postJson('/api/usuarios', [
             'role' => 'mesero', 'nombre' => 'Nuevo Mesero', 'email' => 'nuevo@test.co',
-            'password' => 'clave12345', 'password_confirmation' => 'clave12345',
+            'password' => 'Clave12345', 'password_confirmation' => 'Clave12345',
         ])->assertCreated();
         $alta = Auditoria::where('accion', 'crear_usuario')->sole();
         $this->assertSame($this->admin->id, $alta->user_id);

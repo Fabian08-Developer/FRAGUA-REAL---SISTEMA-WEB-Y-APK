@@ -19,10 +19,20 @@ class Reserva extends Model
         'creado_por', 'registrada_por',
         'pedido_id', 'deposito_abonado', 'llegada_at', 'deposito_caja_turno_id', 'deposito_reembolso_caja_turno_id',
         'no_show_at', 'no_show_automatico', 'recordatorio_enviado_at',
+        // Pago directo (22/10/2026): la captura del comprobante del depósito, su referencia y el motivo de un rechazo.
+        'deposito_comprobante_path', 'deposito_comprobante_mime', 'deposito_referencia', 'deposito_rechazo_motivo',
     ];
 
     // Fase 4, tarea 4: el enlace secreto de la reserva solo viaja en los correos al cliente.
-    protected $hidden = ['token_publico'];
+    // Pago directo: la ruta de la captura tampoco (el personal la abre por la API).
+    protected $hidden = ['token_publico', 'deposito_comprobante_path', 'deposito_comprobante_mime'];
+
+    protected $appends = ['deposito_tiene_comprobante'];
+
+    public function getDepositoTieneComprobanteAttribute(): bool
+    {
+        return $this->deposito_comprobante_path !== null;
+    }
 
     protected static function booted(): void
     {

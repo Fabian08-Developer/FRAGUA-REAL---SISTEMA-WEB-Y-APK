@@ -9,6 +9,8 @@
 // y consulta el historial de cualquier pedido (HU-M02-020).
 // Fase 2, tarea 1: aplica o quita un descuento manual con motivo (RF-M04-036, HU-M04-015).
 // Fase 4, tarea 5: marca una recogida «Listo para recoger» y reintenta el aviso si falló (RF-M07-R-012).
+// Pago directo (22/10/2026, RF-M06-032/033): revisa la captura de un pago en línea y lo aprueba o lo
+// rechaza con motivo (el mismo paso que hace el Mesero en Cobrar).
 import { computed, onMounted, ref, watch } from 'vue'
 import { ChevronDown, History, Pencil, Percent, Receipt, RefreshCw, ShoppingBasket } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
@@ -23,6 +25,9 @@ import EditarPedidoModal from '@/components/pedidos/EditarPedidoModal.vue'
 import ComprobantesPedidoModal from '@/components/pedidos/ComprobantesPedidoModal.vue'
 import HistorialPedidoModal from '@/components/pedidos/HistorialPedidoModal.vue'
 import ListoParaRecoger from '@/components/pedidos/ListoParaRecoger.vue'
+import RevisarComprobanteModal from '@/components/pagos/RevisarComprobanteModal.vue'
+import { pagoService } from '@/services/pago.service'
+import { nombreMedio } from '@/utils/pasarela'
 import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
 import { TIPOS_PEDIDO_UI, formatoHoraPedido, titularPedido } from '@/utils/pedidoUi'
 import { pedidoService } from '@/services/pedido.service'
@@ -30,7 +35,7 @@ import { mensajeDeError } from '@/services/errors'
 import { comandaService } from '@/services/comanda.service'
 import { abrirPdf } from '@/utils/documentos'
 import { avisarComandas, imprimirAlConfirmar, porImprimir } from '@/utils/comandas'
-import type { Pedido, PedidoAviso } from '@/types/models'
+import type { Pago, Pedido, PedidoAviso } from '@/types/models'
 
 const pedidos = ref<Pedido[]>([])
 const cargando = ref(true)
@@ -116,6 +121,50 @@ watch(pagina, cargar)
 
 function alternar(pedido: Pedido) {
   abierto.value = abierto.value === pedido.id ? null : pedido.id
+}
+
+// ---- Pago directo: pagos en línea por revisar ----
+function pagosPorRevisar(pedido: Pedido) {
+  return (pedido.pagos ?? []).filter((p) => p.metodo === 'en_linea' && p.estado === 'pendiente' && !p.anulado)
+}
+
+const revision = ref<{ pago: Pago; pedido: Pedido; rechazar: boolean } | null>(null)
+const errorRevision = ref('')
+
+function abrirRevision(pago: Pago, pedido: Pedido, rechazar = false) {
+  errorRevision.value = ''
+  revision.value = { pago, pedido, rechazar }
+}
+
+async function resolverRevision(accion: 'aprobar' | 'rechazar', motivo?: string) {
+  if (!revision.value) return
+  const { pago, pedido } = revision.value
+  procesando.value = pedido.id
+  errorRevision.value = ''
+  try {
+    if (accion === 'aprobar') await pagoService.confirmarEnLinea(pago.id)
+    else await pagoService.rechazarEnLinea(pago.id, motivo)
+    revision.value = null
+    await cargar() // aprobar puede confirmar o finalizar el pedido
+  } catch (e) {
+    errorRevision.value = mensajeDeError(e, accion === 'aprobar' ? 'No pudimos aprobar el pago.' : 'No pudimos rechazar el pago.')
+  } finally {
+    procesando.value = null
+  }
+}
+
+// Sin captura (p. ej. un intento en Wompi que no se confirmó solo): respaldo manual, como en Cobrar.
+async function aprobarAMano(pago: Pago, pedido: Pedido) {
+  procesando.value = pedido.id
+  error.value = ''
+  try {
+    await pagoService.confirmarEnLinea(pago.id)
+    await cargar()
+  } catch (e) {
+    error.value = mensajeDeError(e, 'No pudimos aprobar el pago.')
+  } finally {
+    procesando.value = null
+  }
 }
 
 function reemplazarPedido(actualizado: Pedido) {
@@ -318,6 +367,7 @@ onMounted(cargar)
 
             <div class="flex shrink-0 flex-col items-end gap-1.5">
               <span class="badge" :class="ESTADOS[pedido.estado].clase">{{ ESTADOS[pedido.estado].texto }}</span>
+              <span v-if="pagosPorRevisar(pedido).length" class="badge bg-sky-50 text-sky-700 ring-sky-600/20">Pago por revisar</span>
               <span class="text-sm font-bold text-ink">{{ formatoPrecio(pedido.total) }}</span>
             </div>
 
@@ -359,6 +409,39 @@ onMounted(cargar)
                 <span class="font-semibold" :class="pagado(pedido) >= Number(pedido.total) ? 'text-emerald-600' : 'text-gray-700'">
                   {{ formatoPrecio(pagado(pedido)) }}
                 </span>
+              </div>
+            </div>
+
+            <!-- Pago directo: el pago en línea que espera revisión (con o sin captura). -->
+            <div
+              v-for="pago in pagosPorRevisar(pedido)"
+              :key="pago.id"
+              class="mt-4 flex flex-col gap-3 rounded-2xl border border-sky-200 bg-sky-50/60 p-3.5 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div class="min-w-0 text-sm">
+                <p class="font-semibold text-ink">Pago en línea por revisar</p>
+                <p class="mt-0.5 text-xs text-gray-600">
+                  {{ formatoPrecio(pago.monto) }} por {{ nombreMedio(pago.pasarela) }}
+                  <template v-if="pago.tiene_comprobante"> · con captura</template>
+                  <template v-else-if="pago.transaccion_pasarela"> · en proceso en Wompi (se confirma solo)</template>
+                  <template v-if="pago.referencia_cliente"> · ref. <span class="font-mono">{{ pago.referencia_cliente }}</span></template>
+                </p>
+              </div>
+              <BaseButton
+                v-if="pago.tiene_comprobante"
+                size="sm"
+                :disabled="procesando === pedido.id"
+                @click="abrirRevision(pago, pedido)"
+              >
+                Revisar comprobante
+              </BaseButton>
+              <div v-else class="grid grid-cols-2 gap-2 sm:flex">
+                <BaseButton v-escritura size="sm" variant="ghost" :disabled="procesando === pedido.id" @click="abrirRevision(pago, pedido, true)">
+                  Rechazar
+                </BaseButton>
+                <BaseButton v-escritura size="sm" variant="secondary" :disabled="procesando === pedido.id" @click="aprobarAMano(pago, pedido)">
+                  Aprobar a mano
+                </BaseButton>
               </div>
             </div>
 
@@ -445,13 +528,27 @@ onMounted(cargar)
     <HistorialPedidoModal :pedido-id="historialId" @cerrar="historialId = null" />
     <ComprobantesPedidoModal :pedido-id="comprobantesId" @cerrar="comprobantesId = null" />
     <DescuentoPedidoModal :pedido="pedidoEnDescuento" @cerrar="descuentoId = null" @actualizado="reemplazarPedido" />
+    <RevisarComprobanteModal
+      :abierto="!!revision && (revision.rechazar || !!revision.pago.tiene_comprobante)"
+      :titulo="revision ? `Comprobante · pedido #${revision.pedido.id}` : ''"
+      :monto="Number(revision?.pago.monto ?? 0)"
+      :medio="revision?.pago.pasarela"
+      :referencia="revision?.pago.referencia_cliente"
+      :cargar="revision?.pago.tiene_comprobante ? () => pagoService.comprobante(revision!.pago.id) : null"
+      :rechazar="revision?.rechazar"
+      :procesando="!!revision && procesando === revision.pedido.id"
+      :error="errorRevision"
+      @cerrar="revision = null"
+      @aprobar="resolverRevision('aprobar')"
+      @rechazar="(m: string) => resolverRevision('rechazar', m)"
+    />
 
     <BaseModal :model-value="!!pedidoACancelar" title="Cancelar pedido" @update:model-value="pedidoACancelar = null">
       <p class="text-sm text-gray-600">
         Vas a cancelar el pedido <strong class="text-ink">#{{ pedidoACancelar?.id }}</strong
         >. Escribe el motivo (obligatorio).
       </p>
-      <textarea
+      <textarea v-formato="'texto'" maxlength="255"
         v-model="motivoCancelar"
         rows="3"
         class="field mt-3"

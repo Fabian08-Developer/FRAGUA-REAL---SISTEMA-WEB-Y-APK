@@ -469,6 +469,13 @@ class CatalogoController extends Controller
             ),
             // Fase 4, tarea 2: tiempos de las reservas (el Cliente ve la tolerancia al reservar).
             ...\App\Support\Reservas\PoliticaReservas::valores(),
+            // Seguridad (21/10/2026): las pantallas muestran los requisitos de la contraseña.
+            'clave' => [
+                'minimo' => max(8, (int) config('fragua_real.seguridad.clave_minimo', 8)),
+                'mezcla' => (bool) config('fragua_real.seguridad.clave_mezcla', true),
+            ],
+            // Pago directo (22/10/2026): las cuentas a las que transfiere el Cliente (solo las listas).
+            'pagos_directos' => app(\App\Services\PagoDirectoService::class)->publico(),
             // Mejora (19/10/2026): dirección, teléfono, WhatsApp y logo que cambia el Administrador.
             'negocio' => app(\App\Services\NegocioService::class)->publico(),
         ]);

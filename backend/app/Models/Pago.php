@@ -22,7 +22,19 @@ class Pago extends Model
     protected $fillable = [
         'pedido_id', 'tipo', 'reserva_id', 'caja_turno_id', 'metodo', 'pasarela', 'monto', 'estado',
         'confirmado_via', 'confirmado_por', 'registrado_por', 'anulado', 'reverso_tipo', 'anulado_motivo', 'anulado_por', 'anulado_at',
+        // Pago directo (22/10/2026): la captura del comprobante, la referencia y el motivo de un rechazo.
+        'comprobante_path', 'comprobante_mime', 'referencia_cliente', 'rechazo_motivo',
     ];
+
+    // La ruta de la captura no sale en las respuestas: el personal la abre con GET /pagos/{pago}/comprobante.
+    protected $hidden = ['comprobante_path', 'comprobante_mime'];
+
+    protected $appends = ['tiene_comprobante'];
+
+    public function getTieneComprobanteAttribute(): bool
+    {
+        return $this->comprobante_path !== null;
+    }
 
     protected $casts = [
         'monto' => 'decimal:2',

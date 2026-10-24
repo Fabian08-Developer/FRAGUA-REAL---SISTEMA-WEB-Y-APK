@@ -3,12 +3,17 @@
 // (también sin cuenta) entra con el enlace de sus correos (/reserva/<token>): ve su reserva y,
 // mientras no haya llegado la hora, la cancela. Si el depósito se pagó en línea, se le devuelve
 // completo (RN-M05-17); si se pagó en efectivo en el local, el backend le indica pasar por allá.
+// Pago directo (22/10/2026, RF-M06-030 a 033): sin Wompi, paga el depósito con la captura de la
+// transferencia; mientras se revisa lo dice, y si se rechaza ve el motivo y la envía de nuevo.
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { CalendarClock, CheckCircle2, XCircle } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
+import PagoEnLinea from '@/components/pagos/PagoEnLinea.vue'
+import { usePagosEnLinea } from '@/composables/usePagosEnLinea'
 import { reservaService } from '@/services/reserva.service'
-import { mensajeDeError } from '@/services/errors'
+import type { PagoEnLineaPayload } from '@/services/pedido.service'
+import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import { irAlCheckout } from '@/utils/pasarela'
 import type { EstadoReserva, ReservaPublica } from '@/types/models'
 
@@ -60,21 +65,28 @@ async function cancelar() {
 }
 
 // ---- Fase 6, tarea 1 (RF-M05-030, RF-M06-008): pagar o reintentar el depósito desde aquí ----
-const pasarela = ref<'nequi' | 'bancolombia'>('nequi')
+const { pagos: configPagos, disponible: enLineaDisponible } = usePagosEnLinea()
 const pagando = ref(false)
-const depositoEnRevision = ref(false)
+const errorPago = ref('')
+const recienEnviado = ref(false)
+// Ya mandó el pago (o la captura) y el personal aún no lo revisa.
+const depositoEnRevision = computed(
+  () =>
+    recienEnviado.value ||
+    (reserva.value?.estado === 'pendiente_pago' && reserva.value.deposito_estado === 'pendiente' && !reserva.value.puede_pagar),
+)
 
-async function pagarDeposito() {
+async function pagarDeposito(datosPago: PagoEnLineaPayload) {
   pagando.value = true
-  error.value = ''
+  errorPago.value = ''
   try {
-    const { data } = await reservaService.pagarDepositoPorEnlace(token, pasarela.value)
+    const { data } = await reservaService.pagarDepositoPorEnlace(token, datosPago)
     if (irAlCheckout(data.checkout)) return // vuelve por /pago/retorno
     reserva.value = data
-    depositoEnRevision.value = true // modo manual: lo aprueba el personal
+    recienEnviado.value = true // modo manual: lo aprueba el personal
     pagando.value = false
   } catch (e) {
-    error.value = mensajeDeError(e, 'No pudimos iniciar el pago del depósito.')
+    errorPago.value = Object.values(erroresDeValidacion(e))[0] ?? mensajeDeError(e, 'No pudimos iniciar el pago del depósito.')
     pagando.value = false
   }
 }
@@ -145,23 +157,34 @@ onMounted(cargar)
       <p v-if="error" class="mt-4 alert-error">{{ error }}</p>
 
       <!-- Fase 6, tarea 1: el depósito se paga (o se reintenta) desde el enlace. -->
-      <section v-if="reserva.puede_pagar && !depositoEnRevision" class="mt-6 rounded-2xl border border-[#e2dbcf] bg-white p-5">
+      <section
+        v-if="reserva.puede_pagar && !depositoEnRevision && enLineaDisponible"
+        class="mt-6 rounded-2xl border border-[#e2dbcf] bg-white p-5"
+      >
         <h2 class="font-display text-lg text-ink">Pagar el depósito</h2>
+        <p v-if="reserva.deposito_estado === 'rechazado'" class="mt-2 alert-error">
+          El pago anterior no se aprobó<template v-if="reserva.deposito_rechazo_motivo">: {{ reserva.deposito_rechazo_motivo }}</template>.
+          Revisa los datos y vuelve a intentarlo.
+        </p>
         <p class="mt-1 text-xs text-[#6c655c]">
-          <template v-if="reserva.deposito_estado === 'rechazado'">El pago anterior no se aprobó. </template>
-          <template v-else-if="reserva.deposito_estado === 'pendiente'">Si no terminaste el pago anterior, puedes intentarlo de nuevo. </template>
+          <template v-if="reserva.deposito_estado === 'pendiente'">Si no terminaste el pago anterior, puedes intentarlo de nuevo. </template>
           Tu reserva se confirma en cuanto el pago quede aprobado.
         </p>
-        <div class="mt-3 flex gap-4">
-          <label class="flex items-center gap-2 text-sm text-ink"><input v-model="pasarela" type="radio" value="nequi" /> Nequi</label>
-          <label class="flex items-center gap-2 text-sm text-ink"><input v-model="pasarela" type="radio" value="bancolombia" /> Bancolombia</label>
-        </div>
-        <BaseButton class="mt-4" :disabled="pagando" @click="pagarDeposito">
-          {{ pagando ? 'Abriendo el pago…' : `Pagar ${formatoPrecio(reserva.deposito_valor)}` }}
-        </BaseButton>
+        <PagoEnLinea
+          class="mt-4"
+          :config="configPagos"
+          :monto="Number(reserva.deposito_valor)"
+          :enviando="pagando"
+          :error="errorPago"
+          :medio-inicial="reserva.deposito_pasarela"
+          concepto="el depósito de"
+          @pagar="pagarDeposito"
+        />
       </section>
       <p v-else-if="depositoEnRevision" class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        Registramos tu pago. En cuanto lo verifiquemos, confirmamos tu reserva y te avisamos por correo.
+        <template v-if="reserva.deposito_tiene_comprobante">Recibimos tu comprobante.</template>
+        <template v-else>Registramos tu pago.</template>
+        En cuanto lo verifiquemos, confirmamos tu reserva y te avisamos por correo.
       </p>
 
       <div v-if="reserva.puede_cancelar" class="mt-6">

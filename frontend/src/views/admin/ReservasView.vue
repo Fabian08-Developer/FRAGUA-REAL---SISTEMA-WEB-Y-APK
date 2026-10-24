@@ -18,10 +18,11 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import PestanasSalon from '@/components/common/PestanasSalon.vue'
+import RevisarComprobanteModal from '@/components/pagos/RevisarComprobanteModal.vue'
 import { reservaService } from '@/services/reserva.service'
 import { mesaService } from '@/services/mesa.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
-import { ESTADO_REEMBOLSO, ESTADO_TRANSACCION, metodoPasarela } from '@/utils/pasarela'
+import { ESTADO_REEMBOLSO, ESTADO_TRANSACCION, metodoPasarela, nombreMedio } from '@/utils/pasarela'
 import { useAuthStore } from '@/stores/auth'
 import { configuracionService } from '@/services/configuracion.service'
 import { HORARIO_POR_DEFECTO, fechaMinimaReserva, horasDelDia, textoHorario, type HorarioReservas } from '@/utils/horarioReservas'
@@ -174,14 +175,43 @@ async function confirmarDeposito(reserva: Reserva) {
   }
 }
 
-async function rechazarDeposito(reserva: Reserva) {
+// Pago directo (22/10/2026, RF-M06-032/033): la captura del depósito se revisa en una ventana; el
+// rechazo lleva motivo, que el Cliente ve en el enlace de su reserva.
+const revisionDeposito = ref<{ reserva: Reserva; rechazar: boolean } | null>(null)
+const errorRevision = ref('')
+
+function abrirRevisionDeposito(reserva: Reserva, rechazar = false) {
+  errorRevision.value = ''
+  revisionDeposito.value = { reserva, rechazar }
+}
+
+async function aprobarDepositoRevisado() {
+  if (!revisionDeposito.value) return
+  const { reserva } = revisionDeposito.value
   procesando.value = reserva.id
-  error.value = ''
+  errorRevision.value = ''
   try {
-    const { data } = await reservaService.rechazarDepositoEnLinea(reserva.id)
+    const { data } = await reservaService.confirmarDepositoEnLinea(reserva.id)
     reemplazar(data)
+    revisionDeposito.value = null
   } catch (e) {
-    error.value = mensajeDeError(e, 'No pudimos rechazar el depósito.')
+    errorRevision.value = mensajeDeError(e, 'No pudimos confirmar el depósito.')
+  } finally {
+    procesando.value = null
+  }
+}
+
+async function rechazarDeposito(motivo: string) {
+  if (!revisionDeposito.value) return
+  const { reserva } = revisionDeposito.value
+  procesando.value = reserva.id
+  errorRevision.value = ''
+  try {
+    const { data } = await reservaService.rechazarDepositoEnLinea(reserva.id, motivo)
+    reemplazar(data)
+    revisionDeposito.value = null
+  } catch (e) {
+    errorRevision.value = mensajeDeError(e, 'No pudimos rechazar el depósito.')
   } finally {
     procesando.value = null
   }
@@ -581,9 +611,16 @@ onBeforeUnmount(() => clearInterval(reloj))
                 <span v-else-if="reserva.deposito_reembolsado" class="font-medium text-gray-700">· reembolsado</span>
               </template>
               <template v-else-if="reserva.deposito_estado === 'pendiente'">
-                — {{ reserva.transaccion_deposito ? 'pago en proceso en Wompi (se confirma solo)' : 'pago en línea pendiente de confirmar' }}
+                <template v-if="reserva.deposito_tiene_comprobante">
+                  — <span class="font-medium text-sky-700">comprobante por revisar ({{ nombreMedio(reserva.deposito_pasarela) }})</span>
+                </template>
+                <template v-else>
+                  — {{ reserva.transaccion_deposito ? 'pago en proceso en Wompi (se confirma solo)' : 'pago en línea pendiente de confirmar' }}
+                </template>
               </template>
-              <template v-else-if="reserva.deposito_estado === 'rechazado'"> — pago en línea rechazado</template>
+              <template v-else-if="reserva.deposito_estado === 'rechazado'">
+                — pago en línea rechazado<template v-if="reserva.deposito_rechazo_motivo">: «{{ reserva.deposito_rechazo_motivo }}»</template>
+              </template>
               <template v-else> — sin pagar</template>
             </p>
             <!-- Fase 6, tarea 1 (RF-M05-030): el último intento en la pasarela y su reembolso. -->
@@ -603,7 +640,16 @@ onBeforeUnmount(() => clearInterval(reloj))
             class="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end"
           >
             <template v-if="reserva.estado === 'pendiente_pago'">
-              <template v-if="reserva.deposito_estado === 'pendiente'">
+              <BaseButton
+                v-if="reserva.deposito_estado === 'pendiente' && reserva.deposito_tiene_comprobante"
+                size="sm"
+                variant="primary"
+                :disabled="procesando === reserva.id"
+                @click="abrirRevisionDeposito(reserva)"
+              >
+                Revisar comprobante
+              </BaseButton>
+              <template v-else-if="reserva.deposito_estado === 'pendiente'">
                 <!-- Con Wompi se confirma solo; los botones quedan de respaldo (D4). -->
                 <BaseButton v-escritura
                   size="sm"
@@ -613,7 +659,7 @@ onBeforeUnmount(() => clearInterval(reloj))
                 >
                   {{ reserva.transaccion_deposito ? 'Confirmar a mano' : 'Confirmar depósito' }}
                 </BaseButton>
-                <BaseButton v-escritura size="sm" variant="ghost" :disabled="procesando === reserva.id" @click="rechazarDeposito(reserva)">
+                <BaseButton v-escritura size="sm" variant="ghost" :disabled="procesando === reserva.id" @click="abrirRevisionDeposito(reserva, true)">
                   {{ reserva.transaccion_deposito ? 'Rechazar a mano' : 'Rechazar depósito' }}
                 </BaseButton>
               </template>
@@ -730,24 +776,24 @@ onBeforeUnmount(() => clearInterval(reloj))
 
         <label class="block">
           <span class="field-label">Nombre del cliente</span>
-          <input v-model="nueva.nombre" type="text" maxlength="255" class="field" />
+          <input v-formato="'persona'" v-model="nueva.nombre" type="text" maxlength="255" class="field" />
           <span v-if="erroresNueva.cliente_nombre" class="mt-1 block text-xs text-red-600">{{ erroresNueva.cliente_nombre }}</span>
         </label>
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="block">
             <span class="field-label">Teléfono</span>
-            <input v-model="nueva.telefono" type="tel" inputmode="tel" maxlength="30" class="field" />
+            <input v-formato="'celular'" v-model="nueva.telefono" type="tel" inputmode="tel" maxlength="30" class="field" />
             <span v-if="erroresNueva.cliente_telefono" class="mt-1 block text-xs text-red-600">{{ erroresNueva.cliente_telefono }}</span>
           </label>
           <label class="block">
             <span class="field-label">Correo</span>
-            <input v-model="nueva.correo" type="email" maxlength="255" class="field" />
+            <input v-formato="'correo'" v-model="nueva.correo" type="email" maxlength="255" class="field" />
             <span v-if="erroresNueva.cliente_correo" class="mt-1 block text-xs text-red-600">{{ erroresNueva.cliente_correo }}</span>
           </label>
         </div>
         <label class="block">
           <span class="field-label">Descripción (opcional)</span>
-          <textarea v-model="nueva.descripcion" rows="2" maxlength="500" class="field resize-none" placeholder="Cumpleaños, silla para bebé, cerca de la ventana…" />
+          <textarea v-formato="'texto'" v-model="nueva.descripcion" rows="2" maxlength="500" class="field resize-none" placeholder="Cumpleaños, silla para bebé, cerca de la ventana…" />
           <span v-if="erroresNueva.descripcion" class="mt-1 block text-xs text-red-600">{{ erroresNueva.descripcion }}</span>
         </label>
         <p class="text-xs text-gray-500">
@@ -787,5 +833,25 @@ onBeforeUnmount(() => clearInterval(reloj))
         <p v-else class="mt-4 text-sm text-gray-500">No hay depósitos retenidos actualmente.</p>
       </template>
     </BaseModal>
+
+    <RevisarComprobanteModal
+      :abierto="!!revisionDeposito"
+      :titulo="revisionDeposito ? `Depósito · reserva #${revisionDeposito.reserva.id}` : ''"
+      :monto="Number(revisionDeposito?.reserva.deposito_valor ?? 0)"
+      :medio="revisionDeposito?.reserva.deposito_pasarela"
+      :referencia="revisionDeposito?.reserva.deposito_referencia"
+      :cargar="
+        revisionDeposito?.reserva.deposito_tiene_comprobante
+          ? () => reservaService.comprobanteDeposito(revisionDeposito!.reserva.id)
+          : null
+      "
+      :rechazar="revisionDeposito?.rechazar"
+      :procesando="!!revisionDeposito && procesando === revisionDeposito.reserva.id"
+      :error="errorRevision"
+      texto-aprobar="Confirmar depósito"
+      @cerrar="revisionDeposito = null"
+      @aprobar="aprobarDepositoRevisado"
+      @rechazar="rechazarDeposito"
+    />
   </div>
 </template>

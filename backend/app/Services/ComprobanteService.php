@@ -193,7 +193,7 @@ class ComprobanteService
         // El logo no va en la copia guardada del comprobante: se pone al generar el PDF.
         $negocio = array_diff_key(app(NegocioService::class)->datos(), ['logo' => true]);
         $metodos = ['efectivo' => 'Efectivo', 'tarjeta' => 'Tarjeta', 'transferencia' => 'Transferencia', 'en_linea' => 'En línea'];
-        $pasarelas = ['nequi' => 'Nequi', 'bancolombia' => 'Bancolombia'];
+        $pasarelas = ['nequi' => 'Nequi', 'bancolombia' => 'Bancolombia', 'breb' => 'Bre-B'];
 
         $descuentos = [];
         if ($pedido->descuento_manual) {

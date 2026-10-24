@@ -10,6 +10,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, KeyRound, Lock, Mail } from 'lucide-vue-next'
 import BaseInput from '@/components/common/BaseInput.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
+import RequisitosContrasena from '@/components/common/RequisitosContrasena.vue'
 import { authService } from '@/services/auth.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 
@@ -54,7 +55,7 @@ async function onSubmit() {
     <p class="mt-2 text-sm text-[#6c655c]">Pega el código que recibiste y elige una nueva contraseña.</p>
   </div>
   <form class="space-y-5" @submit.prevent="onSubmit">
-    <BaseInput
+    <BaseInput formato="correo"
       v-model="email"
       type="email"
       label="Correo electrónico"
@@ -62,7 +63,7 @@ async function onSubmit() {
       :icon="Mail"
       :error="erroresCampo.email"
     />
-    <BaseInput
+    <BaseInput formato="codigo"
       v-model="token"
       label="Código de recuperación"
       placeholder="Pega aquí el código recibido"
@@ -73,9 +74,10 @@ async function onSubmit() {
       v-model="password"
       type="password"
       label="Nueva contraseña"
-      placeholder="Mínimo 8 caracteres"
+      placeholder="Ej. Hamburguesa2026"
       :icon="Lock"
       :error="erroresCampo.password"
+      autocomplete="new-password"
     />
     <BaseInput
       v-model="passwordConfirmation"
@@ -83,7 +85,9 @@ async function onSubmit() {
       label="Confirmar nueva contraseña"
       placeholder="••••••••"
       :icon="Lock"
+      autocomplete="new-password"
     />
+    <RequisitosContrasena :clave="password" :confirmacion="passwordConfirmation" />
     <p v-if="errorGeneral" class="text-sm text-red-600">{{ errorGeneral }}</p>
     <BaseButton type="submit" :disabled="cargando" class="w-full">
       <span class="flex w-full items-center justify-between">

@@ -30,8 +30,12 @@ class SuperAdminService
         if (! filter_var($correo, FILTER_VALIDATE_EMAIL)) {
             throw new RuntimeException('Escribe un correo válido.');
         }
-        if ($password !== null && mb_strlen($password) < 8) {
-            throw new RuntimeException('La contraseña debe tener al menos 8 caracteres.');
+        // Seguridad (21/10/2026, RN-USR-23): la misma regla de contraseña segura de la aplicación.
+        if ($password !== null) {
+            $validador = \Illuminate\Support\Facades\Validator::make(['password' => $password], ['password' => [\Illuminate\Validation\Rules\Password::defaults()]]);
+            if ($validador->fails()) {
+                throw new RuntimeException($validador->errors()->first('password'));
+            }
         }
 
         return DB::transaction(function () use ($correo, $nombre, $password) {

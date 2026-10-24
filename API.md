@@ -1,6 +1,6 @@
 # API — Fragua Real Burger
 
-Referencia de los 168 endpoints de `backend/routes/api.php`, agrupados por módulo. Donde dice «Administrador» entra también el SuperAdmin (M09) y, solo para consultar, la cuenta de Soporte (M10): a ella el servidor le rechaza con 403 «La cuenta de Soporte solo puede consultar.» toda escritura (POST, PUT, PATCH o DELETE), salvo las de su propia cuenta (`/auth/*`, `/perfil`), `POST /reportes/exportar`, `POST /pedidos/cotizacion` y marcar sus notificaciones como leídas, y también `GET /comandas/{comanda}/ticket`, que marca la comanda como impresa. Las rutas del personal llevan además el permiso de menú de la cuenta (M09): si el SuperAdmin le quitó ese menú, responden 403 «Esta opción no está habilitada para tu cuenta…». Todas las rutas van bajo `/api` y responden JSON, salvo los PDF, tickets, fotos y archivos exportados.
+Referencia de los 172 endpoints de `backend/routes/api.php`, agrupados por módulo. Donde dice «Administrador» entra también el SuperAdmin (M09) y, solo para consultar, la cuenta de Soporte (M10): a ella el servidor le rechaza con 403 «La cuenta de Soporte solo puede consultar.» toda escritura (POST, PUT, PATCH o DELETE), salvo las de su propia cuenta (`/auth/*`, `/perfil`), `POST /reportes/exportar`, `POST /pedidos/cotizacion` y marcar sus notificaciones como leídas, y también `GET /comandas/{comanda}/ticket`, que marca la comanda como impresa. Las rutas del personal llevan además el permiso de menú de la cuenta (M09): si el SuperAdmin le quitó ese menú, responden 403 «Esta opción no está habilitada para tu cuenta…». Todas las rutas van bajo `/api` y responden JSON, salvo los PDF, tickets, fotos y archivos exportados.
 
 Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). Si cambia una ruta, actualiza esta tabla.
 
@@ -11,38 +11,39 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 - **Límite**: peticiones por minuto desde una misma dirección IP (`throttle`), solo en las rutas públicas que se pueden abusar. Al pasarlo, la respuesta es 429 hasta que termina ese minuto.
 - Autenticación: `Authorization: Bearer <token>` con el token que devuelve `POST /auth/login`. Una cuenta desactivada recibe 403 («Tu cuenta está desactivada») en cualquier ruta con sesión.
 - Errores: 401 sin sesión válida, 403 sin permiso, 404 si no existe (o no es tuyo), 422 con los mensajes de validación en español, 429 por exceso de intentos.
+- Formatos (22/10/2026, `App\Support\Validacion\Formatos`): los teléfonos se aceptan con espacios, guiones o +57 y se guardan solo con números (10 dígitos: celular 3xx o fijo 60x); los nombres de personas y titulares no llevan números; la cédula o NIT va con 5 a 10 dígitos y, si lleva, el guion del dígito de verificación (se guarda sin puntos); la cuenta Bancolombia, con 11 dígitos; los valores en pesos, hasta 99.999.999.
 
 ## Índice
 
 - [Cuenta y sesión (M01)](#cuenta-y-sesión-m01) (12)
-- [Usuarios y auditoría (M01)](#usuarios-y-auditoría-m01) (10)
-- [Catálogo (M04)](#catálogo-m04) (25)
+- [Usuarios y auditoría (M01)](#usuarios-y-auditoría-m01) (12)
+- [Catálogo (M04)](#catálogo-m04) (33)
 - [Pedidos (M02 y M07)](#pedidos-m02-y-m07) (21)
 - [Comandas de cocina (M02)](#comandas-de-cocina-m02) (4)
 - [Mesas (M05)](#mesas-m05) (12)
-- [Reservas (M05)](#reservas-m05) (16)
-- [Caja y pagos (M06)](#caja-y-pagos-m06) (22)
+- [Reservas (M05)](#reservas-m05) (17)
+- [Caja y pagos (M06)](#caja-y-pagos-m06) (23)
 - [Compras, gastos y cierre diario (M03)](#compras-gastos-y-cierre-diario-m03) (12)
 - [Reportes (M08)](#reportes-m08) (9)
 - [Notificaciones del personal (M11)](#notificaciones-del-personal-m11) (4)
-- [Configuración, sistema y tablero](#configuración-sistema-y-tablero) (6)
+- [Configuración, sistema y tablero](#configuración-sistema-y-tablero) (13)
 
 ## Cuenta y sesión (M01)
 
 | Método | Ruta | Quién | Para qué | Límite |
 |---|---|---|---|---|
-| `POST` | `/auth/login` | Pública | Inicia sesión con el correo o el nombre de usuario y devuelve el token. | 10/min |
+| `POST` | `/auth/login` | Pública | Inicia sesión con el correo o el nombre de usuario y devuelve el token. Tras 5 intentos fallidos seguidos de la misma cuenta, o 20 desde la misma IP en 15 minutos, responde 429 con `message` («Hiciste demasiados intentos fallidos…») y `bloqueado_minutos` durante 15 minutos, aun con la contraseña correcta. | 10/min |
 | `POST` | `/auth/logout` | Con sesión (cualquier rol) | Cierra la sesión actual. |  |
 | `POST` | `/auth/logout-todos` | Con sesión (cualquier rol) | Cierra todas las sesiones de la cuenta. |  |
 | `GET` | `/auth/me` | Con sesión (cualquier rol) | Datos de la cuenta con sesión (rol, permisos). |  |
 | `POST` | `/auth/recuperar` | Pública | Envía el correo para recuperar la contraseña. No revela si el correo existe. | 10/min |
-| `POST` | `/auth/register` | Pública | Crea la cuenta de un Cliente (autorregistro). Solo crea Clientes. | 10/min |
-| `POST` | `/auth/restablecer` | Pública | Cambia la contraseña con el enlace del correo y cierra todas las sesiones. | 10/min |
+| `POST` | `/auth/register` | Pública | Crea la cuenta de un Cliente (autorregistro). Solo crea Clientes. La contraseña debe ser segura: 8 caracteres como mínimo, con al menos una mayúscula, una minúscula y un número (en producción, además, no filtrada). | 10/min |
+| `POST` | `/auth/restablecer` | Pública | Cambia la contraseña con el enlace del correo (contraseña segura), cierra todas las sesiones y quita el bloqueo por intentos de la cuenta. | 10/min |
 | `GET` | `/auth/sesiones` | Con sesión (cualquier rol) | Sesiones abiertas de la cuenta: dispositivo, IP, último uso y vencimiento. |  |
 | `POST` | `/auth/sesiones/cerrar-otras` | Con sesión (cualquier rol) | Cierra todas las sesiones menos la actual. |  |
 | `DELETE` | `/auth/sesiones/{sesion}` | Con sesión (cualquier rol) | Cierra una sesión propia. |  |
 | `PUT` | `/perfil` | Con sesión (cualquier rol) | Edita nombre, teléfono y nombre de usuario propios. |  |
-| `POST` | `/perfil/password` | Con sesión (cualquier rol) | Cambia la contraseña propia (pide la actual). |  |
+| `POST` | `/perfil/password` | Con sesión (cualquier rol) | Cambia la contraseña propia (pide la actual; la nueva debe ser segura). |  |
 
 ## Usuarios y auditoría (M01)
 
@@ -51,7 +52,7 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 | `GET` | `/auditorias` | Administrador | Historial de auditoría con filtros (fechas, usuario, grupo, acción, registro, IP, texto). Solo lectura. |  |
 | `GET` | `/auditorias/opciones` | Administrador | Listas para los filtros de Auditoría y resumen de seguridad (intentos fallidos). |  |
 | `GET` | `/usuarios` | Administrador | Usuarios con filtros por rol y texto (nombre, correo o usuario). Cada cuenta trae `gestionable`: si quien mira puede modificarla (M09). La cuenta de Soporte solo la ven el SuperAdmin y ella misma (M10). |  |
-| `POST` | `/usuarios` | Administrador | Crea una cuenta de Mesero; la de Administrador, solo el SuperAdmin (403 para el Administrador). El rol `superadmin` no se crea aquí. |  |
+| `POST` | `/usuarios` | Administrador | Crea una cuenta de Mesero; la de Administrador, solo el SuperAdmin (403 para el Administrador). El rol `superadmin` no se crea aquí. La contraseña inicial debe ser segura. |  |
 | `PUT` | `/usuarios/{usuario}` | Administrador | Edita datos, rol y el permiso de compras y gastos (cambiar el rol cierra sus sesiones). Una cuenta de Administrador solo la edita el SuperAdmin y la del SuperAdmin no se edita aquí (403). |  |
 | `POST` | `/usuarios/{usuario}/activar` | Administrador | Activa una cuenta. |  |
 | `POST` | `/usuarios/{usuario}/desactivar` | Administrador | Desactiva una cuenta y cierra sus sesiones. |  |
@@ -162,13 +163,14 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 | `GET` | `/reservas/depositos-retenidos` | Administrador | Depósitos retenidos por no-show. |  |
 | `GET` | `/reservas/enlace/{token}` | Pública | Reserva por su enlace secreto (sin cuenta). | 30/min |
 | `POST` | `/reservas/enlace/{token}/cancelar` | Pública | Cancela la reserva desde su enlace antes de la hora. | 30/min |
-| `POST` | `/reservas/enlace/{token}/deposito` | Pública | Paga el depósito en línea desde el enlace de la reserva. | 30/min |
+| `POST` | `/reservas/enlace/{token}/deposito` | Pública | Paga el depósito en línea desde el enlace de la reserva (formulario con `pasarela`; sin Wompi, también `comprobante` y `referencia`, como en `pagar-en-linea`). La respuesta trae `deposito_tiene_comprobante` y, si se rechazó, `deposito_rechazo_motivo`. | 30/min |
 | `POST` | `/reservas/{reserva}/avisos/{aviso}/reintentar` | Administrador, Mesero | Reintenta un aviso de la reserva que falló. |  |
 | `POST` | `/reservas/{reserva}/cancelar` | Administrador, Mesero, Cliente | Cancela una reserva; antes de la hora devuelve el depósito. El Cliente solo las suyas, y no si pagó el depósito en efectivo. |  |
 | `POST` | `/reservas/{reserva}/completar` | Administrador, Mesero | Confirma la llegada: abre la mesa y abona el depósito. |  |
-| `POST` | `/reservas/{reserva}/deposito/en-linea` | Pública | Inicia el pago en línea del depósito (pide el enlace secreto de la reserva). | 30/min |
+| `GET` | `/reservas/{reserva}/deposito/comprobante` | Administrador, Mesero | La captura del depósito que subió el Cliente (imagen o PDF, sin caché). 404 si no hay. |  |
+| `POST` | `/reservas/{reserva}/deposito/en-linea` | Pública | Inicia el pago en línea del depósito (pide el enlace secreto de la reserva; sin Wompi, con `comprobante` y `referencia`). | 30/min |
 | `POST` | `/reservas/{reserva}/deposito/en-linea/confirmar` | Administrador, Mesero | Aprueba a mano el depósito en línea (respaldo). |  |
-| `POST` | `/reservas/{reserva}/deposito/en-linea/rechazar` | Administrador, Mesero | Rechaza a mano el depósito en línea. |  |
+| `POST` | `/reservas/{reserva}/deposito/en-linea/rechazar` | Administrador, Mesero | Rechaza a mano el depósito en línea, con `motivo` opcional (hasta 255) que el Cliente ve en el enlace de su reserva. |  |
 | `POST` | `/reservas/{reserva}/deposito/manual` | Administrador, Mesero | Registra el depósito en efectivo, tarjeta o transferencia (con la caja abierta). |  |
 | `POST` | `/reservas/{reserva}/no-show` | Administrador, Mesero | Marca no-show cuando ya pasó la tolerancia; el depósito se retiene. |  |
 
@@ -182,9 +184,10 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 | `GET` | `/caja/turnos` | Administrador | Historial de turnos de caja. |  |
 | `GET` | `/caja/turnos/{turno}` | Administrador | Detalle de un turno: pagos, pagos y depósitos en línea del día (`depositos_en_linea`), gastos, ajustes y `resumen`. |  |
 | `POST` | `/caja/turnos/{turno}/cerrar` | Administrador | Cierra el turno con el efectivo contado y guarda la diferencia. |  |
-| `POST` | `/pagos/{pago}/anular` | Administrador | Anula o reembolsa un pago; con la caja del día cerrada pide contraseña y queda como ajuste. |  |
+| `POST` | `/pagos/{pago}/anular` | Administrador | Anula o reembolsa un pago; con la caja del día cerrada pide contraseña y queda como ajuste. Si es una anulación y el pedido estaba finalizado y queda con saldo, el pedido vuelve a `preparando` y la respuesta trae `pedido_reabierto` (`pedido_id`, `saldo`); un reembolso no lo reabre. |  |
 | `POST` | `/pagos/{pago}/confirmar-en-linea` | Administrador, Mesero | Aprueba a mano un pago en línea (respaldo de la pasarela). |  |
-| `POST` | `/pagos/{pago}/rechazar-en-linea` | Administrador, Mesero | Rechaza a mano un pago en línea. |  |
+| `GET` | `/pagos/{pago}/comprobante` | Administrador, Mesero | La captura del pago en línea que subió el Cliente (imagen o PDF, sin caché). 404 si no hay. |  |
+| `POST` | `/pagos/{pago}/rechazar-en-linea` | Administrador, Mesero | Rechaza a mano un pago en línea, con `motivo` opcional (hasta 255) que el Cliente ve al seguir su pedido. |  |
 | `GET` | `/pasarela/estado` | Administrador | Si la pasarela está activa y en qué ambiente; URL de eventos. |  |
 | `GET` | `/pasarela/transacciones` | Administrador | Pagos en línea por revisar. |  |
 | `GET` | `/pasarela/transacciones/{referencia}` | Pública | Estado del pago al volver de Wompi (página «Tu pago»). | 60/min |
@@ -192,12 +195,12 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 | `POST` | `/pasarela/transacciones/{transaccion}/revisada` | Administrador | Marca un pago por revisar como resuelto, con nota. |  |
 | `POST` | `/pasarela/wompi/eventos` | Pública | Eventos firmados de Wompi (webhook). Verifica la firma y aplica cada evento una sola vez. | 240/min |
 | `GET` | `/pedidos/seguimiento/{token}/comprobante` | Pública | Comprobante del pedido para el invitado, con su enlace. | 30/min |
-| `POST` | `/pedidos/seguimiento/{token}/pagar-en-linea` | Pública | Inicia el pago en línea del invitado con su enlace. | 30/min |
+| `POST` | `/pedidos/seguimiento/{token}/pagar-en-linea` | Pública | Inicia el pago en línea del invitado con su enlace. Formulario: `pasarela` (`nequi`, `bancolombia` o, sin Wompi, `breb`); sin Wompi también `comprobante` (JPG, PNG, WebP o PDF, hasta 5 MB, obligatorio) y `referencia` (opcional). El monto es siempre el saldo del pedido. Sin Wompi, 422 si el medio no está configurado. | 30/min |
 | `POST` | `/pedidos/{pedido}/cobrar` | Administrador, Mesero | Registra un cobro presencial (efectivo, tarjeta o transferencia). Solo el Mesero, con la caja abierta. |  |
 | `GET` | `/pedidos/{pedido}/comprobante` | Administrador, Mesero, Cliente | Comprobante vigente del pedido: ticket de 80 mm o PDF. El Cliente solo el de sus pedidos; cada impresión del personal se cuenta. |  |
 | `GET` | `/pedidos/{pedido}/comprobantes` | Administrador, Mesero, Cliente | Todos los comprobantes del pedido, también los anulados. Solo el Administrador (Policy). |  |
 | `GET` | `/pedidos/{pedido}/comprobantes/{comprobante}` | Administrador, Mesero, Cliente | Abre un comprobante puntual (el anulado sale con su sello). Solo el Administrador (Policy). |  |
-| `POST` | `/pedidos/{pedido}/pagar-en-linea` | Administrador, Mesero, Cliente | Inicia el pago en línea del Cliente dueño del pedido (Wompi o revisión manual). |  |
+| `POST` | `/pedidos/{pedido}/pagar-en-linea` | Administrador, Mesero, Cliente | Inicia el pago en línea del Cliente dueño del pedido (Wompi o, sin Wompi, transferencia con captura: los mismos campos que la ruta del invitado). La respuesta trae `tiene_comprobante` y `referencia_cliente`. |  |
 
 ## Compras, gastos y cierre diario (M03)
 
@@ -245,8 +248,10 @@ La campana del Mesero y del Administrador (también del SuperAdmin y de Soporte)
 
 | Método | Ruta | Quién | Para qué | Límite |
 |---|---|---|---|---|
-| `GET` | `/configuracion` | Pública | Valores públicos: valor del domicilio, depósito de reserva, tiempos de reserva y su horario (`reserva_hora_inicio`, `reserva_hora_fin`, `reserva_anticipacion_minutos`) y `negocio` (nombre, dirección, teléfono, enlace de WhatsApp, `latitud`/`longitud` del local, `mapa_url` de «Cómo llegar» y `logo_url`). |  |
+| `GET` | `/configuracion` | Pública | Valores públicos: valor del domicilio, depósito de reserva, tiempos de reserva y su horario (`reserva_hora_inicio`, `reserva_hora_fin`, `reserva_anticipacion_minutos`) `clave` (requisitos de la contraseña: `minimo` y `mezcla`), `pagos_directos` (`activo`, `automatico` = Wompi activo, y `medios`: solo las cuentas completas, con `campos` `{campo, etiqueta, valor, copiar}`) y `negocio` (nombre, dirección, teléfono, enlace de WhatsApp, `latitud`/`longitud` del local, `mapa_url` de «Cómo llegar» y `logo_url`). |  |
 | `GET` | `/negocio/logo` | Pública | El logo del negocio (PNG). 404 si no hay. | 600/min |
+| `GET` | `/negocio/pagos-directos` | Administrador | Las cuentas para pagos en línea sin Wompi: `datos` (Nequi `numero`/`titular`; Bancolombia `tipo`/`numero`/`titular`/`documento`; Bre-B `llave`/`titular`) y `publico` (lo que ve el Cliente). |  |
+| `PUT` | `/negocio/pagos-directos` | SuperAdmin | Cambia esas cuentas (vacío = el medio no se ofrece; 403 si lo intenta el Administrador). Queda en Auditoría (`editar_pagos_directos`, antes y después). |  |
 | `PUT` | `/negocio` | Administrador | Cambia la dirección y el teléfono (también el de WhatsApp) del negocio; `nombre`, `nit`, `latitud` y `longitud` (punto del local en el mapa; los dos o ninguno, `null` lo quita), solo el SuperAdmin (403 si los manda el Administrador). Queda en Auditoría. |  |
 | `POST` | `/negocio/ubicacion-desde-enlace` | SuperAdmin | Lee el punto de un enlace de Google Maps (`enlace`: el de «Compartir», `maps.app.goo.gl`, uno largo con `@lat,lng` o `!3d…!4d…`, o «lat, lng»). Los enlaces cortos se siguen solo hasta páginas de Google. Devuelve `{latitud, longitud}` sin guardar nada; 422 si no encuentra el punto. | 20/min |
 | `POST` | `/negocio/logo` | Administrador | Sube o cambia el logo (`logo`: PNG, JPG o WebP, mínimo 64 × 64 px, hasta 5 MB); se guarda en PNG de 512 px. Queda en Auditoría. |  |

@@ -8,6 +8,7 @@ import router from './router'
 import { useAuthStore } from './stores/auth'
 import { EVENTO_SESION_INVALIDA } from './services/api'
 import { vEscritura } from './directives/escritura'
+import { vFormato } from './directives/formato'
 // Mejora (16/10/2026): escucha desde el arranque el aviso del navegador para instalar la app (PWA).
 import './composables/useInstalarApp'
 
@@ -17,6 +18,8 @@ app.use(createPinia())
 app.use(router)
 // M10 (20/10/2026): v-escritura esconde a la cuenta de Soporte los botones que cambian algo.
 app.directive('escritura', vEscritura)
+// 22/10/2026: v-formato limpia lo que se escribe en un campo según su formato (utils/formatos.ts).
+app.directive('formato', vFormato)
 
 // CORREGIDO (29/09/2026): antes esto esperaba cargarUsuarioActual() antes de montar,
 // pensado para "proteger" el primer guard de rutas — pero Vue Router dispara su

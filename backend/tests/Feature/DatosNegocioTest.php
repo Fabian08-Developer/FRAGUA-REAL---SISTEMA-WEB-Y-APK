@@ -45,7 +45,8 @@ class DatosNegocioTest extends TestCase
             ->assertJsonPath('direccion', 'Calle 10 # 5-20, Centro')
             ->assertJsonPath('whatsapp_url', 'https://wa.me/573105551234');
 
-        $this->getJson('/api/configuracion')->assertJsonPath('negocio.telefono', '310 555 1234');
+        // 22/10/2026: el teléfono se guarda solo con números.
+        $this->getJson('/api/configuracion')->assertJsonPath('negocio.telefono', '3105551234');
         $this->assertSame('Calle 10 # 5-20, Centro', app(NegocioService::class)->datos()['direccion']);
         $this->assertTrue(Auditoria::where('accion', 'editar_datos_negocio')->exists());
 

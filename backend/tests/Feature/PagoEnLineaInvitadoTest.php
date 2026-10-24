@@ -18,6 +18,7 @@ use Tests\TestCase;
 class PagoEnLineaInvitadoTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\PagoDirectoDePrueba;
 
     private Producto $producto;
 
@@ -55,7 +56,7 @@ class PagoEnLineaInvitadoTest extends TestCase
         $this->crearRecogidaInvitado();
 
         $this->getJson('/api/pedidos/seguimiento/token-que-no-existe')->assertNotFound();
-        $this->postJson('/api/pedidos/seguimiento/token-que-no-existe/pagar-en-linea', ['pasarela' => 'nequi', 'monto' => 20000])
+        $this->pagoDirecto('/api/pedidos/seguimiento/token-que-no-existe/pagar-en-linea', ['pasarela' => 'nequi', 'monto' => 20000])
             ->assertNotFound();
     }
 
@@ -63,7 +64,7 @@ class PagoEnLineaInvitadoTest extends TestCase
     {
         $respuesta = $this->crearRecogidaInvitado();
 
-        $this->postJson("/api/pedidos/seguimiento/{$respuesta->json('token_publico')}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])
+        $this->pagoDirecto("/api/pedidos/seguimiento/{$respuesta->json('token_publico')}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])
             ->assertCreated()
             ->assertJsonPath('estado', 'pendiente');
 
@@ -74,8 +75,8 @@ class PagoEnLineaInvitadoTest extends TestCase
     {
         $token = $this->crearRecogidaInvitado()->json('token_publico');
 
-        $this->postJson("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])->assertCreated();
-        $this->postJson("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])->assertStatus(422);
+        $this->pagoDirecto("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])->assertCreated();
+        $this->pagoDirecto("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])->assertStatus(422);
 
         $this->assertSame(1, Pago::count());
     }
@@ -85,10 +86,10 @@ class PagoEnLineaInvitadoTest extends TestCase
         $respuesta = $this->crearRecogidaInvitado();
         $token = $respuesta->json('token_publico');
 
-        $primero = $this->postJson("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])->json('id');
+        $primero = $this->pagoDirecto("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])->json('id');
         Pago::find($primero)->update(['estado' => 'rechazado']);
 
-        $this->postJson("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'bancolombia', 'monto' => 20000])->assertCreated();
+        $this->pagoDirecto("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'bancolombia', 'monto' => 20000])->assertCreated();
 
         $this->assertSame(1, Pedido::count(), 'Reintentar el pago no crea otro pedido.');
     }
@@ -98,7 +99,7 @@ class PagoEnLineaInvitadoTest extends TestCase
         $respuesta = $this->crearRecogidaInvitado();
         Pedido::find($respuesta->json('id'))->update(['estado' => 'confirmado']);
 
-        $this->postJson("/api/pedidos/seguimiento/{$respuesta->json('token_publico')}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])
+        $this->pagoDirecto("/api/pedidos/seguimiento/{$respuesta->json('token_publico')}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])
             ->assertStatus(422);
     }
 
@@ -112,7 +113,7 @@ class PagoEnLineaInvitadoTest extends TestCase
             'lineas' => [['producto_id' => $this->producto->id, 'cantidad' => 1]],
         ])->assertCreated()->json('id');
 
-        $this->postJson("/api/pedidos/{$id}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])->assertCreated();
+        $this->pagoDirecto("/api/pedidos/{$id}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 20000])->assertCreated();
         $this->getJson('/api/pedidos')->assertOk()->assertJsonMissingPath('data.0.token_publico');
     }
 }

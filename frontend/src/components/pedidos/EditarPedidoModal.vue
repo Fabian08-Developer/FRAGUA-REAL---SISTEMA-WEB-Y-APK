@@ -271,7 +271,7 @@ const lineasPreparadas = computed(() => (props.pedido?.detalles ?? []).filter((d
                 <Trash2 :size="15" /> Quitar
               </button>
             </div>
-            <input
+            <input v-formato="'texto'"
               v-model="borradores[detalle.id].observaciones"
               type="text"
               maxlength="500"
@@ -292,7 +292,7 @@ const lineasPreparadas = computed(() => (props.pedido?.detalles ?? []).filter((d
           <template v-if="!productoElegido && !comboElegido">
             <label class="relative block">
               <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input v-model="busqueda" type="search" class="field pl-9 text-sm" placeholder="Buscar producto o combo" />
+              <input v-formato="'busqueda'" v-model="busqueda" type="search" class="field pl-9 text-sm" placeholder="Buscar producto o combo" />
             </label>
             <p v-if="cargandoCatalogo" class="text-xs text-gray-500">Cargando catálogo…</p>
             <ul v-else class="max-h-56 divide-y divide-gray-100 overflow-y-auto rounded-xl border border-gray-200">
@@ -356,7 +356,7 @@ const lineasPreparadas = computed(() => (props.pedido?.detalles ?? []).filter((d
               <span class="ml-auto text-sm font-semibold text-ink">{{ formatoPrecio(precioNuevaLinea) }}</span>
             </div>
 
-            <input v-if="productoElegido" v-model="observacionesNuevas" type="text" maxlength="500" class="field text-sm" placeholder="Observaciones (opcional)" />
+            <input v-formato="'texto'" v-if="productoElegido" v-model="observacionesNuevas" type="text" maxlength="500" class="field text-sm" placeholder="Observaciones (opcional)" />
 
             <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <BaseButton variant="ghost" @click="productoElegido = null; comboElegido = null">Elegir otro</BaseButton>

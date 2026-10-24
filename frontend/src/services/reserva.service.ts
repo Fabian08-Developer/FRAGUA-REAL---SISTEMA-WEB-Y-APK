@@ -4,6 +4,7 @@
 // HU-M05-015): el filtro por estado se resuelve en el backend, no en el frontend, para
 // no traer más páginas de las necesarias.
 import api from './api'
+import { formularioPagoEnLinea, type PagoEnLineaPayload } from './pedido.service'
 import type { CheckoutPasarela, EstadoReserva, Mesa, Reserva, ReservaPublica } from '@/types/models'
 
 export interface CrearReservaPayload {
@@ -15,8 +16,7 @@ export interface CrearReservaPayload {
   descripcion?: string | null
 }
 
-export interface DepositoEnLineaPayload {
-  pasarela: 'nequi' | 'bancolombia'
+export interface DepositoEnLineaPayload extends PagoEnLineaPayload {
   // Fase 6, tarea 1: el enlace secreto que devolvió crear() (sin él, 404).
   token: string
 }
@@ -56,13 +56,20 @@ export const reservaService = {
   },
   // Fase 6, tarea 1 (RF-M05-030): con la pasarela activa trae `checkout` con el enlace de Wompi.
   registrarDepositoEnLinea(id: number, payload: DepositoEnLineaPayload) {
-    return api.post<Reserva & { checkout: CheckoutPasarela | null }>(`/reservas/${id}/deposito/en-linea`, payload)
+    const datos = formularioPagoEnLinea(payload)
+    datos.append('token', payload.token)
+    return api.post<Reserva & { checkout: CheckoutPasarela | null }>(`/reservas/${id}/deposito/en-linea`, datos)
   },
   confirmarDepositoEnLinea(id: number) {
     return api.post<Reserva>(`/reservas/${id}/deposito/en-linea/confirmar`)
   },
-  rechazarDepositoEnLinea(id: number) {
-    return api.post<Reserva>(`/reservas/${id}/deposito/en-linea/rechazar`)
+  // Pago directo (22/10/2026): el motivo lo ve el Cliente en el enlace de su reserva.
+  // Pago directo (22/10/2026, RF-M06-032): la captura del depósito, solo para el personal.
+  comprobanteDeposito(id: number) {
+    return api.get<Blob>(`/reservas/${id}/deposito/comprobante`, { responseType: 'blob' })
+  },
+  rechazarDepositoEnLinea(id: number, motivo?: string) {
+    return api.post<Reserva>(`/reservas/${id}/deposito/en-linea/rechazar`, { motivo: motivo?.trim() || undefined })
   },
   // RN-M05-16: presencial (efectivo, tarjeta o transferencia).
   registrarDepositoManual(id: number, metodo: 'efectivo' | 'tarjeta' | 'transferencia') {
@@ -83,8 +90,11 @@ export const reservaService = {
     return api.post<ReservaPublica>(`/reservas/enlace/${encodeURIComponent(token)}/cancelar`)
   },
   // Fase 6, tarea 1 (RF-M05-030): pagar o reintentar el depósito con el enlace de la reserva.
-  pagarDepositoPorEnlace(token: string, pasarela: 'nequi' | 'bancolombia') {
-    return api.post<ReservaPublica & { checkout: CheckoutPasarela | null }>(`/reservas/enlace/${encodeURIComponent(token)}/deposito`, { pasarela })
+  pagarDepositoPorEnlace(token: string, payload: PagoEnLineaPayload) {
+    return api.post<ReservaPublica & { checkout: CheckoutPasarela | null }>(
+      `/reservas/enlace/${encodeURIComponent(token)}/deposito`,
+      formularioPagoEnLinea(payload),
+    )
   },
   completar(id: number) {
     return api.post<Reserva>(`/reservas/${id}/completar`)

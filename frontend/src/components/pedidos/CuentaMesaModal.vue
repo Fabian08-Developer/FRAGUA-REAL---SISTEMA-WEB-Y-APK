@@ -6,6 +6,7 @@
 import { computed, ref, watch } from 'vue'
 import { Banknote, CreditCard, Landmark } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
+import CampoPesos from '@/components/common/CampoPesos.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { mesaService, type CuentaMesa } from '@/services/mesa.service'
 import { mensajeDeError } from '@/services/errors'
@@ -182,7 +183,7 @@ async function cobrar() {
           <span class="field-label">Monto a cobrar</span>
           <span class="relative block">
             <span class="pointer-events-none absolute inset-y-0 left-0 flex w-10 items-center justify-center text-gray-400">$</span>
-            <input v-model.number="monto" type="number" inputmode="decimal" min="0.01" step="0.01" class="field pl-9 text-lg font-semibold sm:text-base" />
+            <CampoPesos v-model="monto" class="field pl-9 text-lg font-semibold sm:text-base" />
           </span>
         </label>
         <p class="mt-1.5 text-xs text-gray-400">Para un pago mixto, cobra una parte con cada método.</p>

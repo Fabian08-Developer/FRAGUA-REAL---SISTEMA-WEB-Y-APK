@@ -7,6 +7,7 @@ import { AtSign, CheckCircle2, KeyRound, Lock, Mail, Phone, User } from 'lucide-
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
 import SesionesLista from '@/components/common/SesionesLista.vue'
+import RequisitosContrasena from '@/components/common/RequisitosContrasena.vue'
 import { authService } from '@/services/auth.service'
 import type { PoliticaSesiones, SesionAbierta } from '@/types/models'
 import { useAuthStore } from '@/stores/auth'
@@ -172,10 +173,10 @@ onMounted(cargarSesiones)
         </div>
 
         <form class="mt-5 space-y-4" @submit.prevent="guardarDatos">
-          <BaseInput v-model="datos.nombre" label="Nombre" :icon="User" :error="erroresDatos.nombre" />
+          <BaseInput formato="persona" v-model="datos.nombre" label="Nombre" :icon="User" :error="erroresDatos.nombre" />
           <BaseInput label="Correo electrónico" :icon="Mail" :model-value="auth.usuario.email" disabled />
           <div>
-            <BaseInput
+            <BaseInput formato="usuario"
               v-model="datos.username"
               label="Nombre de usuario (opcional)"
               placeholder="Ej. carla.p"
@@ -187,7 +188,7 @@ onMounted(cargarSesiones)
               Puedes iniciar sesión con tu correo o con este nombre. De 3 a 30 caracteres: letras sin tilde, números, punto, guion o guion bajo.
             </p>
           </div>
-          <BaseInput v-model="datos.telefono" label="Teléfono (opcional)" :icon="Phone" :error="erroresDatos.telefono" />
+          <BaseInput formato="celular" v-model="datos.telefono" label="Teléfono (opcional)" :icon="Phone" :error="erroresDatos.telefono" />
 
           <p v-if="errorDatos" class="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorDatos }}</p>
           <p v-if="exitoDatos" class="flex items-center gap-2 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">
@@ -221,7 +222,8 @@ onMounted(cargarSesiones)
             :icon="KeyRound"
             :error="erroresPassword.password"
           />
-          <BaseInput v-model="password.confirmacion" type="password" label="Confirmar nueva contraseña" :icon="KeyRound" />
+          <BaseInput v-model="password.confirmacion" type="password" label="Confirmar nueva contraseña" :icon="KeyRound" autocomplete="new-password" />
+          <RequisitosContrasena :clave="password.nueva" :confirmacion="password.confirmacion" />
 
           <p v-if="errorPassword" class="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorPassword }}</p>
           <p v-if="exitoPassword" class="flex items-center gap-2 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">

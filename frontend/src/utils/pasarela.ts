@@ -9,6 +9,12 @@ export function irAlCheckout(checkout: CheckoutPasarela | null | undefined): boo
   return true
 }
 
+// Pago directo (22/10/2026): nombre del medio con el que se pagó en línea (Bre-B solo sin Wompi).
+const MEDIOS: Record<string, string> = { nequi: 'Nequi', bancolombia: 'Bancolombia', breb: 'Bre-B' }
+export function nombreMedio(medio: string | null | undefined): string {
+  return medio ? (MEDIOS[medio] ?? medio) : ''
+}
+
 const METODOS: Record<string, string> = {
   NEQUI: 'Nequi',
   BANCOLOMBIA_TRANSFER: 'Botón Bancolombia',

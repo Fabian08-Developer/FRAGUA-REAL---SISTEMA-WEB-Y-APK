@@ -7,6 +7,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Boxes, Download, FileSpreadsheet, Image as ImageIcon, Layers, Pencil, Percent, Plus, Tags, Upload } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
+import CampoPesos from '@/components/common/CampoPesos.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { catalogoService, type VistaPreviaImportacion } from '@/services/catalogo.service'
@@ -1220,7 +1221,7 @@ onMounted(cargar)
             {{ categoria.nombre }}
           </button>
         </div>
-        <input
+        <input v-formato="'busqueda'"
           v-model="busquedaProducto"
           type="text"
           placeholder="Buscar producto…"
@@ -1433,7 +1434,7 @@ onMounted(cargar)
       <form class="space-y-4" @submit.prevent="confirmarCategoria">
         <label class="block">
           <span class="field-label">Nombre</span>
-          <input v-model="formCategoria.nombre" type="text" class="field" />
+          <input v-formato="'nombre'" v-model="formCategoria.nombre" type="text" class="field" />
           <span v-if="erroresCategoria.nombre" class="mt-1 block text-xs text-red-600">{{ erroresCategoria.nombre }}</span>
         </label>
 
@@ -1467,19 +1468,19 @@ onMounted(cargar)
 
         <label class="block">
           <span class="field-label">Nombre</span>
-          <input v-model="formProducto.nombre" type="text" class="field" />
+          <input v-formato="'nombre'" v-model="formProducto.nombre" type="text" class="field" />
           <span v-if="erroresProducto.nombre" class="mt-1 block text-xs text-red-600">{{ erroresProducto.nombre }}</span>
         </label>
 
         <label class="block">
           <span class="field-label">Descripción (opcional)</span>
-          <textarea v-model="formProducto.descripcion" rows="2" class="field"></textarea>
+          <textarea v-formato="'texto'" maxlength="1000" v-model="formProducto.descripcion" rows="2" class="field"></textarea>
         </label>
 
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="block">
             <span class="field-label">Precio base</span>
-            <input v-model.number="formProducto.precio_base" type="number" min="0" step="100" class="field" />
+            <CampoPesos v-model="formProducto.precio_base" class="field" />
             <span v-if="erroresProducto.precio_base" class="mt-1 block text-xs text-red-600">{{ erroresProducto.precio_base }}</span>
           </label>
           <label class="block">
@@ -1558,14 +1559,14 @@ onMounted(cargar)
           <div v-if="variantesEdicion.length" class="space-y-3">
             <div v-for="v in variantesEdicion" :key="v.id ?? v.nombre" class="space-y-2 rounded-xl border border-gray-200 p-3">
               <div class="flex flex-wrap items-center gap-2">
-                <input v-model="v.nombre" type="text" placeholder="Nombre" class="min-w-0 flex-1 field-sm" />
-                <input v-model.number="v.precio" type="number" min="0" step="100" placeholder="Precio" class="w-24 field-sm" />
+                <input v-formato="'nombre'" v-model="v.nombre" type="text" placeholder="Nombre" class="min-w-0 flex-1 field-sm" />
+                <CampoPesos v-model="v.precio" placeholder="Precio" class="w-24 field-sm" />
                 <label class="flex items-center gap-1 text-xs text-gray-600">
                   <input v-model="v.activa" type="checkbox" class="h-3.5 w-3.5 accent-brand-600" />
                   Activa
                 </label>
               </div>
-              <input
+              <input v-formato="'texto'"
                 v-model="v.descripcion"
                 type="text"
                 maxlength="160"
@@ -1602,8 +1603,8 @@ onMounted(cargar)
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <input v-model="nuevaVariante.nombre" type="text" placeholder="Nueva variante (ej. Familiar)" class="min-w-0 flex-1 field-sm" />
-            <input v-model.number="nuevaVariante.precio" type="number" min="0" step="100" placeholder="Precio" class="w-24 field-sm" />
+            <input v-formato="'nombre'" v-model="nuevaVariante.nombre" type="text" placeholder="Nueva variante (ej. Familiar)" class="min-w-0 flex-1 field-sm" />
+            <CampoPesos v-model="nuevaVariante.precio" placeholder="Precio" class="w-24 field-sm" />
             <BaseButton variant="ghost" type="button" @click="agregarVariante">
               <Plus :size="14" class="inline-block" />
             </BaseButton>
@@ -1615,8 +1616,8 @@ onMounted(cargar)
           <p class="field-label">Extras específicos de este producto</p>
           <div v-if="extrasEdicion.length" class="space-y-2">
             <div v-for="e in extrasEdicion" :key="e.id ?? e.nombre" class="flex flex-wrap items-center gap-2">
-              <input v-model="e.nombre" type="text" placeholder="Nombre" class="min-w-0 flex-1 field-sm" />
-              <input v-model.number="e.precio" type="number" min="0" step="100" placeholder="Precio" class="w-24 field-sm" />
+              <input v-formato="'nombre'" v-model="e.nombre" type="text" placeholder="Nombre" class="min-w-0 flex-1 field-sm" />
+              <CampoPesos v-model="e.precio" placeholder="Precio" class="w-24 field-sm" />
               <label class="flex items-center gap-1 text-xs text-gray-600">
                 <input v-model="e.activo" type="checkbox" class="h-3.5 w-3.5 accent-brand-600" />
                 Activo
@@ -1627,8 +1628,8 @@ onMounted(cargar)
             </div>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <input v-model="nuevoExtraEspecifico.nombre" type="text" placeholder="Nuevo extra (ej. Salsa BBQ)" class="min-w-0 flex-1 field-sm" />
-            <input v-model.number="nuevoExtraEspecifico.precio" type="number" min="0" step="100" placeholder="Precio" class="w-24 field-sm" />
+            <input v-formato="'nombre'" v-model="nuevoExtraEspecifico.nombre" type="text" placeholder="Nuevo extra (ej. Salsa BBQ)" class="min-w-0 flex-1 field-sm" />
+            <CampoPesos v-model="nuevoExtraEspecifico.precio" placeholder="Precio" class="w-24 field-sm" />
             <BaseButton variant="ghost" type="button" @click="agregarExtraEspecifico">
               <Plus :size="14" class="inline-block" />
             </BaseButton>
@@ -1687,12 +1688,12 @@ onMounted(cargar)
 
         <label v-if="formOferta.modo === 'precio'" class="block">
           <span class="field-label">Precio de oferta (normal {{ formatoMoneda(precioNormalOferta) }})</span>
-          <input v-model.number="formOferta.precio_oferta" type="number" min="100" step="100" class="field" placeholder="Ej. 28000" />
+          <CampoPesos v-model="formOferta.precio_oferta" class="field" placeholder="Ej. 28000" />
           <span v-if="erroresOferta.precio_oferta" class="mt-1 block text-xs text-red-600">{{ erroresOferta.precio_oferta }}</span>
         </label>
         <label v-else class="block">
           <span class="field-label">Porcentaje de descuento</span>
-          <input v-model.number="formOferta.porcentaje" type="number" min="1" max="99" step="1" class="field" placeholder="Ej. 15" />
+          <input v-formato="'porcentaje'" maxlength="2" v-model.number="formOferta.porcentaje" type="text" min="1" max="99" class="field" placeholder="Ej. 15" />
           <span v-if="erroresOferta.porcentaje" class="mt-1 block text-xs text-red-600">{{ erroresOferta.porcentaje }}</span>
         </label>
 
@@ -1838,14 +1839,14 @@ onMounted(cargar)
       <form class="space-y-4" @submit.prevent="confirmarCombo">
         <label class="block">
           <span class="field-label">Nombre</span>
-          <input v-model="formCombo.nombre" type="text" class="field" />
+          <input v-formato="'nombre'" v-model="formCombo.nombre" type="text" class="field" />
           <span v-if="erroresCombo.nombre" class="mt-1 block text-xs text-red-600">{{ erroresCombo.nombre }}</span>
         </label>
 
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="block">
             <span class="field-label">Precio del combo</span>
-            <input v-model.number="formCombo.precio" type="number" min="0" step="100" class="field" />
+            <CampoPesos v-model="formCombo.precio" class="field" />
             <span v-if="erroresCombo.precio" class="mt-1 block text-xs text-red-600">{{ erroresCombo.precio }}</span>
           </label>
           <label class="block">
@@ -1872,10 +1873,10 @@ onMounted(cargar)
                 <!-- RN-M04-12: un componente dado de baja impide activar el combo. -->
                 <span v-if="!producto.activo" class="ml-1 text-xs font-medium text-red-600">(dado de baja)</span>
               </span>
-              <input
+              <input v-formato="'entero'" maxlength="2"
                 v-if="productosCombo[producto.id]"
                 v-model.number="productosCombo[producto.id]"
-                type="number"
+                type="text"
                 min="1"
                 class="w-16 field-sm"
               />
@@ -1959,12 +1960,12 @@ onMounted(cargar)
       <form class="space-y-4" @submit.prevent="confirmarExtraGeneral">
         <label class="block">
           <span class="field-label">Nombre</span>
-          <input v-model="formExtraGeneral.nombre" type="text" class="field" />
+          <input v-formato="'nombre'" v-model="formExtraGeneral.nombre" type="text" class="field" />
           <span v-if="erroresExtraGeneral.nombre" class="mt-1 block text-xs text-red-600">{{ erroresExtraGeneral.nombre }}</span>
         </label>
         <label class="block">
           <span class="field-label">Precio</span>
-          <input v-model.number="formExtraGeneral.precio" type="number" min="0" step="100" class="field" />
+          <CampoPesos v-model="formExtraGeneral.precio" class="field" />
           <span v-if="erroresExtraGeneral.precio" class="mt-1 block text-xs text-red-600">{{ erroresExtraGeneral.precio }}</span>
         </label>
         <label v-if="extraGeneralEditando" class="flex items-center gap-2">
@@ -1986,7 +1987,7 @@ onMounted(cargar)
       <form class="space-y-4" @submit.prevent="confirmarPromocion">
         <label class="block">
           <span class="field-label">Nombre</span>
-          <input v-model="formPromocion.nombre" type="text" placeholder="Ej. Navidad, Amor y Amistad…" class="field" />
+          <input v-formato="'nombre'" v-model="formPromocion.nombre" type="text" placeholder="Ej. Navidad, Amor y Amistad…" class="field" />
           <span v-if="erroresPromocion.nombre" class="mt-1 block text-xs text-red-600">{{ erroresPromocion.nombre }}</span>
         </label>
 
@@ -2050,13 +2051,13 @@ onMounted(cargar)
               {{ formPromocion.tipo_valor === 'porcentaje' ? 'Porcentaje (%)' : 'Monto ($)' }}
             </span>
             <input
+              v-if="formPromocion.tipo_valor === 'porcentaje'"
               v-model.number="formPromocion.valor"
-              type="number"
-              min="0"
-              :max="formPromocion.tipo_valor === 'porcentaje' ? 100 : undefined"
-              step="1"
+              v-formato="'porcentaje'"
+              type="text"
               class="field"
             />
+            <CampoPesos v-else v-model="formPromocion.valor" class="field" />
             <span v-if="erroresPromocion.valor" class="mt-1 block text-xs text-red-600">{{ erroresPromocion.valor }}</span>
           </label>
         </div>

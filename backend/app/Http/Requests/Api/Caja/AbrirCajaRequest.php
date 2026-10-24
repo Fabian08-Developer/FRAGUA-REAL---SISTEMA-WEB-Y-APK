@@ -14,7 +14,7 @@ class AbrirCajaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'base_inicial' => ['required', 'numeric', 'min:0'],
+            'base_inicial' => ['required', 'numeric', 'min:0', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS],
         ];
     }
 }

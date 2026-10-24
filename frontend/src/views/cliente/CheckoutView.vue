@@ -8,19 +8,24 @@
 // CORREGIDO (Fase 0, tarea 4, 09/10/2026): el pedido se crea UNA vez. Si el pago en
 // línea falla, el Cliente reintenta solo el pago sobre el mismo pedido (RF-M06-008);
 // antes reintentar volvía a crear el pedido completo.
+//
+// Pago directo (22/10/2026, RF-M06-030): sin Wompi, el pedido se crea primero y en la confirmación
+// el Cliente ve las cuentas del negocio, transfiere el total exacto y sube la captura.
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Banknote, Bike, CheckCircle2, MapPin, ShoppingBag, Smartphone } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
+import PagoEnLinea from '@/components/pagos/PagoEnLinea.vue'
+import { usePagosEnLinea } from '@/composables/usePagosEnLinea'
 import { useAuthStore } from '@/stores/auth'
 import { useCarritoStore } from '@/stores/carrito'
 import { useCotizacion } from '@/composables/useCotizacion'
 import { configuracionService } from '@/services/configuracion.service'
-import { pedidoService } from '@/services/pedido.service'
+import { pedidoService, type PagoEnLineaPayload } from '@/services/pedido.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
-import { irAlCheckout } from '@/utils/pasarela'
-import type { Pedido, TipoPedido } from '@/types/models'
+import { irAlCheckout, nombreMedio } from '@/utils/pasarela'
+import type { MedioPagoEnLinea, Pedido, TipoPedido } from '@/types/models'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -42,7 +47,23 @@ if (carrito.lineas.length === 0) {
 
 const tipo = ref<Extract<TipoPedido, 'domicilio' | 'recogida'>>('domicilio')
 const metodoPago = ref<'en_linea' | 'contra_entrega'>('contra_entrega')
-const pasarela = ref<'nequi' | 'bancolombia'>('nequi')
+const pasarela = ref<MedioPagoEnLinea>('nequi')
+
+// Pago directo: qué medios se ofrecen (con Wompi, Nequi y Bancolombia; sin Wompi, los configurados).
+const { pagos, disponible: enLineaDisponible, directo } = usePagosEnLinea()
+const opcionesMedio = computed<MedioPagoEnLinea[]>(() =>
+  directo.value ? (pagos.value?.medios ?? []).map((m) => m.medio) : ['nequi', 'bancolombia'],
+)
+watch(opcionesMedio, (lista) => {
+  if (!lista.includes(pasarela.value) && lista[0]) pasarela.value = lista[0]
+})
+watch(enLineaDisponible, (si) => {
+  if (!si && metodoPago.value === 'en_linea') metodoPago.value = 'contra_entrega'
+})
+const textoMedios = computed(() => {
+  const nombres = opcionesMedio.value.map(nombreMedio)
+  return nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} o ${nombres[nombres.length - 1]}` : (nombres[0] ?? '')
+})
 
 // RN-M07-01, RF-M07-003 a 007 y 010 (Fase 1, tarea 2): nombre, teléfono, dirección, barrio y
 // referencia son obligatorios en un domicilio; el Cliente con cuenta confirma su teléfono para
@@ -138,8 +159,9 @@ async function confirmarPedido() {
     carrito.vaciar()
     pedidoCreado.value = pedido
 
-    if (metodoPago.value === 'en_linea') {
-      await pagarEnLinea()
+    // Con Wompi se sale a pagar de una vez; sin Wompi el Cliente transfiere y sube la captura aquí.
+    if (metodoPago.value === 'en_linea' && !directo.value) {
+      await pagarEnLinea({ pasarela: pasarela.value })
     }
   } catch (error) {
     const camposInvalidos = erroresDeValidacion(error)
@@ -155,13 +177,13 @@ async function confirmarPedido() {
 
 // RF-M06-005/008: registra el pago en línea del pedido ya creado. Si falla, el pedido sigue
 // pendiente y el botón "Reintentar pago" vuelve a llamar solo a esta función.
-async function pagarEnLinea() {
+async function pagarEnLinea(datosPago: PagoEnLineaPayload) {
   const pedido = pedidoCreado.value
   if (!pedido) return
+  pasarela.value = datosPago.pasarela
   pagando.value = true
   errorPago.value = ''
   try {
-    const datosPago = { pasarela: pasarela.value, monto: Number(pedido.total) }
     let respuesta
     if (esCliente.value) {
       respuesta = await pedidoService.pagarEnLinea(pedido.id, datosPago)
@@ -178,7 +200,8 @@ async function pagarEnLinea() {
     }
     pagoRegistrado.value = true
   } catch (error) {
-    errorPago.value = mensajeDeError(error, 'No pudimos registrar tu pago en línea.')
+    const campos = erroresDeValidacion(error)
+    errorPago.value = Object.values(campos)[0] ?? mensajeDeError(error, 'No pudimos registrar tu pago en línea.')
   } finally {
     if (!redirigiendo.value) pagando.value = false
   }
@@ -197,11 +220,19 @@ async function pagarEnLinea() {
       </p>
       <p class="mt-4 text-sm text-[#6c655c]">
         <template v-if="metodoPago === 'en_linea' && redirigiendo">
-          Te estamos llevando a la pasarela de pago (Wompi) para que pagues con {{ pasarela === 'nequi' ? 'Nequi' : 'Bancolombia' }}.
+          Te estamos llevando a la pasarela de pago (Wompi) para que pagues con {{ nombreMedio(pasarela) }}.
           Al terminar vuelves aquí y confirmamos tu pedido solos.
+        </template>
+        <template v-else-if="metodoPago === 'en_linea' && pagoRegistrado && directo">
+          Recibimos tu comprobante. En cuanto verifiquemos la transferencia confirmamos tu pedido y empezamos a
+          prepararlo.
         </template>
         <template v-else-if="metodoPago === 'en_linea' && pagoRegistrado">
           Ya registramos tu pago. En breve lo verificamos, confirmamos tu pedido y empezamos a prepararlo.
+        </template>
+        <template v-else-if="metodoPago === 'en_linea' && directo && !errorPago">
+          Ahora transfiere el valor exacto a una de nuestras cuentas y sube la captura aquí abajo. Si prefieres,
+          paga {{ pedidoCreado.tipo === 'domicilio' ? 'contra entrega' : 'al recoger' }} sin hacer nada más.
         </template>
         <template v-else-if="metodoPago === 'en_linea'">
           Tu pedido quedó guardado, pero el pago en línea no se pudo registrar. Puedes intentarlo de nuevo
@@ -223,24 +254,16 @@ async function pagarEnLinea() {
         </router-link>
         <p class="mt-1 text-xs text-[#6c655c]">Guárdalo: sin cuenta, es la única forma de ver el estado o cancelarlo mientras esté pendiente.</p>
       </div>
-      <!-- Reintentar solo el pago, sobre el mismo pedido (RF-M06-008). -->
-      <div v-if="metodoPago === 'en_linea' && !pagoRegistrado && !redirigiendo" class="mt-6 space-y-3 text-left">
-        <p v-if="errorPago" class="alert-error">{{ errorPago }}</p>
-        <div class="flex justify-center gap-4">
-          <label class="flex items-center gap-2 text-sm text-ink">
-            <input v-model="pasarela" type="radio" value="nequi" />
-            Nequi
-          </label>
-          <label class="flex items-center gap-2 text-sm text-ink">
-            <input v-model="pasarela" type="radio" value="bancolombia" />
-            Bancolombia
-          </label>
-        </div>
-        <div class="flex justify-center">
-          <BaseButton variant="primary" :disabled="pagando" @click="pagarEnLinea">
-            {{ redirigiendo ? 'Abriendo la pasarela…' : pagando ? 'Registrando pago…' : 'Reintentar pago' }}
-          </BaseButton>
-        </div>
+      <!-- Pagar (sin Wompi) o reintentar solo el pago, sobre el mismo pedido (RF-M06-008). -->
+      <div v-if="metodoPago === 'en_linea' && !pagoRegistrado && !redirigiendo" class="mt-6 text-left">
+        <PagoEnLinea
+          :config="pagos"
+          :monto="Number(pedidoCreado.total)"
+          :enviando="pagando"
+          :error="errorPago"
+          :medio-inicial="pasarela"
+          @pagar="pagarEnLinea"
+        />
       </div>
 
       <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -306,7 +329,7 @@ async function pagarEnLinea() {
           <!-- Dirección (solo domicilio) -->
           <section v-if="tipo === 'domicilio'" class="space-y-4">
             <h2 class="font-display text-lg text-ink">Dirección de entrega</h2>
-            <BaseInput
+            <BaseInput formato="direccion"
               v-model="form.direccion_entrega"
               label="Dirección"
               placeholder="Calle, carrera, número"
@@ -314,8 +337,8 @@ async function pagarEnLinea() {
               :error="errores.direccion_entrega"
             />
             <div class="grid gap-4 sm:grid-cols-2">
-              <BaseInput v-model="form.barrio" label="Barrio" placeholder="Tu barrio" :error="errores.barrio" />
-              <BaseInput
+              <BaseInput formato="nombre" :maxlength="80" v-model="form.barrio" label="Barrio" placeholder="Tu barrio" :error="errores.barrio" />
+              <BaseInput formato="nombre" :maxlength="160"
                 v-model="form.referencia"
                 label="Punto de referencia"
                 placeholder="Ej. casa azul frente al parque"
@@ -327,7 +350,7 @@ async function pagarEnLinea() {
           <!-- Teléfono del Cliente con cuenta (el invitado lo deja en sus datos de contacto) -->
           <section v-if="esCliente" class="space-y-4">
             <h2 class="font-display text-lg text-ink">Teléfono de contacto</h2>
-            <BaseInput
+            <BaseInput formato="celular"
               v-model="form.telefono_contacto"
               label="Teléfono"
               type="tel"
@@ -347,8 +370,8 @@ async function pagarEnLinea() {
               si prefieres guardar tu historial de pedidos.
             </p>
             <div class="grid gap-4 sm:grid-cols-2">
-              <BaseInput v-model="form.nombre_invitado" label="Nombre" placeholder="Tu nombre" :error="errores.cliente_invitado_nombre" />
-              <BaseInput
+              <BaseInput formato="persona" v-model="form.nombre_invitado" label="Nombre" placeholder="Tu nombre" :error="errores.cliente_invitado_nombre" />
+              <BaseInput formato="celular"
                 v-model="form.telefono_invitado"
                 label="Teléfono"
                 type="tel"
@@ -356,7 +379,7 @@ async function pagarEnLinea() {
                 :error="errores.cliente_invitado_telefono"
               />
               <div class="sm:col-span-2">
-                <BaseInput
+                <BaseInput formato="correo"
                   v-model="form.correo_invitado"
                   label="Correo (opcional)"
                   type="email"
@@ -377,7 +400,7 @@ async function pagarEnLinea() {
               {{ tipo === 'domicilio' ? 'Indicaciones para la entrega' : 'Indicaciones para la recogida' }}
               <span class="text-xs font-sans text-[#6c655c]">(opcional)</span>
             </label>
-            <textarea
+            <textarea v-formato="'texto'"
               id="observaciones-entrega"
               v-model="form.observaciones_entrega"
               rows="2"
@@ -413,6 +436,7 @@ async function pagarEnLinea() {
             </label>
 
             <label
+              v-if="enLineaDisponible"
               class="flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition"
               :class="[
                 metodoPago === 'en_linea'
@@ -429,22 +453,22 @@ async function pagarEnLinea() {
               <span>
                 <span class="flex items-center gap-2 text-sm font-medium text-ink">
                   <Smartphone :size="16" />
-                  Pago en línea (Nequi o Bancolombia)
+                  Pago en línea ({{ textoMedios }})
                 </span>
                 <span class="mt-0.5 block text-xs text-[#6c655c]">
-                  Pagas ahora mismo, en línea. Confirmamos tu pedido cuando verifiquemos el pago.
+                  <template v-if="directo">
+                    Al confirmar te mostramos nuestras cuentas: transfieres desde tu app y subes la captura.
+                    Confirmamos tu pedido cuando verifiquemos el pago.
+                  </template>
+                  <template v-else>Pagas ahora mismo, en línea. Confirmamos tu pedido cuando verifiquemos el pago.</template>
                 </span>
               </span>
             </label>
 
-            <div v-if="metodoPago === 'en_linea'" class="flex gap-3 pl-8">
-              <label class="flex items-center gap-2 text-sm text-ink">
-                <input v-model="pasarela" type="radio" value="nequi" />
-                Nequi
-              </label>
-              <label class="flex items-center gap-2 text-sm text-ink">
-                <input v-model="pasarela" type="radio" value="bancolombia" />
-                Bancolombia
+            <div v-if="enLineaDisponible && metodoPago === 'en_linea'" class="flex flex-wrap gap-x-4 gap-y-2 pl-8">
+              <label v-for="m in opcionesMedio" :key="m" class="flex items-center gap-2 text-sm text-ink">
+                <input v-model="pasarela" type="radio" :value="m" />
+                {{ nombreMedio(m) }}
               </label>
             </div>
           </section>

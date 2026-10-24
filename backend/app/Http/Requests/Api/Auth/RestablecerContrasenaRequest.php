@@ -17,7 +17,7 @@ class RestablecerContrasenaRequest extends FormRequest
         return [
             'email' => ['required', 'email'],
             'token' => ['required', 'string'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()], // contraseña segura (RN-USR-23)
         ];
     }
 }

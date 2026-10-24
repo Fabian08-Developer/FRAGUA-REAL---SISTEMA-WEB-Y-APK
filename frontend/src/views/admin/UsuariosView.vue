@@ -4,6 +4,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { History, KeyRound, LayoutGrid, Pencil, Plus, Users as UsersIcon } from 'lucide-vue-next'
 import SesionesLista from '@/components/common/SesionesLista.vue'
+import RequisitosContrasena from '@/components/common/RequisitosContrasena.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -368,7 +369,7 @@ onMounted(cargar)
           {{ opcion.t }}
         </button>
       </div>
-      <input
+      <input v-formato="'busqueda'"
         v-model="busqueda"
         type="text"
         placeholder="Buscar por nombre, correo o usuario…"
@@ -510,40 +511,41 @@ onMounted(cargar)
 
         <label class="block">
           <span class="field-label">Nombre</span>
-          <input v-model="form.nombre" type="text" class="field" />
+          <input v-formato="'persona'" v-model="form.nombre" type="text" class="field" />
           <span v-if="erroresForm.nombre" class="mt-1 block text-xs text-red-600">{{ erroresForm.nombre }}</span>
         </label>
 
         <label class="block">
           <span class="field-label">Correo</span>
-          <input v-model="form.email" type="email" class="field" />
+          <input v-formato="'correo'" v-model="form.email" type="email" class="field" />
           <span v-if="erroresForm.email" class="mt-1 block text-xs text-red-600">{{ erroresForm.email }}</span>
         </label>
 
         <label class="block">
           <span class="field-label">Nombre de usuario (opcional)</span>
-          <input v-model="form.username" type="text" class="field" autocomplete="off" autocapitalize="none" placeholder="Ej. mario.m" />
+          <input v-formato="'usuario'" v-model="form.username" type="text" class="field" autocomplete="off" autocapitalize="none" placeholder="Ej. mario.m" />
           <span v-if="erroresForm.username" class="mt-1 block text-xs text-red-600">{{ erroresForm.username }}</span>
           <span v-else class="mt-1 block text-xs text-gray-500">Para entrar sin escribir el correo.</span>
         </label>
 
         <label class="block">
           <span class="field-label">Teléfono (opcional)</span>
-          <input v-model="form.telefono" type="text" class="field" />
+          <input v-formato="'celular'" v-model="form.telefono" type="text" class="field" />
           <span v-if="erroresForm.telefono" class="mt-1 block text-xs text-red-600">{{ erroresForm.telefono }}</span>
         </label>
 
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="block">
             <span class="field-label">Contraseña</span>
-            <input v-model="form.password" type="password" class="field" />
+            <input v-model="form.password" type="password" class="field" autocomplete="new-password" />
             <span v-if="erroresForm.password" class="mt-1 block text-xs text-red-600">{{ erroresForm.password }}</span>
           </label>
           <label class="block">
             <span class="field-label">Confirmar contraseña</span>
-            <input v-model="form.password_confirmation" type="password" class="field" />
+            <input v-model="form.password_confirmation" type="password" class="field" autocomplete="new-password" />
           </label>
         </div>
+        <RequisitosContrasena :clave="form.password" :confirmacion="form.password_confirmation" />
 
         <p v-if="errorForm" class="alert-error">{{ errorForm }}</p>
 
@@ -626,25 +628,25 @@ onMounted(cargar)
       <form v-if="usuarioEditando" class="space-y-4" @submit.prevent="confirmarEditar">
         <label class="block">
           <span class="field-label">Nombre</span>
-          <input v-model="formEditar.nombre" type="text" class="field" autocomplete="off" />
+          <input v-formato="'persona'" v-model="formEditar.nombre" type="text" class="field" autocomplete="off" />
           <span v-if="erroresEditar.nombre" class="mt-1 block text-xs text-red-600">{{ erroresEditar.nombre }}</span>
         </label>
 
         <label class="block">
           <span class="field-label">Correo</span>
-          <input v-model="formEditar.email" type="email" class="field" autocomplete="off" />
+          <input v-formato="'correo'" v-model="formEditar.email" type="email" class="field" autocomplete="off" />
           <span v-if="erroresEditar.email" class="mt-1 block text-xs text-red-600">{{ erroresEditar.email }}</span>
         </label>
 
         <label class="block">
           <span class="field-label">Nombre de usuario (opcional)</span>
-          <input v-model="formEditar.username" type="text" class="field" autocomplete="off" autocapitalize="none" placeholder="Vacío = entra solo con el correo" />
+          <input v-formato="'usuario'" v-model="formEditar.username" type="text" class="field" autocomplete="off" autocapitalize="none" placeholder="Vacío = entra solo con el correo" />
           <span v-if="erroresEditar.username" class="mt-1 block text-xs text-red-600">{{ erroresEditar.username }}</span>
         </label>
 
         <label class="block">
           <span class="field-label">Teléfono (opcional)</span>
-          <input v-model="formEditar.telefono" type="tel" class="field" autocomplete="off" />
+          <input v-formato="'celular'" v-model="formEditar.telefono" type="tel" class="field" autocomplete="off" />
           <span v-if="erroresEditar.telefono" class="mt-1 block text-xs text-red-600">{{ erroresEditar.telefono }}</span>
         </label>
 

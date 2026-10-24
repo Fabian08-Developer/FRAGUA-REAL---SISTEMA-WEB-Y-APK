@@ -11,15 +11,17 @@
 import { computed, onMounted, ref } from 'vue'
 import { Banknote, CircleDollarSign, CreditCard, Landmark, Smartphone, Wallet } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
+import CampoPesos from '@/components/common/CampoPesos.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import CuentaMesaModal from '@/components/pedidos/CuentaMesaModal.vue'
+import RevisarComprobanteModal from '@/components/pagos/RevisarComprobanteModal.vue'
 import { pedidoService } from '@/services/pedido.service'
 import { cajaService, type EstadoCaja } from '@/services/caja.service'
 import { pagoService } from '@/services/pago.service'
 import { mensajeDeError } from '@/services/errors'
-import { metodoPasarela } from '@/utils/pasarela'
+import { metodoPasarela, nombreMedio } from '@/utils/pasarela'
 import { TIPOS_PEDIDO_UI, faltaParaFinalizar, formatoHoraPedido, saldoPendiente, titularPedido, totalPagado } from '@/utils/pedidoUi'
 import type { Pago, Pedido } from '@/types/models'
 
@@ -214,14 +216,43 @@ async function aprobarPago(pago: Pago) {
   }
 }
 
-async function rechazarPago(pago: Pago) {
+// Pago directo (22/10/2026, RF-M06-032/033): con captura, se revisa en una ventana y se aprueba o se
+// rechaza con motivo (el Cliente lo ve); sin captura, «Rechazar» abre la misma ventana para el motivo.
+const revision = ref<{ pago: Pago; pedido: Pedido; rechazar: boolean } | null>(null)
+const errorRevision = ref('')
+
+function abrirRevision(pago: Pago, pedido: Pedido, rechazar = false) {
+  errorRevision.value = ''
+  revision.value = { pago, pedido, rechazar }
+}
+
+async function aprobarRevisado() {
+  if (!revision.value) return
+  const { pago } = revision.value
   procesandoPagoId.value = pago.id
-  errorPago.value = ''
+  errorRevision.value = ''
   try {
-    await pagoService.rechazarEnLinea(pago.id)
+    await pagoService.confirmarEnLinea(pago.id)
+    revision.value = null
     await cargar()
   } catch (e) {
-    errorPago.value = mensajeDeError(e, 'No pudimos rechazar el pago.')
+    errorRevision.value = mensajeDeError(e, 'No pudimos aprobar el pago.')
+  } finally {
+    procesandoPagoId.value = null
+  }
+}
+
+async function rechazarPago(motivo: string) {
+  if (!revision.value) return
+  const { pago } = revision.value
+  procesandoPagoId.value = pago.id
+  errorRevision.value = ''
+  try {
+    await pagoService.rechazarEnLinea(pago.id, motivo)
+    revision.value = null
+    await cargar()
+  } catch (e) {
+    errorRevision.value = mensajeDeError(e, 'No pudimos rechazar el pago.')
   } finally {
     procesandoPagoId.value = null
   }
@@ -285,8 +316,9 @@ onMounted(cargar)
           <span class="badge bg-sky-50 text-sky-700 ring-sky-600/20">{{ pagosEnLineaPendientes.length }}</span>
         </h2>
         <p class="mt-1.5 text-xs text-gray-500">
-          Los que pasan por la pasarela (Wompi) se confirman solos al llegar el pago. Apruébalo o recházalo a mano solo
-          como respaldo, si ves el dinero en la cuenta o el Cliente te muestra el comprobante.
+          Si el Cliente subió la captura de la transferencia, revísala y confirma en la app del banco que el dinero
+          llegó antes de aprobar. Los que pasan por la pasarela (Wompi) se confirman solos; apruébalos a mano solo como
+          respaldo.
         </p>
 
         <p v-if="errorPago" class="mt-3 alert-error">{{ errorPago }}</p>
@@ -301,7 +333,7 @@ onMounted(cargar)
               <p class="truncate text-[15px] font-semibold text-ink">{{ titularPedido(pedido) }}</p>
               <p class="mt-0.5 text-xs text-gray-500">
                 #{{ pedido.id }} · {{ TIPOS_PEDIDO_UI[pedido.tipo].texto }} ·
-                {{ pago.pasarela === 'nequi' ? 'Nequi' : 'Bancolombia' }}
+                {{ nombreMedio(pago.pasarela) }}
               </p>
               <p class="mt-1.5 font-display text-xl font-medium text-ink">{{ formatoPrecio(pago.monto) }}</p>
               <!-- Fase 6, tarea 1: el intento en la pasarela, si lo hubo. -->
@@ -309,9 +341,17 @@ onMounted(cargar)
                 En proceso en Wompi<template v-if="pago.transaccion_pasarela.metodo_pago"> · {{ metodoPasarela(pago.transaccion_pasarela.metodo_pago) }}</template>
                 · se confirma solo
               </p>
+              <p v-if="pago.tiene_comprobante" class="mt-1 text-xs font-medium text-sky-700">
+                Captura adjunta<template v-if="pago.referencia_cliente"> · ref. <span class="font-mono">{{ pago.referencia_cliente }}</span></template>
+              </p>
             </div>
-            <div class="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
-              <BaseButton variant="ghost" :disabled="procesandoPagoId === pago.id" @click="rechazarPago(pago)">
+            <div v-if="pago.tiene_comprobante" class="sm:shrink-0">
+              <BaseButton class="w-full" :disabled="procesandoPagoId === pago.id" @click="abrirRevision(pago, pedido)">
+                Revisar comprobante
+              </BaseButton>
+            </div>
+            <div v-else class="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+              <BaseButton variant="ghost" :disabled="procesandoPagoId === pago.id" @click="abrirRevision(pago, pedido, true)">
                 {{ pago.transaccion_pasarela ? 'Rechazar a mano' : 'Rechazar' }}
               </BaseButton>
               <BaseButton
@@ -446,12 +486,8 @@ onMounted(cargar)
           <span class="field-label">Monto a cobrar</span>
           <span class="relative block">
             <span class="pointer-events-none absolute inset-y-0 left-0 flex w-10 items-center justify-center text-gray-400">$</span>
-            <input
-              v-model.number="monto"
-              type="number"
-              inputmode="decimal"
-              min="0.01"
-              step="0.01"
+            <CampoPesos
+              v-model="monto"
               class="field pl-9 text-lg font-semibold sm:text-base"
             />
           </span>
@@ -470,5 +506,20 @@ onMounted(cargar)
         </div>
       </template>
     </BaseModal>
+
+    <RevisarComprobanteModal
+      :abierto="!!revision"
+      :titulo="revision ? `Comprobante · pedido #${revision.pedido.id}` : ''"
+      :monto="Number(revision?.pago.monto ?? 0)"
+      :medio="revision?.pago.pasarela"
+      :referencia="revision?.pago.referencia_cliente"
+      :cargar="revision?.pago.tiene_comprobante ? () => pagoService.comprobante(revision!.pago.id) : null"
+      :rechazar="revision?.rechazar"
+      :procesando="!!revision && procesandoPagoId === revision.pago.id"
+      :error="errorRevision"
+      @cerrar="revision = null"
+      @aprobar="aprobarRevisado"
+      @rechazar="rechazarPago"
+    />
   </div>
 </template>

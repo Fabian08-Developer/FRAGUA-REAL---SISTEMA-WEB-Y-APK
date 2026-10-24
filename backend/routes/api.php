@@ -194,6 +194,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         // aprobarlo.
         Route::post('/pagos/{pago}/confirmar-en-linea', [PagoController::class, 'confirmarEnLinea'])->middleware('menu:pedidos,caja,cobrar');
         Route::post('/pagos/{pago}/rechazar-en-linea', [PagoController::class, 'rechazarEnLinea'])->middleware('menu:pedidos,caja,cobrar');
+        // Pago directo (22/10/2026): la captura del comprobante que subió el Cliente.
+        Route::get('/pagos/{pago}/comprobante', [PagoController::class, 'comprobante'])->middleware('menu:pedidos,caja,cobrar');
 
         // M05 (Admin/Mesero): listado de reservas con filtro opcional ?estado=.
         Route::get('/reservas', [ReservaController::class, 'index'])->middleware('menu:mesas,reservas');
@@ -202,6 +204,7 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         // que exista el webhook real; ver README-BACKEND.md) o manual (cualquier método de M06).
         Route::post('/reservas/{reserva}/deposito/en-linea/confirmar', [ReservaController::class, 'confirmarDepositoEnLinea'])->middleware('menu:mesas,reservas');
         Route::post('/reservas/{reserva}/deposito/en-linea/rechazar', [ReservaController::class, 'rechazarDepositoEnLinea'])->middleware('menu:mesas,reservas');
+        Route::get('/reservas/{reserva}/deposito/comprobante', [ReservaController::class, 'comprobanteDeposito'])->middleware('menu:mesas,reservas');
         Route::post('/reservas/{reserva}/deposito/manual', [ReservaController::class, 'registrarDepositoManual'])->middleware('menu:mesas,reservas');
 
         Route::post('/reservas/{reserva}/no-show', [ReservaController::class, 'marcarNoShow'])->middleware('menu:mesas,reservas');
@@ -329,6 +332,9 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
         Route::post('/negocio/ubicacion-desde-enlace', [NegocioController::class, 'ubicacionDesdeEnlace'])->middleware(['menu:configuracion', 'throttle:20,1']);
         Route::post('/negocio/logo', [NegocioController::class, 'subirLogo'])->middleware('menu:configuracion');
         Route::delete('/negocio/logo', [NegocioController::class, 'quitarLogo'])->middleware('menu:configuracion');
+        // Pago directo (22/10/2026): las cuentas de Nequi, Bancolombia y Bre-B (las cambia solo el SuperAdmin).
+        Route::get('/negocio/pagos-directos', [NegocioController::class, 'pagosDirectos'])->middleware('menu:configuracion');
+        Route::put('/negocio/pagos-directos', [NegocioController::class, 'actualizarPagosDirectos'])->middleware('menu:configuracion');
         // Fase 4, tarea 1: estado del programador de tareas y de la cola de trabajos.
         Route::get('/sistema/estado', [ConfiguracionController::class, 'estadoSistema'])->middleware('menu:configuracion');
         // Endurecimiento (13/10/2026): revisión de seguridad antes de abrir al público.

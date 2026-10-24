@@ -280,7 +280,7 @@ onMounted(cargar)
         </p>
         <label class="block">
           <span class="field-label">Motivo</span>
-          <textarea
+          <textarea v-formato="'texto'" maxlength="255"
             v-model="motivoForzada"
             rows="3"
             placeholder="Ej. El cliente se fue sin avisar y dejó el pedido sin cerrar."

@@ -642,3 +642,41 @@ Resumen; la lista completa del invitado está en `QA-CLIENTE.md` (secciones 4 a 
 - [ ] Si se detiene el cron del servidor, al Administrador (y a Soporte) les llega «Las tareas
       automáticas están detenidas». Si la revisión antes de producción tiene errores, llega a las 7:00 a. m.
 - [ ] «Marcar todo como leído» deja el contador en cero. Un aviso no se repite.
+
+## 15b. Anular un pago de un pedido finalizado (22/10/2026)
+
+- [ ] Cobrar un pedido local en dos pagos (por ejemplo, efectivo y tarjeta) hasta que quede finalizado.
+      En Caja, anular el de tarjeta como «Anulación»: el detalle del turno dice «El pedido #… volvió a
+      cobro: le falta …», el pedido aparece otra vez en Pedidos y el Mesero recibe la notificación.
+      Al cobrar lo que falta, el pedido se finaliza solo.
+- [ ] Con «Reembolso» en vez de «Anulación», el pedido sigue finalizado.
+
+## 15c. Cuentas para pagos en línea sin Wompi (22/10/2026)
+
+- [ ] Como SuperAdmin, Configuración > «Cuentas para pagos en línea»: llenar Nequi y guardar. Nequi dice
+      «Se ofrece»; Bancolombia sin número dice «No se ofrece». Auditoría registra el cambio con el antes y
+      el después.
+- [ ] Como Administrador, la tarjeta se ve con los campos bloqueados y el aviso «Solo el SuperAdmin cambia
+      las cuentas donde se recibe el dinero».
+- [ ] En Pedidos, un pedido con captura sale con «Pago por revisar»; al abrirlo, «Revisar comprobante»
+      muestra la captura y deja aprobar o rechazar con motivo. En Reservas, igual con el depósito.
+
+## 15d. Formato de los campos (22/10/2026)
+
+- [ ] Configuración: en el teléfono, el NIT, el número de Nequi, la cuenta Bancolombia y la cédula o NIT no
+      entra ninguna letra; en «A nombre de» no entran números; «Valor del domicilio» y «Depósito» se ven con
+      punto de miles (20.000) y no aceptan letras; los tiempos de reserva solo aceptan números.
+- [ ] Pegar «NIT: 900.123.456-7» en el NIT deja «900123456-7»; pegar «+57 322 725-9965» en el teléfono deja
+      «3227259965».
+- [ ] Catálogo, Caja, Compras y gastos: los precios y valores se escriben con punto de miles; la cantidad
+      acepta decimales (2,5); en Usuarios, el teléfono solo acepta 10 números y el nombre, solo letras.
+
+## 16. Contraseña segura y bloqueo por intentos (21/10/2026)
+
+- [ ] Usuarios › Nuevo usuario: debajo de la contraseña salen los requisitos y se marcan al cumplirse; con
+      «mesero123» el servidor responde que falta una mayúscula. Lo mismo en Mi perfil › Cambiar contraseña.
+- [ ] En el servidor, `php artisan fragua:crear-soporte` con una contraseña débil dice qué le falta y no crea nada.
+- [ ] Equivocarse 5 veces seguidas con la contraseña de un Mesero: el quinto intento dice que espere 15
+      minutos; la campana del Administrador y del SuperAdmin muestra «Cuenta bloqueada por intentos
+      fallidos» y Auditoría (Seguridad y sesiones) lo registra.
+- [ ] Recuperar la contraseña de esa cuenta: puede entrar de inmediato con la nueva.

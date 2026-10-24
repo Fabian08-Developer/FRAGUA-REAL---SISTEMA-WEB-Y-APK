@@ -160,7 +160,7 @@ class SoporteTest extends TestCase
     public function test_la_cuenta_se_crea_solo_en_el_servidor_y_no_convierte_cuentas_del_negocio(): void
     {
         $this->artisan('fragua:crear-soporte', ['correo' => 'dev@test.co', '--nombre' => 'Dev'])
-            ->expectsQuestion('Contraseña (mínimo 8 caracteres)', 'Clave-Dev-2026')
+            ->expectsQuestion('Contraseña (mínimo 8 caracteres, con mayúscula, minúscula y número)', 'Clave-Dev-2026')
             ->expectsQuestion('Repite la contraseña', 'Clave-Dev-2026')
             ->expectsOutput('Cuenta de Soporte creada: dev@test.co')
             ->assertExitCode(0);
@@ -176,7 +176,7 @@ class SoporteTest extends TestCase
         $dev->createToken('portatil');
         $dev->forceFill(['activo' => false])->save();
         $this->artisan('fragua:crear-soporte', ['correo' => 'dev@test.co', '--cambiar-clave' => true])
-            ->expectsQuestion('Contraseña (mínimo 8 caracteres)', 'Clave-Nueva-2026')
+            ->expectsQuestion('Contraseña (mínimo 8 caracteres, con mayúscula, minúscula y número)', 'Clave-Nueva-2026')
             ->expectsQuestion('Repite la contraseña', 'Clave-Nueva-2026')
             ->expectsOutput('La cuenta está desactivada: solo el SuperAdmin puede reactivarla, en Usuarios.')
             ->assertExitCode(0);

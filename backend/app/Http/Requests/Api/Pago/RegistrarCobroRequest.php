@@ -19,7 +19,7 @@ class RegistrarCobroRequest extends FormRequest
     {
         return [
             'metodo' => ['required', 'in:efectivo,tarjeta,transferencia'],
-            'monto' => ['required', 'numeric', 'min:0.01'],
+            'monto' => ['required', 'numeric', 'min:0.01', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS],
         ];
     }
 }

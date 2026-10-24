@@ -4,14 +4,18 @@
 // (/seguimiento/<token>). Ve el estado, los productos, el total y lo pagado; mientras el pedido
 // está PENDIENTE puede pagarlo en línea o reintentar el pago (RF-M06-005/008) y cancelarlo
 // (RF-M07-016, RF-M07-R-009). La página se actualiza sola cada 30 segundos.
+// Pago directo (22/10/2026, RF-M06-030 a 033): sin Wompi, paga transfiriendo y subiendo la captura;
+// mientras se revisa lo dice, y si se rechaza ve el motivo y puede enviarla de nuevo.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Bike, CheckCircle2, ShoppingBag, XCircle, CircleX } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
+import PagoEnLinea from '@/components/pagos/PagoEnLinea.vue'
+import { usePagosEnLinea } from '@/composables/usePagosEnLinea'
 import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
-import { pedidoService } from '@/services/pedido.service'
-import { mensajeDeError } from '@/services/errors'
+import { pedidoService, type PagoEnLineaPayload } from '@/services/pedido.service'
+import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import { irAlCheckout } from '@/utils/pasarela'
 import type { Pedido } from '@/types/models'
 
@@ -96,28 +100,36 @@ const pagoEnRevision = computed(() =>
 const intentoEnPasarela = computed(() =>
   (pedido.value?.pagos ?? []).some((x) => x.metodo === 'en_linea' && x.estado === 'pendiente' && !x.anulado && x.transaccion_pasarela),
 )
+// Pago directo: el último pago en línea, para decir si se está revisando la captura o por qué se rechazó.
+const ultimoEnLinea = computed(() =>
+  (pedido.value?.pagos ?? []).filter((x) => x.metodo === 'en_linea' && !x.anulado).sort((a, b) => b.id - a.id)[0] ?? null,
+)
+const comprobanteEnRevision = computed(() => pagoEnRevision.value && !!ultimoEnLinea.value?.tiene_comprobante)
+const rechazado = computed(() => (ultimoEnLinea.value?.estado === 'rechazado' ? ultimoEnLinea.value : null))
+const { pagos: configPagos, disponible: enLineaDisponible } = usePagosEnLinea()
+
 const puedePagar = computed(
   () =>
+    enLineaDisponible.value &&
     pedido.value?.estado === 'pendiente' &&
     (!pagoEnRevision.value || intentoEnPasarela.value) &&
     Number(pedido.value.total) - pagado.value > 0,
 )
 
 // ---- Pago en línea (RF-M06-005/008) ----
-const pasarela = ref<'nequi' | 'bancolombia'>('nequi')
 const pagando = ref(false)
 const errorPago = ref('')
 
-async function pagar() {
+async function pagar(datosPago: PagoEnLineaPayload) {
   if (!pedido.value) return
   pagando.value = true
   errorPago.value = ''
   try {
-    const { data } = await pedidoService.pagarEnLineaConToken(token, { pasarela: pasarela.value, monto: Number(pedido.value.total) - pagado.value })
+    const { data } = await pedidoService.pagarEnLineaConToken(token, datosPago)
     if (irAlCheckout(data.checkout)) return // vuelve por /pago/retorno
     await cargar(true)
   } catch (e) {
-    errorPago.value = mensajeDeError(e, 'No pudimos registrar tu pago.')
+    errorPago.value = Object.values(erroresDeValidacion(e))[0] ?? mensajeDeError(e, 'No pudimos registrar tu pago.')
   } finally {
     pagando.value = false
   }
@@ -214,6 +226,9 @@ async function cancelar() {
         <p v-if="pagoEnRevision && intentoEnPasarela" class="mt-3 text-xs text-[#6c655c]">
           Tu pago en línea está en proceso en la pasarela. Si pagas con Nequi, apruébalo en la app; en cuanto llegue, confirmamos tu pedido.
         </p>
+        <p v-else-if="comprobanteEnRevision" class="mt-3 rounded-xl bg-[#fff7e5] px-3 py-2 text-xs text-[#7a5a12]">
+          Recibimos tu comprobante. Estamos verificando la transferencia; en cuanto la confirmemos empezamos tu pedido.
+        </p>
         <p v-else-if="pagoEnRevision" class="mt-3 text-xs text-[#6c655c]">Tu pago en línea está en revisión.</p>
         <p v-if="pedido.direccion_entrega" class="mt-3 text-xs text-[#6c655c]">
           Entrega en {{ pedido.direccion_entrega }}<template v-if="pedido.barrio">, {{ pedido.barrio }}</template>
@@ -225,18 +240,23 @@ async function cancelar() {
       <!-- Pagar en línea -->
       <section v-if="puedePagar" class="mt-4 rounded-2xl border border-[#e2dbcf] bg-white p-5">
         <h2 class="font-display text-lg text-ink">Pagar en línea</h2>
+        <p v-if="rechazado" class="mt-2 alert-error">
+          Tu pago anterior no se aprobó<template v-if="rechazado.rechazo_motivo">: {{ rechazado.rechazo_motivo }}</template>.
+          Revisa los datos y vuelve a enviar el comprobante.
+        </p>
         <p class="mt-1 text-xs text-[#6c655c]">
           <template v-if="intentoEnPasarela">¿No terminaste el pago? Puedes intentarlo de nuevo. </template>
           También puedes pagar {{ pedido.tipo === 'domicilio' ? 'contra entrega' : 'al recoger' }}.
         </p>
-        <div class="mt-3 flex gap-4">
-          <label class="flex items-center gap-2 text-sm text-ink"><input v-model="pasarela" type="radio" value="nequi" /> Nequi</label>
-          <label class="flex items-center gap-2 text-sm text-ink"><input v-model="pasarela" type="radio" value="bancolombia" /> Bancolombia</label>
-        </div>
-        <p v-if="errorPago" class="mt-3 alert-error">{{ errorPago }}</p>
-        <BaseButton class="mt-4" :disabled="pagando" @click="pagar">
-          {{ pagando ? 'Registrando…' : `Pagar ${formatoPrecio(Number(pedido.total) - pagado)}` }}
-        </BaseButton>
+        <PagoEnLinea
+          class="mt-4"
+          :config="configPagos"
+          :monto="Number(pedido.total) - pagado"
+          :enviando="pagando"
+          :error="errorPago"
+          :medio-inicial="pedido.pasarela_preferida"
+          @pagar="pagar"
+        />
       </section>
 
       <!-- Cancelar -->
@@ -266,7 +286,7 @@ async function cancelar() {
         <div v-else class="rounded-2xl border border-red-200 bg-red-50/60 p-5">
           <label class="block">
             <span class="text-sm font-medium text-ink">¿Por qué cancelas?</span>
-            <textarea v-model="motivo" rows="2" maxlength="255" class="field mt-2" />
+            <textarea v-formato="'texto'" v-model="motivo" rows="2" maxlength="255" class="field mt-2" />
           </label>
           <p v-if="errorCancelar" class="mt-2 text-xs text-red-600">{{ errorCancelar }}</p>
           <div class="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

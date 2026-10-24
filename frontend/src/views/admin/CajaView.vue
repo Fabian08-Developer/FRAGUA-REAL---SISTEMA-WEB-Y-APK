@@ -7,6 +7,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Banknote, CreditCard, Landmark, RefreshCw, Smartphone, Wallet } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
+import CampoPesos from '@/components/common/CampoPesos.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import PagosPasarelaPorRevisar from '@/components/caja/PagosPasarelaPorRevisar.vue'
@@ -14,7 +15,7 @@ import ResumenTurno from '@/components/caja/ResumenTurno.vue'
 import { cajaService } from '@/services/caja.service'
 import { pagoService } from '@/services/pago.service'
 import { mensajeDeError } from '@/services/errors'
-import { ESTADO_REEMBOLSO, ESTADO_TRANSACCION, metodoPasarela } from '@/utils/pasarela'
+import { ESTADO_REEMBOLSO, ESTADO_TRANSACCION, metodoPasarela, nombreMedio } from '@/utils/pasarela'
 import type { CajaTurno, Pago } from '@/types/models'
 
 function formatoPrecio(valor: number | null) {
@@ -202,6 +203,7 @@ async function verDetalle(turno: CajaTurno) {
 }
 
 function cerrarDetalle() {
+  avisoAnulacion.value = ''
   turnoDetalle.value = null
 }
 
@@ -212,6 +214,8 @@ const tipoReverso = ref<'anulacion' | 'reembolso'>('anulacion')
 const passwordConfirmacion = ref('')
 const errorAnular = ref('')
 const anulando = ref(false)
+// 22/10/2026 (RN-M06-15): el pedido finalizado que quedó con saldo vuelve a cobro; se avisa aquí.
+const avisoAnulacion = ref('')
 
 // RF-M06-019: si la caja de ese día ya cerró, anular exige autorización adicional (la
 // contraseña del Administrador) y queda como ajuste extraordinario.
@@ -247,11 +251,14 @@ async function confirmarAnular() {
   anulando.value = true
   errorAnular.value = ''
   try {
-    await pagoService.anular(pagoAAnular.value.id, {
+    const { data: anulado } = await pagoService.anular(pagoAAnular.value.id, {
       motivo: motivoAnular.value.trim(),
       tipo: tipoReverso.value,
       password_confirmacion: cajaDelPagoCerrada.value ? passwordConfirmacion.value : undefined,
     })
+    avisoAnulacion.value = anulado.pedido_reabierto
+      ? `El pedido #${anulado.pedido_reabierto.pedido_id} volvió a cobro: le falta ${formatoPrecio(Number(anulado.pedido_reabierto.saldo))}. El Mesero lo cobra desde Pedidos.`
+      : ''
     pagoAAnular.value = null
     // PagoController::anular responde el Pago "a secas" (sin pedido/registradoPorUsuario/
     // anuladoPorUsuario cargados) — parchar el array local con eso haría desaparecer "cobrado
@@ -408,11 +415,8 @@ onMounted(() => {
     <BaseModal v-model="modalAbrirOpen" title="Abrir turno de caja">
       <label class="block text-xs font-medium text-gray-700">
         Base inicial
-        <input
-          v-model.number="baseInicial"
-          type="number"
-          min="0"
-          step="0.01"
+        <CampoPesos
+          v-model="baseInicial"
           class="mt-2 field"
         />
       </label>
@@ -432,11 +436,8 @@ onMounted(() => {
     <BaseModal v-model="modalCerrarOpen" title="Cerrar turno de caja">
       <label class="block text-xs font-medium text-gray-700">
         Efectivo contado
-        <input
-          v-model.number="efectivoContado"
-          type="number"
-          min="0"
-          step="0.01"
+        <CampoPesos
+          v-model="efectivoContado"
           class="mt-2 field"
         />
       </label>
@@ -446,7 +447,7 @@ onMounted(() => {
 
       <label class="mt-4 block text-xs font-medium text-gray-700">
         Justificación del descuadre (si aplica)
-        <textarea
+        <textarea v-formato="'texto'" maxlength="500"
           v-model="justificacionDescuadre"
           rows="2"
           class="mt-2 field"
@@ -467,6 +468,7 @@ onMounted(() => {
     <!-- Detalle de un turno: sus pagos, con anular por fila -->
     <BaseModal :model-value="!!turnoDetalle || cargandoDetalle" :title="turnoDetalle ? `Turno ${formatoFecha(turnoDetalle.fecha)}` : 'Detalle del turno'" @update:model-value="cerrarDetalle">
       <p v-if="errorDetalle" class="alert-error">{{ errorDetalle }}</p>
+      <p v-if="avisoAnulacion" class="mb-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800" role="status">{{ avisoAnulacion }}</p>
 
       <div v-if="cargandoDetalle" class="loading-state">Cargando pagos…</div>
 
@@ -538,7 +540,7 @@ onMounted(() => {
                   </span>
                 </p>
                 <p class="mt-0.5 text-xs text-gray-500">
-                  {{ pago.pasarela === 'nequi' ? 'Nequi' : 'Bancolombia' }} · {{ formatoPrecio(pago.monto) }}
+                  {{ nombreMedio(pago.pasarela) }} · {{ formatoPrecio(pago.monto) }}
                   <template v-if="pago.anulado && pago.anulado_motivo">· "{{ pago.anulado_motivo }}"</template>
                 </p>
                 <!-- Fase 6, tarea 1: cómo se aprobó y qué dijo la pasarela. -->
@@ -580,7 +582,7 @@ onMounted(() => {
             </li>
             <!-- Mejora (16/10/2026): los pagados en línea ese día, que antes no salían aquí. -->
             <li v-for="r in turnoDetalle.depositos_en_linea" :key="`l${r.id}`" class="rounded-lg bg-gray-50 px-3 py-2">
-              Recibido {{ formatoPrecio(Number(r.deposito_valor)) }} (en línea<template v-if="r.deposito_pasarela">, {{ r.deposito_pasarela === 'nequi' ? 'Nequi' : 'Bancolombia' }}</template>) ·
+              Recibido {{ formatoPrecio(Number(r.deposito_valor)) }} (en línea<template v-if="r.deposito_pasarela">, {{ nombreMedio(r.deposito_pasarela) }}</template>) ·
               reserva #{{ r.id }} de {{ r.cliente_nombre }}<template v-if="r.mesa">, {{ r.mesa.nombre }}</template>
             </li>
             <li v-for="r in turnoDetalle.depositos_devueltos" :key="`v${r.id}`" class="rounded-lg bg-amber-50 px-3 py-2">
@@ -630,6 +632,14 @@ onMounted(() => {
           </button>
         </div>
 
+        <p class="mt-3 text-xs text-gray-500">
+          <template v-if="tipoReverso === 'anulacion'">
+            Anulación: el pago se registró por error. Si el pedido ya estaba finalizado y queda sin pagar completo, vuelve a
+            cobro para cobrar lo que falta.
+          </template>
+          <template v-else>Reembolso: se le devuelve el dinero al cliente; el pedido sigue como está.</template>
+        </p>
+
         <p v-if="cajaDelPagoCerrada" class="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
           La caja de ese día ya cerró. El reverso queda como ajuste extraordinario y el arqueo de ese día no cambia.
           Confirma tu contraseña para autorizarlo.
@@ -641,7 +651,7 @@ onMounted(() => {
 
         <label class="mt-4 block text-xs font-medium text-gray-700">
           Motivo
-          <textarea
+          <textarea v-formato="'texto'" maxlength="255"
             v-model="motivoAnular"
             rows="2"
             class="mt-2 field"

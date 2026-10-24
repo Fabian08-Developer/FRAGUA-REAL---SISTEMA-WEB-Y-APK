@@ -204,14 +204,14 @@ async function quitarLogo() {
 
         <div class="mt-4 space-y-4">
           <div v-if="auth.esSuperAdmin" class="grid gap-4 sm:grid-cols-2">
-            <BaseInput v-model="nombre" label="Nombre del negocio" type="text" placeholder="Fragua Real Burger" :error="errores.nombre" />
-            <BaseInput v-model="nit" label="NIT" type="text" placeholder="1075320008-5" :error="errores.nit" />
+            <BaseInput formato="nombre" v-model="nombre" label="Nombre del negocio" type="text" placeholder="Fragua Real Burger" :error="errores.nombre" />
+            <BaseInput formato="documento" v-model="nit" label="NIT" type="text" placeholder="1075320008-5" :error="errores.nit" />
           </div>
           <p v-else class="rounded-xl bg-[#fbfaf7] px-3 py-2 text-xs text-gray-500">
             {{ negocio.datos.nombre }}<template v-if="negocio.datos.nit"> · NIT {{ negocio.datos.nit }}</template> — el nombre y el NIT
             solo los cambia el SuperAdmin.
           </p>
-          <BaseInput v-model="direccion" label="Dirección" type="text" placeholder="Esquina frente al malecón turístico, etapa 1." :error="errores.direccion" />
+          <BaseInput formato="direccion" v-model="direccion" label="Dirección" type="text" placeholder="Esquina frente al malecón turístico, etapa 1." :error="errores.direccion" />
 
           <!-- M09: punto exacto del local. -->
           <div>
@@ -279,7 +279,7 @@ async function quitarLogo() {
             </div>
           </div>
           <div>
-            <BaseInput v-model="telefono" label="Teléfono y WhatsApp" type="text" placeholder="322 725 9965" :error="errores.telefono" />
+            <BaseInput formato="celular" v-model="telefono" label="Teléfono y WhatsApp" type="text" placeholder="322 725 9965" :error="errores.telefono" />
             <p v-if="!errores.telefono" class="mt-1 text-xs text-gray-500">
               Con este número se arma el botón de WhatsApp (sin indicativo se asume Colombia, +57).
             </p>

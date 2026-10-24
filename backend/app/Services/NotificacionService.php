@@ -39,6 +39,9 @@ class NotificacionService
         'pedido_listo' => ['pedidos', ['mesero'], ['pedidos']],
         'pedido_cancelado' => ['pedidos', self::PERSONAL, ['pedidos']],
         'pago_en_linea' => ['pedidos', self::PERSONAL, ['pedidos', 'caja', 'cobrar']],
+        // Pago directo (22/10/2026): el Cliente subió el comprobante de una transferencia.
+        'pago_por_confirmar' => ['pedidos', self::PERSONAL, ['pedidos', 'caja', 'cobrar']],
+        'deposito_por_confirmar' => ['reservas', self::PERSONAL, ['mesas', 'reservas']],
         'reserva_nueva' => ['reservas', self::PERSONAL, ['mesas', 'reservas']],
         'reserva_confirmada' => ['reservas', self::PERSONAL, ['mesas', 'reservas']],
         'reserva_cancelada' => ['reservas', self::PERSONAL, ['mesas', 'reservas']],
@@ -46,11 +49,15 @@ class NotificacionService
         'reserva_no_show' => ['reservas', self::PERSONAL, ['mesas', 'reservas']],
         'pago_por_revisar' => ['caja', self::ADMIN, ['caja']],
         'pago_anulado' => ['caja', self::ADMIN, ['caja']],
+        // Decisión del 22/10/2026: el pedido finalizado volvió a cobro; lo cobra el Mesero.
+        'pedido_reabierto' => ['caja', self::PERSONAL, ['caja', 'cobrar', 'pedidos']],
         'caja_abierta' => ['caja', self::ADMIN, ['caja']],
         'cierre_pendiente' => ['caja', self::ADMIN, ['compras_gastos']],
         'producto_agotado' => ['operacion', self::PERSONAL, ['catalogo', 'menu', 'pedidos']],
         'comanda_no_salio' => ['operacion', self::PERSONAL, ['pedidos']],
         'sistema' => ['sistema', [...self::ADMIN, 'soporte'], ['configuracion']],
+        // Seguridad (21/10/2026): una cuenta quedó bloqueada por intentos fallidos.
+        'cuenta_bloqueada' => ['sistema', self::ADMIN, ['usuarios', 'auditoria']],
     ];
 
     // ---------------------------------------------------------------- Pedidos
@@ -89,7 +96,21 @@ class NotificacionService
             "pago_en_linea:{$pago->id}:".($aprobado ? 'aprobado' : 'rechazado'), $this->enlacesPedidos(), $actor);
     }
 
+    public function pagoPorConfirmar(Pago $pago): void
+    {
+        $this->notificar('pago_por_confirmar', "Comprobante por revisar · pedido #{$pago->pedido_id}",
+            "{$this->plata($pago->monto)} por ".self::medio($pago->pasarela).'. Revisa la captura y aprueba o rechaza el pago.',
+            "pago_por_confirmar:{$pago->id}", ['administrador' => '/admin/pedidos', 'mesero' => '/mesero/caja']);
+    }
+
     // ---------------------------------------------------------------- Reservas
+
+    public function depositoPorConfirmar(Reserva $reserva): void
+    {
+        $this->notificar('deposito_por_confirmar', 'Comprobante de depósito por revisar',
+            "{$this->reserva($reserva)} · {$this->plata($reserva->deposito_valor)} por ".self::medio($reserva->deposito_pasarela).'.',
+            "deposito_por_confirmar:{$reserva->id}:".now()->timestamp, $this->enlacesReservas());
+    }
 
     public function reservaNueva(Reserva $reserva, ?User $actor): void
     {
@@ -135,6 +156,13 @@ class NotificacionService
             ['administrador' => '/admin/caja'], $actor);
     }
 
+    public function pedidoReabierto(Pedido $pedido, float $saldo, User $actor): void
+    {
+        $this->notificar('pedido_reabierto', "El pedido #{$pedido->id} volvió a cobro",
+            "Se anuló un pago y le falta {$this->plata($saldo)}. Cóbralo desde Pedidos.", "pedido_reabierto:{$pedido->id}:".now()->timestamp,
+            $this->enlacesPedidos(), $actor);
+    }
+
     // ---------------------------------------------------------------- Operación
 
     public function productoAgotado(string $nombre, string $clave, ?User $actor): void
@@ -148,6 +176,16 @@ class NotificacionService
         $this->notificar('comanda_no_salio', "La comanda del pedido #{$comanda->pedido_id} no salió",
             ($comanda->ultimo_error ?: 'No salió de la impresora.').' Vuelve a imprimirla.',
             "comanda_no_salio:{$comanda->id}:".now()->timestamp, $this->enlacesPedidos(), $actor);
+    }
+
+    // ---------------------------------------------------------------- Seguridad
+
+    public function cuentaBloqueada(User $usuario, ?string $ip): void
+    {
+        $minutos = (int) config('fragua_real.seguridad.bloqueo_minutos', 15);
+        $this->notificar('cuenta_bloqueada', 'Cuenta bloqueada por intentos fallidos',
+            "{$usuario->nombre} ({$usuario->email}): {$minutos} min sin poder entrar".($ip ? " · IP {$ip}" : '').'. Si no fue esa persona, revisa la Auditoría.',
+            "cuenta_bloqueada:{$usuario->id}:".now()->format('YmdHi'), ['administrador' => '/admin/auditoria'], $usuario);
     }
 
     // ---------------------------------------------------------------- Tareas programadas
@@ -347,6 +385,11 @@ class NotificacionService
         $hora = $reserva->fecha_hora->copy()->setTimezone(self::ZONA)->format('d/m g:i a');
 
         return ($reserva->mesa?->nombre ?? 'Mesa')." · {$hora} · {$reserva->cliente_nombre}";
+    }
+
+    private static function medio(?string $medio): string
+    {
+        return PagoDirectoService::MEDIOS[$medio][0] ?? 'transferencia';
     }
 
     private function plata(mixed $valor): string

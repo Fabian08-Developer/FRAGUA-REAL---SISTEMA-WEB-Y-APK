@@ -89,7 +89,19 @@ class PagoController extends Controller
     public function rechazarEnLinea(Request $request, Pago $pago)
     {
         $this->authorize('rechazarEnLinea', $pago);
+        // Pago directo (22/10/2026, RF-M06-033): el motivo lo ve el Cliente en su seguimiento.
+        $datos = $request->validate(['motivo' => ['nullable', 'string', 'max:255']]);
 
-        return response()->json($this->pagoService->rechazarPagoEnLinea($pago, $request->user(), 'manual')->load('transaccionPasarela'));
+        return response()->json($this->pagoService->rechazarPagoEnLinea($pago, $request->user(), 'manual', $datos['motivo'] ?? null)->load('transaccionPasarela'));
+    }
+
+    // GET /api/pagos/{pago}/comprobante — Pago directo (RF-M06-032): la captura que subió el Cliente,
+    // solo para el personal.
+    public function comprobante(Request $request, Pago $pago, \App\Services\PagoDirectoService $pagosDirectos)
+    {
+        abort_if(! ($request->user()->esAdministrador() || $request->user()->esMesero()), 403);
+        abort_if(! $pagosDirectos->existe($pago->comprobante_path), 404, 'Este pago no tiene comprobante.');
+
+        return $pagosDirectos->respuesta($pago->comprobante_path, $pago->comprobante_mime, "comprobante-pedido-{$pago->pedido_id}");
     }
 }

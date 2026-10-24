@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, AtSign, Lock, Mail, Phone, User } from 'lucide-vue-next'
 import BaseInput from '@/components/common/BaseInput.vue'
 import BaseButton from '@/components/common/BaseButton.vue'
+import RequisitosContrasena from '@/components/common/RequisitosContrasena.vue'
 import { useAuth } from '@/composables/useAuth'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import { destinoInterno } from '@/utils/redireccion'
@@ -59,14 +60,14 @@ async function onSubmit() {
   </div>
   <form class="space-y-4" @submit.prevent="onSubmit">
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <BaseInput
+      <BaseInput formato="persona"
         v-model="nombre"
         label="Nombre completo"
         placeholder="Tu nombre y apellido"
         :icon="User"
         :error="erroresCampo.nombre"
       />
-      <BaseInput
+      <BaseInput formato="celular"
         v-model="telefono"
         type="tel"
         label="Teléfono (opcional)"
@@ -75,7 +76,7 @@ async function onSubmit() {
         :error="erroresCampo.telefono"
       />
     </div>
-    <BaseInput
+    <BaseInput formato="correo"
       v-model="email"
       type="email"
       label="Correo electrónico"
@@ -85,7 +86,7 @@ async function onSubmit() {
       :error="erroresCampo.email"
     />
     <!-- Fase 3, tarea 3 (RF-M01-007/011): opcional; con él también se puede iniciar sesión. -->
-    <BaseInput
+    <BaseInput formato="usuario"
       v-model="username"
       label="Nombre de usuario (opcional)"
       placeholder="Ej. carla.p — para entrar sin escribir el correo"
@@ -98,9 +99,10 @@ async function onSubmit() {
         v-model="password"
         type="password"
         label="Contraseña"
-        placeholder="Mínimo 8 caracteres"
+        placeholder="Ej. Hamburguesa2026"
         :icon="Lock"
         :error="erroresCampo.password"
+        autocomplete="new-password"
       />
       <BaseInput
         v-model="passwordConfirmation"
@@ -108,8 +110,10 @@ async function onSubmit() {
         label="Confirmar contraseña"
         placeholder="••••••••"
         :icon="Lock"
+        autocomplete="new-password"
       />
     </div>
+    <RequisitosContrasena :clave="password" :confirmacion="passwordConfirmation" />
     <p v-if="errorGeneral" class="text-sm text-red-600">{{ errorGeneral }}</p>
     <BaseButton type="submit" :disabled="cargando" class="w-full">
       <span class="flex w-full items-center justify-between">

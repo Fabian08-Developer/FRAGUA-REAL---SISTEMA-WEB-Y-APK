@@ -31,6 +31,7 @@ use Tests\TestCase;
 class PasarelaWompiTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\PagoDirectoDePrueba;
 
     private const SECRETO_EVENTOS = 'test_events_secreto';
     private const SECRETO_INTEGRIDAD = 'test_integrity_secreto';
@@ -80,7 +81,7 @@ class PasarelaWompiTest extends TestCase
 
     private function pagar(string $token, string $pasarela = 'nequi')
     {
-        return $this->postJson("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => $pasarela, 'monto' => 20000]);
+        return $this->pagoDirecto("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => $pasarela, 'monto' => 20000]);
     }
 
     private function evento(string $referencia, string $estado, int $centavos = 2000000, string $id = '1234-1760000000-00001', string $metodo = 'NEQUI', ?int $timestamp = null): array
@@ -114,7 +115,7 @@ class PasarelaWompiTest extends TestCase
     {
         [$id, $token] = $this->pedidoInvitado();
 
-        $respuesta = $this->postJson("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 1])->assertCreated()
+        $respuesta = $this->pagoDirecto("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => 1])->assertCreated()
             ->assertJsonPath('estado', 'pendiente');
 
         $tx = TransaccionPasarela::sole();
@@ -314,8 +315,8 @@ class PasarelaWompiTest extends TestCase
         ])->assertCreated();
         $reservaId = $creada->json('id');
 
-        $this->postJson("/api/reservas/{$reservaId}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => 'otro'])->assertNotFound();
-        $respuesta = $this->postJson("/api/reservas/{$reservaId}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $creada->json('token_publico')])->assertOk();
+        $this->pagoDirecto("/api/reservas/{$reservaId}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => 'otro'])->assertNotFound();
+        $respuesta = $this->pagoDirecto("/api/reservas/{$reservaId}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $creada->json('token_publico')])->assertOk();
 
         $tx = TransaccionPasarela::sole();
         $this->assertMatchesRegularExpression('/^FRR-'.$reservaId.'-/', $tx->referencia);
@@ -376,7 +377,7 @@ class PasarelaWompiTest extends TestCase
             'mesa_id' => $mesa->id, 'cliente_nombre' => 'Laura', 'cliente_telefono' => '3105551234', 'cliente_correo' => 'laura@correo.co',
             'fecha_hora' => '2026-10-14 20:00',
         ])->assertCreated();
-        $this->postJson("/api/reservas/{$creada->json('id')}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $creada->json('token_publico')])->assertOk();
+        $this->pagoDirecto("/api/reservas/{$creada->json('id')}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $creada->json('token_publico')])->assertOk();
         $tx = TransaccionPasarela::sole();
         $this->enviarEvento($this->evento($tx->referencia, 'APPROVED', 2000000, 'tx-r', 'CARD'))->assertOk();
 
@@ -433,7 +434,7 @@ class PasarelaWompiTest extends TestCase
             'fecha_hora' => '2026-10-14 20:00',
         ])->assertCreated();
         $token = $creada->json('token_publico');
-        $this->postJson("/api/reservas/{$creada->json('id')}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $token])->assertOk();
+        $this->pagoDirecto("/api/reservas/{$creada->json('id')}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $token])->assertOk();
         $primera = TransaccionPasarela::sole();
         $this->enviarEvento($this->evento($primera->referencia, 'DECLINED'))->assertOk();
 
@@ -441,7 +442,7 @@ class PasarelaWompiTest extends TestCase
         $this->getJson("/api/pasarela/transacciones/{$primera->referencia}")->assertJsonPath('estado', 'rechazado')->assertJsonPath('reserva.enlace', $token);
         $this->getJson("/api/reservas/enlace/{$token}")->assertJsonPath('puede_pagar', true)->assertJsonPath('deposito_estado', 'rechazado');
 
-        $this->postJson("/api/reservas/enlace/{$token}/deposito", ['pasarela' => 'bancolombia'])->assertOk()
+        $this->pagoDirecto("/api/reservas/enlace/{$token}/deposito", ['pasarela' => 'bancolombia'])->assertOk()
             ->assertJsonPath('deposito_estado', 'pendiente')
             ->assertJsonPath('checkout.proveedor', 'wompi');
         $this->assertSame(2, TransaccionPasarela::count());
@@ -450,7 +451,7 @@ class PasarelaWompiTest extends TestCase
         $this->enviarEvento($this->evento($segunda->referencia, 'APPROVED', 2000000, 'tx-ok'))->assertOk();
         $this->assertSame('confirmada', Reserva::sole()->estado);
         $this->getJson("/api/reservas/enlace/{$token}")->assertJsonPath('puede_pagar', false);
-        $this->postJson("/api/reservas/enlace/{$token}/deposito", ['pasarela' => 'nequi'])->assertStatus(422);
+        $this->pagoDirecto("/api/reservas/enlace/{$token}/deposito", ['pasarela' => 'nequi'])->assertStatus(422);
     }
 
     public function test_un_reembolso_que_wompi_no_hace_queda_en_la_lista_por_revisar(): void

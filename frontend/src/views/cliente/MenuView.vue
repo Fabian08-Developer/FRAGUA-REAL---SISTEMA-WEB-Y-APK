@@ -487,7 +487,7 @@ function formatoPrecio(valor: number) {
 
             <label class="mt-5 block pb-5 text-xs text-ink">
               ¿Quieres quitar algún ingrediente?
-              <input
+              <input v-formato="'texto'" maxlength="500"
                 v-model="notas"
                 type="text"
                 placeholder="Indicación opcional para cocina"

@@ -56,7 +56,7 @@ class SuperAdminTest extends TestCase
 
     public function test_solo_el_superadmin_crea_cuentas_de_administrador(): void
     {
-        $nueva = ['role' => 'administrador', 'nombre' => 'Caro', 'email' => 'caro@test.co', 'password' => 'secreto123', 'password_confirmation' => 'secreto123'];
+        $nueva = ['role' => 'administrador', 'nombre' => 'Caro', 'email' => 'caro@test.co', 'password' => 'Secreto123', 'password_confirmation' => 'Secreto123'];
 
         Sanctum::actingAs($this->admin);
         $this->postJson('/api/usuarios', $nueva)->assertForbidden()
@@ -119,7 +119,7 @@ class SuperAdminTest extends TestCase
     public function test_el_comando_crea_el_superadmin_o_vuelve_superadmin_una_cuenta(): void
     {
         $this->artisan('fragua:crear-superadmin', ['correo' => 'duena@test.co', '--nombre' => 'Dueña'])
-            ->expectsQuestion('Contraseña (mínimo 8 caracteres)', 'Clave-Duena-2026')
+            ->expectsQuestion('Contraseña (mínimo 8 caracteres, con mayúscula, minúscula y número)', 'Clave-Duena-2026')
             ->expectsQuestion('Repite la contraseña', 'Clave-Duena-2026')
             ->expectsOutput('Cuenta SuperAdmin creada: duena@test.co')
             ->assertExitCode(0);
@@ -141,7 +141,7 @@ class SuperAdminTest extends TestCase
 
         // Contraseñas que no coinciden: no cambia nada.
         $this->artisan('fragua:crear-superadmin', ['correo' => 'nadie@test.co'])
-            ->expectsQuestion('Contraseña (mínimo 8 caracteres)', 'Clave-1234')
+            ->expectsQuestion('Contraseña (mínimo 8 caracteres, con mayúscula, minúscula y número)', 'Clave-1234')
             ->expectsQuestion('Repite la contraseña', 'Otra-1234')
             ->assertExitCode(1);
         $this->assertNull(User::where('email', 'nadie@test.co')->first());
@@ -159,8 +159,8 @@ class SuperAdminTest extends TestCase
         Sanctum::actingAs($this->super);
         $this->putJson('/api/negocio', $datos)->assertOk()
             ->assertJsonPath('nombre', 'Fragua Real Burger & Grill')
-            ->assertJsonPath('nit', '900.123.456-7');
-        $this->assertSame('900.123.456-7', app(NegocioService::class)->datos()['nit']);
+            ->assertJsonPath('nit', '900123456-7'); // se guarda sin puntos (22/10/2026)
+        $this->assertSame('900123456-7', app(NegocioService::class)->datos()['nit']);
         $this->putJson('/api/negocio', array_merge($datos, ['nit' => 'NIT-ABC']))->assertStatus(422)->assertJsonValidationErrors(['nit']);
     }
 

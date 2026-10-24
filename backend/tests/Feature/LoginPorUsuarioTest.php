@@ -68,7 +68,7 @@ class LoginPorUsuarioTest extends TestCase
 
     public function test_RF_M01_011_formato_y_unicidad_sin_importar_mayusculas_al_registrarse(): void
     {
-        $base = ['nombre' => 'Carla', 'password' => 'clave12345', 'password_confirmation' => 'clave12345'];
+        $base = ['nombre' => 'Carla', 'password' => 'Clave12345', 'password_confirmation' => 'Clave12345'];
 
         $this->postJson('/api/auth/register', $base + ['email' => 'carla@test.co', 'username' => 'MARIO.M'])
             ->assertStatus(422)->assertJsonPath('errors.username.0', 'Ese nombre de usuario ya lo usa otra cuenta.');
@@ -92,7 +92,7 @@ class LoginPorUsuarioTest extends TestCase
 
         $this->postJson('/api/usuarios', [
             'role' => 'mesero', 'nombre' => 'Nuevo', 'email' => 'nuevo@test.co', 'username' => 'Nuevo1',
-            'password' => 'clave12345', 'password_confirmation' => 'clave12345',
+            'password' => 'Clave12345', 'password_confirmation' => 'Clave12345',
         ])->assertCreated()->assertJsonPath('username', 'nuevo1');
         $this->assertSame('nuevo1', Auditoria::where('accion', 'crear_usuario')->sole()->detalles['usuario']);
 

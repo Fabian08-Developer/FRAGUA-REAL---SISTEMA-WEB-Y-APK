@@ -16,7 +16,7 @@ class StoreExtraRequest extends FormRequest
         return [
             'nombre' => ['required', 'string', 'max:255'],
             // RF-M04-023, RN-M04-10 (Fase 2, tarea 3): mayor a cero.
-            'precio' => ['required', 'numeric', 'gt:0'],
+            'precio' => ['required', 'numeric', 'gt:0', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS],
             'alcance' => ['required', 'in:general,especifico'],
             // RN-M04-05: "especifico" exige producto_id; "general" debe dejarlo vacío
             // (se asocia a productos al editarlos; sin asociar no se ofrece con ninguno).

@@ -34,6 +34,9 @@ final class CatalogoAuditoria
         // Seguridad y sesiones (Fase 3, tarea 1: RF-M01-017, RF-M01-024)
         'inicio_sesion' => ['Inicio de sesión', 'seguridad'],
         'inicio_sesion_fallido' => ['Intento de inicio de sesión fallido', 'seguridad'],
+        // Seguridad (21/10/2026)
+        'bloqueo_inicio_sesion' => ['Cuenta bloqueada por intentos fallidos', 'seguridad'],
+        'inicio_sesion_bloqueado' => ['Intento de inicio de sesión durante un bloqueo', 'seguridad'],
         'cierre_sesion' => ['Cierre de sesión', 'seguridad'],
         'cierre_sesion_todos' => ['Cierre de sesión en todos los dispositivos', 'seguridad'],
         'cambiar_contrasena' => ['Cambio de contraseña', 'seguridad'],
@@ -65,6 +68,8 @@ final class CatalogoAuditoria
 
         // Pedidos
         'modificar_pedido' => ['Modificación de pedido', 'pedidos'],
+        // Decisión del 22/10/2026 (RN-M06-15)
+        'reabrir_pedido' => ['Pedido reabierto para cobrar el saldo (pago anulado)', 'pedidos'],
         'cancelar_pedido' => ['Cancelación de pedido', 'pedidos'],
         'aplicar_descuento_manual' => ['Descuento manual aplicado', 'pedidos'],
         'quitar_descuento_manual' => ['Descuento manual quitado', 'pedidos'],
@@ -131,6 +136,8 @@ final class CatalogoAuditoria
 
         // Configuración
         'editar_configuracion' => ['Cambio de configuración', 'configuracion'],
+        // Pago directo (22/10/2026)
+        'editar_pagos_directos' => ['Cambio de las cuentas del pago directo (Nequi, Bancolombia, Bre-B)', 'configuracion'],
         'editar_datos_negocio' => ['Cambio de los datos del negocio', 'configuracion'],
         'cambiar_logo_negocio' => ['Cambio del logo del negocio', 'configuracion'],
         'quitar_logo_negocio' => ['Logo del negocio quitado', 'configuracion'],

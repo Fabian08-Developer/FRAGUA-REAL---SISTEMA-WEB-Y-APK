@@ -6,6 +6,7 @@
 //                   ambos valores en la tabla `configuraciones`; aplican a los pedidos/reservas
 //                   creados después del cambio.
 import api from './api'
+import type { MedioPagoEnLinea } from '@/types/models'
 
 // Mejora (19/10/2026): datos del negocio que cambia el Administrador (Inicio, pie de página y PDF).
 export interface DatosNegocio {
@@ -35,6 +36,30 @@ export interface Configuracion {
   reserva_hora_inicio?: string
   reserva_hora_fin?: string
   reserva_anticipacion_minutos?: number
+  // Seguridad (21/10/2026): requisitos de la contraseña (los hace cumplir el servidor).
+  clave?: { minimo: number; mezcla: boolean }
+  // Pago directo (22/10/2026): las cuentas a las que se transfiere (solo las que están completas).
+  pagos_directos?: PagosDirectosPublico
+}
+
+// Pago directo (22/10/2026, RF-M06-030): sin Wompi, el Cliente transfiere a estas cuentas y sube la
+// captura. «automatico» = Wompi activo (el pago se hace en la pasarela, sin captura).
+export interface MedioPagoDirecto {
+  medio: MedioPagoEnLinea
+  nombre: string
+  campos: { campo: string; etiqueta: string; valor: string; copiar: boolean }[]
+}
+export interface PagosDirectosPublico {
+  activo: boolean
+  automatico: boolean
+  medios: MedioPagoDirecto[]
+}
+
+// Lo que guarda el SuperAdmin en Configuración (GET/PUT /negocio/pagos-directos).
+export interface DatosPagosDirectos {
+  nequi: { numero: string; titular: string }
+  bancolombia: { tipo: string; numero: string; titular: string; documento: string }
+  breb: { llave: string; titular: string }
 }
 
 // Rangos permitidos (los mismos que valida el backend, PoliticaReservas::RANGOS).
@@ -104,5 +129,12 @@ export const configuracionService = {
   },
   quitarLogo() {
     return api.delete<DatosNegocio>('/negocio/logo')
+  },
+  // Pago directo (22/10/2026): el Administrador las ve; solo el SuperAdmin las cambia.
+  pagosDirectos() {
+    return api.get<{ datos: DatosPagosDirectos; publico: PagosDirectosPublico }>('/negocio/pagos-directos')
+  },
+  actualizarPagosDirectos(datos: DatosPagosDirectos) {
+    return api.put<{ datos: DatosPagosDirectos; publico: PagosDirectosPublico }>('/negocio/pagos-directos', datos)
   },
 }

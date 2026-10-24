@@ -27,6 +27,7 @@ use Tests\TestCase;
 class ComprobantePagoTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\PagoDirectoDePrueba;
 
     private User $mesero;
     private User $admin;
@@ -170,7 +171,7 @@ class ComprobantePagoTest extends TestCase
         $pedido = Pedido::findOrFail($respuesta->json('id'));
         $total = (float) $pedido->total;
 
-        $this->postJson("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => $total])->assertSuccessful();
+        $this->pagoDirecto("/api/pedidos/seguimiento/{$token}/pagar-en-linea", ['pasarela' => 'nequi', 'monto' => $total])->assertSuccessful();
         $this->assertSame(0, Comprobante::count(), 'un pago en revisión todavía no da comprobante');
 
         Sanctum::actingAs($this->admin);

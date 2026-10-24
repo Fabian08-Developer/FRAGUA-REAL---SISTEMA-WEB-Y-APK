@@ -6,7 +6,11 @@
 // (CatalogoController, M04) — nada de nombres o precios inventados; cuando
 // un producto no tiene Producto.imagen_url todavía, se usa un ícono por tipo
 // de plato (ver utils/iconoCategoria.ts), igual que en el Menú.
+// Mejora del Inicio (21/10/2026): franja «Ofertas y combos de hoy» (OfertasDeHoy, GET /combos y las
+// promociones vigentes de los productos), destacados elegidos entre los disponibles (primero los que
+// tienen foto) y precios bien escritos (antes salía «Desde 5000.00»).
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Bike, ChefHat, MapPin, MessageCircle, SlidersHorizontal } from 'lucide-vue-next'
 import mascota from '@/assets/img/mascota-fragua-real.png'
 import fotoLocal from '@/assets/img/hamburguesas-fragua-real.jpg'
@@ -17,23 +21,35 @@ import fotoBacon from '@/assets/img/platos/hamburguesa-bacon-cheddar.jpg'
 import fotoSalchipapa from '@/assets/img/platos/salchipapa.jpg'
 import fotoSandwich from '@/assets/img/platos/sandwich-platano.jpg'
 import fotoDuo1 from '@/assets/img/platos/duo-hamburguesas-1.jpg'
+import CarritoFlotante from '@/components/common/CarritoFlotante.vue'
 import MapaUbicacion from '@/components/common/MapaUbicacion.vue'
+import OfertasDeHoy from '@/components/inicio/OfertasDeHoy.vue'
 import { catalogoService } from '@/services/catalogo.service'
+import { useCarritoStore } from '@/stores/carrito'
 import { useNegocioStore } from '@/stores/negocio'
 import { iconoPorNombre } from '@/utils/iconoCategoria'
-import type { Categoria, Producto } from '@/types/models'
+import { precioConPromocion } from '@/utils/promociones'
+import type { Categoria, Combo, Producto } from '@/types/models'
 
+const router = useRouter()
+const carrito = useCarritoStore()
 const categorias = ref<Categoria[]>([])
 const productos = ref<Producto[]>([])
+const combos = ref<Combo[]>([])
+// Lo que se agregó desde «Ofertas de hoy» (el aviso y el botón del pedido, en el teléfono).
+const avisoAgregado = ref<{ id: number; texto: string } | null>(null)
 
 onMounted(async () => {
   try {
-    const [resCategorias, resProductos] = await Promise.all([
+    const [resCategorias, resProductos, resCombos] = await Promise.all([
       catalogoService.categorias(),
       catalogoService.productos(),
+      // Si los combos no cargan, el resto del Inicio sigue igual.
+      catalogoService.combos().catch(() => ({ data: [] as Combo[] })),
     ])
     categorias.value = resCategorias.data
     productos.value = resProductos.data
+    combos.value = resCombos.data
   } catch {
     // El Home sigue siendo útil sin estas secciones (hero, reservas y
     // contacto no dependen del catálogo) — solo se ocultan en silencio.
@@ -41,10 +57,31 @@ onMounted(async () => {
 })
 
 const categoriasDestacadas = computed(() => categorias.value.slice(0, 6))
-const productosDestacados = computed(() => productos.value.slice(0, 3))
+// Destacados: disponibles, sin los que ya salen en «Ofertas de hoy», primero los que tienen foto y
+// después los platos antes que las bebidas.
+const productosDestacados = computed(() =>
+  productos.value
+    .filter((p) => p.disponible !== false && !(p.promociones_vigentes ?? []).length)
+    .map((p, i) => ({ p, i, puntos: (p.imagen_url ? 2 : 0) + (p.tipo_venta === 'bebida' ? 0 : 1) }))
+    .sort((a, b) => b.puntos - a.puntos || a.i - b.i)
+    .slice(0, 3)
+    .map(({ p }) => p),
+)
 
-function formatoPrecio(valor: number) {
-  return valor.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+function formatoPrecio(valor: number | string) {
+  return Number(valor).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+}
+
+function precioDestacado(producto: Producto): string {
+  const variantes = (producto.variantes ?? []).filter((v) => v.disponible !== false)
+  const precio = variantes.length
+    ? Math.min(...variantes.map((v) => precioConPromocion(producto, Number(v.precio), v.id)))
+    : precioConPromocion(producto, Number(producto.precio_base))
+  return `${variantes.length ? 'Desde ' : ''}${formatoPrecio(precio)}`
+}
+
+function alAgregar(texto: string) {
+  avisoAgregado.value = { id: Date.now(), texto }
 }
 
 // Datos de contacto reales del negocio (no se inventan): dirección y WhatsApp.
@@ -182,6 +219,9 @@ const beneficios = [
       </div>
     </section>
 
+    <!-- Mejora del Inicio (21/10/2026): ofertas y combos que se pueden pedir hoy -->
+    <OfertasDeHoy :productos="productos" :combos="combos" @agregado="alAgregar" />
+
     <!-- Accesos rápidos por categoría -->
     <section v-if="categoriasDestacadas.length" class="mx-auto max-w-6xl px-4 pb-4 sm:px-6">
       <div class="mb-6 flex items-center gap-3">
@@ -222,17 +262,18 @@ const beneficios = [
               :src="producto.imagen_url"
               :alt="producto.nombre"
               class="size-full object-cover"
+              loading="lazy"
             />
             <component v-else :is="iconoPorNombre(producto.nombre)" :size="40" class="text-brand-500" />
           </div>
           <p class="mt-4 font-display text-lg text-ink">{{ producto.nombre }}</p>
           <p v-if="producto.descripcion" class="mt-1 line-clamp-2 text-sm text-[#6c655c]">{{ producto.descripcion }}</p>
-          <p class="mt-3 text-sm font-medium text-brand-700">Desde {{ formatoPrecio(producto.precio_base) }}</p>
+          <p class="mt-auto pt-3 text-sm font-semibold text-brand-700">{{ precioDestacado(producto) }}</p>
           <router-link
-            to="/menu"
-            class="mt-4 flex items-center justify-center rounded-xl border border-[#ddd7cd] px-4 py-2.5 text-sm font-medium text-ink transition hover:border-brand-500"
+            :to="{ name: 'menu', query: { categoria: producto.categoria?.nombre } }"
+            class="mt-4 flex items-center justify-center rounded-xl border border-[#ddd7cd] px-4 py-2.5 text-sm font-medium text-ink transition hover:border-brand-500 hover:bg-[#fbfaf7]"
           >
-            Ver detalles
+            Ver en el menú
           </router-link>
         </div>
       </div>
@@ -361,6 +402,15 @@ const beneficios = [
         />
       </div>
     </section>
+
+    <!-- En el teléfono: el botón del pedido y el aviso de lo que se agregó desde «Ofertas de hoy». -->
+    <CarritoFlotante
+      v-if="carrito.totalProductos > 0"
+      :cantidad="carrito.totalProductos"
+      :aviso="avisoAgregado"
+      solo-movil
+      @abrir="router.push('/carrito')"
+    />
   </div>
 </template>
 

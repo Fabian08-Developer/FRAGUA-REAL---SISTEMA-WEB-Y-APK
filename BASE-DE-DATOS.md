@@ -1,6 +1,6 @@
 # Base de datos — Fragua Real Burger
 
-PostgreSQL en producción; SQLite en memoria para las pruebas automáticas. 40 tablas propias del sistema más la de control de migraciones, creadas por 64 migraciones de Laravel en `backend/database/migrations`. Este documento describe cómo está hoy la base; la lógica que la usa está en [`README-BACKEND.md`](README-BACKEND.md) y los endpoints en [`API.md`](API.md).
+PostgreSQL en producción; SQLite en memoria para las pruebas automáticas. 40 tablas propias del sistema más la de control de migraciones, creadas por 65 migraciones de Laravel en `backend/database/migrations`. Este documento describe cómo está hoy la base; la lógica que la usa está en [`README-BACKEND.md`](README-BACKEND.md) y los endpoints en [`API.md`](API.md).
 
 ## Contenido
 
@@ -55,7 +55,7 @@ La fecha del nombre de cada migración solo fija el orden en que corren; no es l
 | Tabla | Columnas | Qué guarda |
 |---|---|---|
 | `mesas` | 8 | Mesas del local con su QR y su estado (libre, ocupada o reservada). `ocupada_desde` marca el inicio de la visita. |
-| `reservas` | 31 | Reservas con el depósito: método, estado, en qué turno de caja se recibió o devolvió, abono al pedido, no-show y enlace secreto para el cliente. `descripcion` es la nota opcional del cliente (hasta 500 caracteres). |
+| `reservas` | 35 | Reservas con el depósito: método, estado, en qué turno de caja se recibió o devolvió, abono al pedido, no-show y enlace secreto para el cliente. `descripcion` es la nota opcional del cliente (hasta 500 caracteres). Pago directo: captura del depósito (`deposito_comprobante_path` y `_mime`, en `storage/app/private/comprobantes-pago`), `deposito_referencia` y `deposito_rechazo_motivo`; `deposito_pasarela` acepta `breb`. |
 | `reserva_avisos` | 11 | Cada correo de una reserva (confirmación, recordatorio, cancelación, no-show): destino, estado, intentos y error. |
 
 ### Pedidos (M02, M07)
@@ -74,7 +74,7 @@ La fecha del nombre de cada migración solo fija el orden en que corren; no es l
 | Tabla | Columnas | Qué guarda |
 |---|---|---|
 | `caja_turnos` | 14 | Un turno de caja por día: base, efectivo esperado y contado, diferencia y quién abrió y cerró. |
-| `pagos` | 19 | Pagos de un pedido (1:N, admite pago mixto, ADR-003) y abonos de depósito; anulación, reverso y cómo se aprobó (pasarela o manual). |
+| `pagos` | 23 | Pagos de un pedido (1:N, admite pago mixto, ADR-003) y abonos de depósito; anulación, reverso y cómo se aprobó (pasarela o manual). Pago directo: la captura que subió el Cliente (`comprobante_path` y `comprobante_mime`), `referencia_cliente` y `rechazo_motivo`; `pasarela` acepta `breb`. |
 | `ajustes_caja` | 10 | Anulaciones o reembolsos hechos cuando la caja de ese día ya cerró (ADR-008). No reescriben el turno. |
 | `comprobantes` | 12 | Comprobantes de pago con consecutivo (FR-000001), copia del documento, impresiones y anulación con motivo. |
 | `transacciones_pasarela` | 28 | Cada intento de pago en Wompi (de un pago o de un depósito): referencia secreta, estado, respuesta completa, eventos, revisión y reembolso. |
@@ -92,7 +92,7 @@ La fecha del nombre de cada migración solo fija el orden en que corren; no es l
 | Tabla | Columnas | Qué guarda |
 |---|---|---|
 | `reporte_exportaciones` | 14 | Reportes exportados (PDF o Excel) guardados para volver a descargarlos tal cual. |
-| `configuraciones` | 6 | Valores que edita el Administrador: valor del domicilio, depósito de reserva, tiempos de las reservas y datos del negocio (`negocio_direccion`, `negocio_telefono`, `negocio_logo_path` y, del SuperAdmin, `negocio_nombre`, `negocio_nit`, `negocio_latitud` y `negocio_longitud` (el punto del local en el mapa); la ruta del logo en `storage/app/private/negocio`). |
+| `configuraciones` | 6 | Valores que edita el Administrador: valor del domicilio, depósito de reserva, tiempos de las reservas y datos del negocio (`negocio_direccion`, `negocio_telefono`, `negocio_logo_path` y, del SuperAdmin, `negocio_nombre`, `negocio_nit`, `negocio_latitud` y `negocio_longitud` (el punto del local en el mapa); la ruta del logo en `storage/app/private/negocio`). Del SuperAdmin también las cuentas para pagos en línea sin Wompi: `pago_nequi_*`, `pago_bancolombia_*` y `pago_breb_*`. |
 
 ### Notificaciones (M11)
 
@@ -221,6 +221,7 @@ Además, `transacciones_pasarela` se enlaza con un pago o con una reserva por `p
 | `2026_10_23_000002` | 16/10/2026 | `variantes.descripcion`, `imagen_url` e `imagen_path`. | — |
 | `2026_10_23_000003` | 16/10/2026 | `promociones.variante_id` y `promociones.es_oferta`. | — |
 | `2026_10_26_000001` | 19/10/2026 | `reservas.descripcion`: nota opcional del cliente en su reserva. | — |
+| `2026_10_30_000001` | 22/10/2026 | Pago directo: captura, referencia y motivo del rechazo en `pagos` y `reservas`; `pasarela` y `deposito_pasarela` aceptan `breb` (en PostgreSQL cambian `pagos_pasarela_check` y `reservas_deposito_pasarela_check`). Al deshacerla, un `breb` queda en nulo. | — |
 | `2026_10_29_000001` | 21/10/2026 | Tabla `notificaciones` (M11): la campana del personal, con índice único `user_id` + `clave` y los índices para contar las no leídas y limpiar las viejas. | — |
 | `2026_10_28_000001` | 20/10/2026 | `users.role` acepta `soporte` (M10). En PostgreSQL cambia la restricción `users_role_check`; al deshacerla, una cuenta de Soporte queda como Cliente desactivada y sin sesiones (nunca como Administrador). | — |
 | `2026_10_27_000001` | 20/10/2026 | `users.menus_permitidos`: permisos de menú por cuenta (M09). | — |
@@ -328,4 +329,5 @@ Estas reglas no se pueden expresar solo con columnas; las aplica Laravel:
   `configuraciones`. Antes de usar el sistema con datos reales hay que cambiar esas contraseñas o
   desactivar las cuentas.
 - Además de la base, las copias de seguridad deben incluir `backend/storage/app/private`: soportes de
-  compras y gastos, fotos de productos (`productos/`) y reportes exportados (`reportes/`).
+  compras y gastos, fotos de productos (`productos/`), reportes exportados (`reportes/`) y capturas de
+  los pagos por transferencia (`comprobantes-pago/`).

@@ -130,7 +130,7 @@ return [
         'mixed' => 'El campo :attribute debe contener al menos una mayúscula y una minúscula.',
         'numbers' => 'El campo :attribute debe contener al menos un número.',
         'symbols' => 'El campo :attribute debe contener al menos un símbolo.',
-        'uncompromised' => 'El :attribute proporcionado ha aparecido en una filtración de datos conocida. Por favor elige otro :attribute.',
+        'uncompromised' => 'Esa :attribute aparece en una filtración de datos conocida: elige otra.',
     ],
     'present' => 'El campo :attribute debe estar presente.',
     'present_if' => 'El campo :attribute debe estar presente cuando :other es :value.',

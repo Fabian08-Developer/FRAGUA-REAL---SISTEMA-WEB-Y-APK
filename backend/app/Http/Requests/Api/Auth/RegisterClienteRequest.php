@@ -19,6 +19,8 @@ class RegisterClienteRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        // 22/10/2026: el teléfono se guarda solo con números y el nombre sin espacios de más.
+        \App\Support\Validacion\Formatos::normalizar($this, ['telefono' => 'telefono', 'nombre' => 'nombre']);
         if ($this->has('username')) {
             $this->merge(['username' => NombreUsuario::normalizar($this->input('username'))]);
         }
@@ -26,18 +28,21 @@ class RegisterClienteRequest extends FormRequest
 
     public function messages(): array
     {
-        return NombreUsuario::mensajes();
+        return NombreUsuario::mensajes() + [
+            'telefono.regex' => \App\Support\Validacion\Formatos::MENSAJE_CELULAR,
+            'nombre.regex' => \App\Support\Validacion\Formatos::MENSAJE_PERSONA,
+        ];
     }
 
     public function rules(): array
     {
         return [
-            'nombre' => ['required', 'string', 'max:255'],
+            'nombre' => ['required', 'string', 'max:80', 'regex:'.\App\Support\Validacion\Formatos::PERSONA],
             'email' => ['required', 'email', 'unique:users,email'],
             // Fase 3, tarea 3 (RF-M01-007/011): nombre de usuario opcional para iniciar sesión.
             'username' => NombreUsuario::reglas(),
-            'telefono' => ['nullable', 'string', 'max:30'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'telefono' => ['nullable', 'string', 'regex:'.\App\Support\Validacion\Formatos::CELULAR],
+            'password' => ['required', 'string', 'confirmed', \Illuminate\Validation\Rules\Password::defaults()], // contraseña segura (RN-USR-23)
         ];
     }
 }

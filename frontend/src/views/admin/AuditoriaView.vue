@@ -272,15 +272,15 @@ onMounted(() => {
       </label>
       <label class="block">
         <span class="field-label">Número del registro</span>
-        <input v-model.number="filtros.entidad_id" type="number" min="1" inputmode="numeric" class="field" placeholder="Ej. 125 (pedido 125)" />
+        <input v-formato="'entero'" maxlength="9" v-model.number="filtros.entidad_id" type="text" min="1" inputmode="numeric" class="field" placeholder="Ej. 125 (pedido 125)" />
       </label>
       <label class="block">
         <span class="field-label">IP</span>
-        <input v-model.trim="filtros.ip" type="search" class="field" placeholder="Ej. 190.85.10.4" />
+        <input v-formato="'ip'" v-model.trim="filtros.ip" type="search" class="field" placeholder="Ej. 190.85.10.4" />
       </label>
       <label class="block">
         <span class="field-label">Texto en el detalle</span>
-        <input v-model.trim="filtros.busqueda" type="search" maxlength="100" class="field" placeholder="Motivo, correo, valor…" />
+        <input v-formato="'busqueda'" v-model.trim="filtros.busqueda" type="search" maxlength="100" class="field" placeholder="Motivo, correo, valor…" />
       </label>
       <div class="flex gap-2 sm:col-span-2 sm:justify-end lg:col-span-3">
         <BaseButton variant="ghost" type="button" @click="limpiarFiltros">Limpiar</BaseButton>

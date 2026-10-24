@@ -34,7 +34,7 @@ class UpdateCompraGastoRequest extends FormRequest
             'descripcion' => ['sometimes', 'string', 'max:255'],
             'cantidad' => ['sometimes', 'nullable', 'numeric', 'gt:0', 'max:99999999'],
             'unidad' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'valor' => ['sometimes', 'numeric', 'min:0.01'], // RN-M03-01
+            'valor' => ['sometimes', 'numeric', 'min:0.01', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS], // RN-M03-01
             'metodo_pago' => ['sometimes', 'in:efectivo,transferencia,tarjeta,otro'],
             'proveedor' => ['sometimes', 'nullable', 'string', 'max:255'],
             'numero_factura' => ['sometimes', 'nullable', 'string', 'max:255'],

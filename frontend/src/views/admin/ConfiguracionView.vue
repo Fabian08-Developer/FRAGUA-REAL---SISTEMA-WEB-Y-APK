@@ -14,6 +14,7 @@ import PageHeader from '@/components/common/PageHeader.vue'
 import EstadoTareasAutomaticas from '@/components/configuracion/EstadoTareasAutomaticas.vue'
 import RevisionProduccion from '@/components/configuracion/RevisionProduccion.vue'
 import DatosNegocio from '@/components/configuracion/DatosNegocio.vue'
+import PagosDirectos from '@/components/configuracion/PagosDirectos.vue'
 import { configuracionService, RANGOS_TIEMPOS_RESERVA } from '@/services/configuracion.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 
@@ -145,6 +146,11 @@ onMounted(cargar)
       <DatosNegocio />
     </div>
 
+    <!-- Pago directo (22/10/2026): cuentas de Nequi, Bancolombia y Bre-B (las cambia el SuperAdmin). -->
+    <div v-if="!cargando" class="mt-4 max-w-2xl">
+      <PagosDirectos />
+    </div>
+
     <form v-if="!cargando" class="mt-4 max-w-2xl space-y-4" novalidate @submit.prevent="guardar">
       <div class="card p-4 sm:p-5">
         <div class="flex items-start gap-3">
@@ -158,7 +164,7 @@ onMounted(cargar)
               local no tiene costo.
             </p>
             <div class="mt-3">
-              <BaseInput
+              <BaseInput formato="pesos"
                 v-model="domicilio"
                 label="Valor en pesos (COP)"
                 type="text"
@@ -186,7 +192,7 @@ onMounted(cargar)
               si se cancela a tiempo, se retiene si hay no-show y se abona al pedido si el cliente llega.
             </p>
             <div class="mt-3">
-              <BaseInput
+              <BaseInput formato="pesos"
                 v-model="deposito"
                 label="Valor en pesos (COP)"
                 type="text"
@@ -215,17 +221,17 @@ onMounted(cargar)
             </p>
             <div class="mt-3 grid gap-4 sm:grid-cols-3">
               <div>
-                <BaseInput v-model="tolerancia" label="Tolerancia (no-show)" type="text" placeholder="15" :error="errores.reserva_tolerancia_minutos" />
+                <BaseInput formato="entero" :maxlength="4" v-model="tolerancia" label="Tolerancia (no-show)" type="text" placeholder="15" :error="errores.reserva_tolerancia_minutos" />
                 <p v-if="!errores.reserva_tolerancia_minutos" class="mt-1 text-xs text-gray-500">
                   Si el cliente no llega {{ duracionTexto(tolerancia) || '…' }} después de la hora, la reserva se libera y el depósito se retiene.
                 </p>
               </div>
               <div>
-                <BaseInput v-model="recordatorio" label="Recordatorio" type="text" placeholder="120" :error="errores.reserva_recordatorio_minutos" />
+                <BaseInput formato="entero" :maxlength="4" v-model="recordatorio" label="Recordatorio" type="text" placeholder="120" :error="errores.reserva_recordatorio_minutos" />
                 <p v-if="!errores.reserva_recordatorio_minutos" class="mt-1 text-xs text-gray-500">Se avisa al cliente {{ duracionTexto(recordatorio) || '…' }} antes.</p>
               </div>
               <div>
-                <BaseInput v-model="ventana" label="Mesa Reservada" type="text" placeholder="60" :error="errores.reserva_ventana_reservada_minutos" />
+                <BaseInput formato="entero" :maxlength="4" v-model="ventana" label="Mesa Reservada" type="text" placeholder="60" :error="errores.reserva_ventana_reservada_minutos" />
                 <p v-if="!errores.reserva_ventana_reservada_minutos" class="mt-1 text-xs text-gray-500">La mesa se ve Reservada desde {{ duracionTexto(ventana) || '…' }} antes.</p>
               </div>
             </div>

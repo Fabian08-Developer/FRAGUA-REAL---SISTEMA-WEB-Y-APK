@@ -110,7 +110,7 @@ onMounted(cargar)
     <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
       <label class="relative block sm:w-72">
         <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input v-model="busqueda" type="search" class="field pl-9" placeholder="Buscar producto" aria-label="Buscar producto" />
+        <input v-formato="'busqueda'" v-model="busqueda" type="search" class="field pl-9" placeholder="Buscar producto" aria-label="Buscar producto" />
       </label>
       <label class="flex items-center gap-2 text-sm text-gray-600">
         <input v-model="soloAgotados" type="checkbox" class="size-[18px] accent-brand-600" />

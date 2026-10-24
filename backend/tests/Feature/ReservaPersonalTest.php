@@ -19,6 +19,7 @@ use Tests\TestCase;
 class ReservaPersonalTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\PagoDirectoDePrueba;
 
     private User $mesero;
     private User $admin;
@@ -114,8 +115,8 @@ class ReservaPersonalTest extends TestCase
         [$primera, $segunda] = [$r1->json('id'), $r2->json('id')];
 
         // Fase 6, tarea 1: el depósito se inicia con el enlace secreto que recibió quien reservó.
-        $this->postJson("/api/reservas/{$segunda}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $r2->json('token_publico')])->assertOk();
-        $this->postJson("/api/reservas/{$primera}/deposito/en-linea", ['pasarela' => 'bancolombia', 'token' => $r1->json('token_publico')])->assertOk();
+        $this->pagoDirecto("/api/reservas/{$segunda}/deposito/en-linea", ['pasarela' => 'nequi', 'token' => $r2->json('token_publico')])->assertOk();
+        $this->pagoDirecto("/api/reservas/{$primera}/deposito/en-linea", ['pasarela' => 'bancolombia', 'token' => $r1->json('token_publico')])->assertOk();
 
         Sanctum::actingAs($this->admin);
         $this->postJson("/api/reservas/{$segunda}/deposito/en-linea/confirmar")->assertOk();

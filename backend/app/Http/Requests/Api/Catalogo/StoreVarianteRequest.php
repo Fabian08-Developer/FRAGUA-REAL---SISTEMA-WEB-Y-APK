@@ -20,7 +20,7 @@ class StoreVarianteRequest extends FormRequest
             // aparte (POST /variantes/{id}/foto), igual que la del producto.
             'descripcion' => ['nullable', 'string', 'max:160'],
             // RF-M04-023, RN-M04-10 (Fase 2, tarea 3): mayor a cero.
-            'precio' => ['required', 'numeric', 'gt:0'],
+            'precio' => ['required', 'numeric', 'gt:0', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS],
             'activa' => ['boolean'],
         ];
     }

@@ -6,16 +6,21 @@
 // paso 2 termina en "en revisión", no en "confirmada" al instante.
 // Fase 1, tarea 4: al elegir fecha y hora, la lista de mesas se reduce a las que no tienen otra
 // reserva a esa hora (GET /mesas/disponibles); el servidor vuelve a validarlo al crear.
+// Pago directo (22/10/2026, RF-M06-030): sin Wompi, el depósito se paga transfiriendo a las cuentas
+// del negocio y subiendo la captura; el personal la revisa y confirma la reserva.
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { CalendarClock, CheckCircle2, Clock, Mail, MessageCircle, Phone, ReceiptText, RotateCcw, Smartphone, User, Users } from 'lucide-vue-next'
+import { CalendarClock, CheckCircle2, Clock, Mail, MessageCircle, Phone, ReceiptText, RotateCcw, User, Users } from 'lucide-vue-next'
 import { HORARIO_POR_DEFECTO, fechaMinimaReserva, horasDelDia, textoHorario, type HorarioReservas } from '@/utils/horarioReservas'
 import BaseButton from '@/components/common/BaseButton.vue'
 import BaseInput from '@/components/common/BaseInput.vue'
+import PagoEnLinea from '@/components/pagos/PagoEnLinea.vue'
+import { usePagosEnLinea } from '@/composables/usePagosEnLinea'
 import { useAuthStore } from '@/stores/auth'
 import { useNegocioStore } from '@/stores/negocio'
 import { mesaService } from '@/services/mesa.service'
 import { configuracionService } from '@/services/configuracion.service'
 import { reservaService } from '@/services/reserva.service'
+import type { PagoEnLineaPayload } from '@/services/pedido.service'
 import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import { irAlCheckout } from '@/utils/pasarela'
 import type { Mesa, Reserva } from '@/types/models'
@@ -39,7 +44,7 @@ const form = reactive({
 })
 const MAX_DESCRIPCION = 500
 
-const pasarela = ref<'nequi' | 'bancolombia'>('nequi')
+const { pagos: configPagos, cargado: pagosCargados, disponible: enLineaDisponible, directo } = usePagosEnLinea()
 
 const enviando = ref(false)
 const errores = ref<Record<string, string>>({})
@@ -105,10 +110,6 @@ watch(
 )
 
 // Mejora de diseño (16/10/2026): la mesa se elige con botones y el resumen usa su nombre.
-const PASARELAS = [
-  { v: 'nequi', t: 'Nequi' },
-  { v: 'bancolombia', t: 'Botón Bancolombia' },
-] as const
 const mesaElegida = computed(() => mesas.value.find((m) => m.id === form.mesa_id) ?? null)
 // En orden natural: Mesa 1, Mesa 2… Mesa 10 (el servidor no las manda ordenadas).
 const mesasOrdenadas = computed(() =>
@@ -176,14 +177,14 @@ async function confirmarReserva() {
   }
 }
 
-async function pagarDeposito() {
+async function pagarDeposito(datosPago: PagoEnLineaPayload) {
   if (!reservaCreada.value) return
   errorDeposito.value = ''
   pagandoDeposito.value = true
   try {
     // Fase 6, tarea 1 (RF-M05-030): con el enlace secreto que devolvió la creación de la reserva.
     const { data } = await reservaService.registrarDepositoEnLinea(reservaCreada.value.id, {
-      pasarela: pasarela.value,
+      ...datosPago,
       token: reservaCreada.value.token_publico ?? '',
     })
     // Con la pasarela activa se paga en Wompi y se vuelve por /pago/retorno.
@@ -193,7 +194,8 @@ async function pagarDeposito() {
     }
     depositoRegistrado.value = true
   } catch (error) {
-    errorDeposito.value = mensajeDeError(error, 'No pudimos registrar el pago del depósito. Intenta de nuevo.')
+    errorDeposito.value =
+      Object.values(erroresDeValidacion(error))[0] ?? mensajeDeError(error, 'No pudimos registrar el pago del depósito. Intenta de nuevo.')
   } finally {
     if (!redirigiendo.value) pagandoDeposito.value = false
   }
@@ -239,42 +241,32 @@ async function pagarDeposito() {
             </div>
           </dl>
 
-          <p class="mt-6 text-xs font-medium uppercase tracking-[0.08em] text-[#6c655c]">Paga con</p>
-          <div class="mt-2 grid gap-3 sm:grid-cols-2">
-            <label
-              v-for="opcion in PASARELAS"
-              :key="opcion.v"
-              class="flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3.5 text-sm transition"
-              :class="pasarela === opcion.v ? 'border-brand-500 bg-[#fff7e5] text-ink' : 'border-[#dfd8cd] bg-white text-[#59534c] hover:border-brand-400'"
-            >
-              <input v-model="pasarela" type="radio" :value="opcion.v" class="accent-brand-600" />
-              <Smartphone :size="16" class="text-brand-700" />
-              <span class="font-medium">{{ opcion.t }}</span>
-            </label>
-          </div>
-
-          <p v-if="errorDeposito" class="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ errorDeposito }}</p>
-
-          <BaseButton class="mt-6 w-full sm:w-auto" :disabled="pagandoDeposito" @click="pagarDeposito">
-            <Smartphone :size="16" />
-            {{
-              redirigiendo
-                ? 'Abriendo la pasarela…'
-                : pagandoDeposito
-                  ? 'Registrando…'
-                  : `Pagar ${formatoPrecio(reservaCreada.deposito_valor)} con ${pasarela === 'nequi' ? 'Nequi' : 'Bancolombia'}`
-            }}
-          </BaseButton>
+          <PagoEnLinea
+            v-if="enLineaDisponible"
+            class="mt-6"
+            :config="configPagos"
+            :monto="Number(reservaCreada.deposito_valor)"
+            :enviando="pagandoDeposito || redirigiendo"
+            :error="errorDeposito"
+            concepto="el depósito de"
+            @pagar="pagarDeposito"
+          />
+          <p v-else-if="pagosCargados" class="mt-6 rounded-xl bg-[#fff7e5] px-4 py-3 text-sm text-[#7a5a12]">
+            Por ahora el depósito no se puede pagar en línea. Escríbenos por WhatsApp y te decimos cómo pagarlo; con
+            el enlace que te llegó al correo puedes volver a esta reserva.
+          </p>
         </template>
 
         <template v-else>
           <span class="flex size-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
             <CheckCircle2 :size="26" />
           </span>
-          <h2 class="mt-4 font-display text-2xl text-ink">¡Ya casi! Tu depósito quedó registrado</h2>
+          <h2 class="mt-4 font-display text-2xl text-ink">
+            {{ directo ? '¡Ya casi! Recibimos tu comprobante' : '¡Ya casi! Tu depósito quedó registrado' }}
+          </h2>
           <p class="mt-2 text-sm text-[#6c655c]">
-            En breve confirmamos el pago y tu reserva pasa a «Confirmada». Te llega un correo con el enlace para verla o
-            cancelarla.
+            {{ directo ? 'En cuanto verifiquemos la transferencia' : 'En breve confirmamos el pago y' }} tu reserva pasa a
+            «Confirmada». Te llega un correo con el enlace para verla o cancelarla.
           </p>
           <div class="mt-6 flex flex-col gap-3 sm:flex-row">
             <router-link
@@ -382,14 +374,14 @@ async function pagarDeposito() {
             <span class="flex size-7 items-center justify-center rounded-full bg-ink font-sans text-xs font-semibold text-brand-400">3</span>
             Tus datos
           </h2>
-          <BaseInput v-model="form.cliente_nombre" label="Nombre" :icon="User" :error="errores.cliente_nombre" />
+          <BaseInput formato="persona" v-model="form.cliente_nombre" label="Nombre" :icon="User" :error="errores.cliente_nombre" />
           <div class="grid gap-4 sm:grid-cols-2">
-            <BaseInput v-model="form.cliente_telefono" label="Teléfono" :icon="Phone" :error="errores.cliente_telefono" />
-            <BaseInput v-model="form.cliente_correo" label="Correo" :icon="Mail" :error="errores.cliente_correo" />
+            <BaseInput formato="celular" v-model="form.cliente_telefono" label="Teléfono" :icon="Phone" :error="errores.cliente_telefono" />
+            <BaseInput formato="correo" v-model="form.cliente_correo" label="Correo" :icon="Mail" :error="errores.cliente_correo" />
           </div>
           <label class="block">
             <span class="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.08em] text-[#6c655c]">Descripción (opcional)</span>
-            <textarea
+            <textarea v-formato="'texto'"
               v-model="form.descripcion"
               rows="3"
               :maxlength="MAX_DESCRIPCION"

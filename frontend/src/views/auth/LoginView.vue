@@ -57,7 +57,7 @@ async function onSubmit() {
     <p v-if="route.query.restablecida" class="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-700">
       Tu contraseña quedó actualizada. Ingresa con la nueva.
     </p>
-    <BaseInput
+    <BaseInput formato="correo"
       v-model="identificador"
       type="text"
       label="Correo o nombre de usuario"

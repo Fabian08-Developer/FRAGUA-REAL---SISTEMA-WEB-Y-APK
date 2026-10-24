@@ -1,7 +1,7 @@
 // M02/M07 — espeja StorePedidoRequest y RegistrarPagoEnLineaRequest del backend
 // (routes/api.php: POST /pedidos, GET /pedidos, GET /pedidos/{id}, POST /pedidos/{id}/pagar-en-linea).
 import api from './api'
-import type { CheckoutPasarela, Comprobante, Pago, Pedido, PromocionAplicada, TipoPedido } from '@/types/models'
+import type { CheckoutPasarela, Comprobante, MedioPagoEnLinea, Pago, Pedido, PromocionAplicada, TipoPedido } from '@/types/models'
 
 export interface LineaPedidoPayload {
   producto_id?: number
@@ -32,16 +32,27 @@ export interface CrearPedidoPayload {
   observaciones_entrega?: string
   // Sin dato, el backend asume contra entrega / al recoger.
   metodo_pago_preferido?: 'contra_entrega' | 'en_linea'
-  pasarela_preferida?: 'nequi' | 'bancolombia'
+  pasarela_preferida?: MedioPagoEnLinea
   lineas: LineaPedidoPayload[]
 }
 
 // Fase 6, tarea 1 (RF-M06-006): el pago creado y, si la pasarela está activa, el enlace del checkout.
 export type PagoEnLineaRespuesta = Pago & { checkout: CheckoutPasarela | null }
 
+// Pago directo (22/10/2026): sin Wompi va la captura del comprobante (y una referencia opcional); el
+// monto lo fija el servidor (el saldo del pedido). Se envía como formulario con archivo.
 export interface PagoEnLineaPayload {
-  pasarela: 'nequi' | 'bancolombia'
-  monto: number
+  pasarela: MedioPagoEnLinea
+  comprobante?: File | null
+  referencia?: string
+}
+
+export function formularioPagoEnLinea(payload: PagoEnLineaPayload): FormData {
+  const datos = new FormData()
+  datos.append('pasarela', payload.pasarela)
+  if (payload.comprobante) datos.append('comprobante', payload.comprobante)
+  if (payload.referencia?.trim()) datos.append('referencia', payload.referencia.trim())
+  return datos
 }
 
 // Espeja RegistrarCobroRequest — cobro PRESENCIAL (M06), siempre hecho por el Mesero,
@@ -105,12 +116,12 @@ export const pedidoService = {
   },
   // Fase 6, tarea 1: con la pasarela activa trae `checkout` con el enlace de Wompi (ver utils/pasarela.ts).
   pagarEnLinea(id: number, payload: PagoEnLineaPayload) {
-    return api.post<PagoEnLineaRespuesta>(`/pedidos/${id}/pagar-en-linea`, payload)
+    return api.post<PagoEnLineaRespuesta>(`/pedidos/${id}/pagar-en-linea`, formularioPagoEnLinea(payload))
   },
   // RF-M06-005 (Fase 0, tarea 4): el invitado paga y consulta su pedido con el token que
   // recibió al crearlo — no tiene sesión.
   pagarEnLineaConToken(token: string, payload: PagoEnLineaPayload) {
-    return api.post<PagoEnLineaRespuesta>(`/pedidos/seguimiento/${token}/pagar-en-linea`, payload)
+    return api.post<PagoEnLineaRespuesta>(`/pedidos/seguimiento/${token}/pagar-en-linea`, formularioPagoEnLinea(payload))
   },
   seguimiento(token: string) {
     return api.get<Pedido>(`/pedidos/seguimiento/${token}`)

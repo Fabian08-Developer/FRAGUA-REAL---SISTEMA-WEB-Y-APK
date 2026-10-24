@@ -5,6 +5,7 @@
 // automáticas del pedido (no se acumulan). Quitarlo devuelve las automáticas.
 import { computed, ref, watch } from 'vue'
 import BaseButton from '@/components/common/BaseButton.vue'
+import CampoPesos from '@/components/common/CampoPesos.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import { pedidoService } from '@/services/pedido.service'
 import { promocionService } from '@/services/promocion.service'
@@ -139,7 +140,8 @@ async function quitar() {
 
       <label v-if="modo !== 'promocion'" class="mt-4 block">
         <span class="text-sm font-medium text-ink">{{ modo === 'porcentaje' ? 'Porcentaje (1 a 100)' : 'Valor a rebajar (COP)' }}</span>
-        <input v-model.number="valor" type="number" inputmode="decimal" :min="modo === 'porcentaje' ? 1 : 100" :max="modo === 'porcentaje' ? 100 : undefined" class="field mt-1.5" />
+        <input v-if="modo === 'porcentaje'" v-model.number="valor" v-formato="'porcentaje'" type="text" class="field mt-1.5" />
+        <CampoPesos v-else v-model="valor" class="field mt-1.5" />
       </label>
       <label v-else class="mt-4 block">
         <span class="text-sm font-medium text-ink">Promoción</span>
@@ -151,7 +153,7 @@ async function quitar() {
 
       <label class="mt-4 block">
         <span class="text-sm font-medium text-ink">Motivo</span>
-        <textarea v-model="motivo" rows="2" maxlength="255" class="field mt-1.5" placeholder="Ej.: demora en la cocina, cliente frecuente" />
+        <textarea v-formato="'texto'" v-model="motivo" rows="2" maxlength="255" class="field mt-1.5" placeholder="Ej.: demora en la cocina, cliente frecuente" />
       </label>
 
       <p v-if="error" class="mt-3 alert-error">{{ error }}</p>

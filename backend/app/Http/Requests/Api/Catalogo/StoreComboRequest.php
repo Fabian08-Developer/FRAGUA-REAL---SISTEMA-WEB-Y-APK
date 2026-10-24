@@ -16,7 +16,7 @@ class StoreComboRequest extends FormRequest
         return [
             'nombre' => ['required', 'string', 'max:255'],
             // RF-M04-023, RN-M04-10 (Fase 2, tarea 3): mayor a cero.
-            'precio' => ['required', 'numeric', 'gt:0'],
+            'precio' => ['required', 'numeric', 'gt:0', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS],
             // BUG corregido junto con esta tarea: la migración define tipo_venta como enum
             // bebida/alimento/otro (igual que en productos), pero esta regla aceptaba
             // cualquier string de hasta 50 caracteres — un valor fuera del enum pasaba la

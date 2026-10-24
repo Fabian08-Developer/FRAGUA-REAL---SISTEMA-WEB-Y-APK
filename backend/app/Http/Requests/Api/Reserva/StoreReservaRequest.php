@@ -22,6 +22,7 @@ class StoreReservaRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        \App\Support\Validacion\Formatos::normalizar($this, ['cliente_telefono' => 'telefono', 'cliente_nombre' => 'nombre']);
         if (! $this->filled('fecha_hora') || ! is_string($this->fecha_hora)) {
             return;
         }
@@ -42,7 +43,8 @@ class StoreReservaRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'cliente_telefono.regex' => 'Escribe un teléfono válido (solo números, de 7 a 15 dígitos).',
+            'cliente_telefono.regex' => \App\Support\Validacion\Formatos::MENSAJE_CELULAR,
+            'cliente_nombre.regex' => \App\Support\Validacion\Formatos::MENSAJE_PERSONA,
             'fecha_hora.after' => 'La reserva tiene que ser para una fecha y hora futuras.',
             'mesa_id.exists' => 'La mesa no existe o está desactivada.',
         ];
@@ -53,9 +55,9 @@ class StoreReservaRequest extends FormRequest
         return [
             // Fase 1, tarea 4: solo mesas activas reciben reservas.
             'mesa_id' => ['required', \Illuminate\Validation\Rule::exists('mesas', 'id')->where('activa', true)],
-            'cliente_nombre' => ['required', 'string', 'max:255'],
-            'cliente_telefono' => ['required', 'string', 'max:30', 'regex:'.\App\Http\Requests\Api\Pedido\StorePedidoRequest::FORMATO_TELEFONO], // RN-M05-12
-            'cliente_correo' => ['required', 'email', 'max:255'],   // RN-M05-12
+            'cliente_nombre' => ['required', 'string', 'max:80', 'regex:'.\App\Support\Validacion\Formatos::PERSONA],
+            'cliente_telefono' => ['required', 'string', 'regex:'.\App\Http\Requests\Api\Pedido\StorePedidoRequest::FORMATO_TELEFONO], // RN-M05-12
+            'cliente_correo' => ['required', 'email', 'max:120'],   // RN-M05-12
             'fecha_hora' => ['required', 'date', 'after:now'],
             // Corrección (19/10/2026): una nota del cliente para el restaurante (cumpleaños, silla
             // para bebé, cerca de la ventana…). Opcional.

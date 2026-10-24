@@ -23,7 +23,7 @@ class PonerOfertaRequest extends FormRequest
     {
         return [
             'modo' => ['required', 'in:precio,porcentaje'],
-            'precio_oferta' => ['required_if:modo,precio', 'nullable', 'numeric', 'gt:0'],
+            'precio_oferta' => ['required_if:modo,precio', 'nullable', 'numeric', 'gt:0', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS],
             // RN-M04-23: mayor a cero; menor a 100 (al 100 % el producto sería gratis).
             'porcentaje' => ['required_if:modo,porcentaje', 'nullable', 'numeric', 'gt:0', 'lt:100'],
             'variante_id' => ['nullable', 'integer'],

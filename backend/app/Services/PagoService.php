@@ -84,13 +84,25 @@ class PagoService
             $pedido->refresh();
         }
 
-        // Con la pasarela se cobra exactamente lo que falta: el monto no lo decide el navegador.
-        if ($pasarela->activa()) {
-            $data['monto'] = round((float) $pedido->total - $pedido->totalPagado(), 2);
-        }
+        // Se cobra exactamente lo que falta: el monto no lo decide el navegador (con Wompi y, desde el
+        // 22/10/2026, también en el pago directo, que muestra ese monto para transferirlo).
+        $data['monto'] = round((float) $pedido->total - $pedido->totalPagado(), 2);
+        $comprobante = $data['comprobante'] ?? null;
+        unset($data['comprobante']);
 
         $pago = $this->registrarPagoEnLinea($pedido, $data);
         if (! $pasarela->activa()) {
+            // Pago directo (RF-M06-031/032): la captura queda con el pago y el personal recibe el aviso.
+            if ($comprobante instanceof \Illuminate\Http\UploadedFile) {
+                $archivo = app(PagoDirectoService::class)->guardarComprobante($comprobante, "pedido-{$pedido->id}");
+                $pago->forceFill([
+                    'comprobante_path' => $archivo['path'],
+                    'comprobante_mime' => $archivo['mime'],
+                    'referencia_cliente' => filled($data['referencia'] ?? null) ? trim($data['referencia']) : null,
+                ])->save();
+                app(NotificacionService::class)->pagoPorConfirmar($pago);
+            }
+
             return [$pago, null];
         }
 
@@ -188,6 +200,8 @@ class PagoService
         $pago->estado = 'rechazado';
         $pago->confirmado_via = $via;
         $pago->confirmado_por = $actor?->id;
+        // Pago directo (RF-M06-033): el Cliente ve por qué no se aceptó su comprobante.
+        $pago->rechazo_motivo = filled($motivo) ? mb_substr(trim($motivo), 0, 255) : null;
         $pago->save();
 
         $this->auditarEnLinea('rechazar_pago_en_linea', $pago, $actor, $via, $motivo);
@@ -305,6 +319,31 @@ class PagoService
      * turno aunque ya estuviera cerrado, sin pedir nada, y cambiaba la cifra de un arqueo
      * que ya se había hecho.
      */
+    /**
+     * RN-M06-15: un pedido finalizado que quedó sin pagar completo por una anulación vuelve a «en
+     * preparación» (sigue entregado o recogido) para cobrar el saldo. Devuelve el saldo, o null si
+     * no hubo que reabrirlo.
+     */
+    private function reabrirSiQuedoConSaldo(Pago $pago, User $actor, string $motivo): ?float
+    {
+        $pedido = $pago->pedido()->first();
+        if (! $pedido || $pedido->estado !== 'finalizado' || $pedido->pagoCompleto()) {
+            return null;
+        }
+        $saldo = round((float) $pedido->total - $pedido->totalPagado(), 2);
+
+        $pedido->forceFill(['estado' => 'preparando', 'finalizado_por' => null, 'finalizado_at' => null])->save();
+        app(AuditoriaService::class)->registrar('reabrir_pedido', 'Pedido', $pedido->id, [
+            'motivo' => 'pago anulado',
+            'pago_id' => $pago->id,
+            'motivo_anulacion' => $motivo,
+            'saldo' => $saldo,
+        ], $actor);
+        app(NotificacionService::class)->pedidoReabierto($pedido, $saldo, $actor);
+
+        return $saldo;
+    }
+
     public function anular(Pago $pago, User $actor, string $motivo, string $tipo = 'anulacion', ?string $passwordConfirmacion = null): Pago
     {
         if ($pago->anulado) {
@@ -366,12 +405,14 @@ class PagoService
                 'ajuste_extraordinario' => $cajaCerrada,
             ], $actor);
 
-            // Decisión pendiente de confirmar con el usuario: si anular este pago hace que el
-            // pedido ya no esté totalPagado(), este Service NO revierte automáticamente el
-            // pedido de "finalizado" a otro estado — no hay una regla de negocio documentada
-            // para ese caso. Se deja así a propósito en vez de asumir un comportamiento.
-
             app(NotificacionService::class)->pagoAnulado($pago, $actor); // M11
+
+            // Decisión del negocio (22/10/2026, RN-M06-15): si se ANULA un pago (un error de
+            // registro) y el pedido ya estaba finalizado, al quedar con saldo vuelve a «en
+            // preparación» para cobrarle lo que falta; con el pago completo se vuelve a finalizar
+            // solo. Un REEMBOLSO no lo reabre: ahí se le devolvió el dinero al cliente a propósito.
+            $saldo = $tipo === 'anulacion' ? $this->reabrirSiQuedoConSaldo($pago, $actor, $motivo) : null;
+            $pago->setAttribute('pedido_reabierto', $saldo !== null ? ['pedido_id' => $pago->pedido_id, 'saldo' => $saldo] : null);
 
             return $pago;
         });

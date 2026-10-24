@@ -9,7 +9,8 @@ class StorePedidoRequest extends FormRequest
 {
     // Teléfono colombiano o internacional: dígitos con espacios, guiones o paréntesis, y un "+"
     // opcional al inicio; entre 7 y 15 dígitos en total.
-    public const FORMATO_TELEFONO = '/^(?=(?:\D*\d){7,15}\D*$)\+?[0-9 ()\-]+$/';
+    // 22/10/2026: 10 dígitos (celular o fijo de Colombia); el teléfono llega ya sin espacios ni +57.
+    public const FORMATO_TELEFONO = \App\Support\Validacion\Formatos::CELULAR;
 
     // CORREGIDO (Fase 0, tarea 2, 09/10/2026): antes devolvía true siempre, y como POST
     // /pedidos es pública, cualquiera sin sesión podía crear un pedido con origen=mesero.
@@ -53,6 +54,9 @@ class StorePedidoRequest extends FormRequest
         if ($usuario && $usuario->esCliente()) {
             $this->merge(['cliente_id' => $usuario->id]);
         }
+        \App\Support\Validacion\Formatos::normalizar($this, [
+            'cliente_invitado_telefono' => 'telefono', 'telefono_contacto' => 'telefono', 'cliente_invitado_nombre' => 'nombre',
+        ]);
     }
 
     public function rules(): array
@@ -86,7 +90,7 @@ class StorePedidoRequest extends FormRequest
         $clienteSinTelefono = fn () => $esRemoto && $this->filled('cliente_id')
             && ! $this->filled('cliente_invitado_telefono')
             && blank(\App\Models\User::whereKey($this->input('cliente_id'))->value('telefono'));
-        $telefono = ['nullable', 'string', 'max:30', 'regex:'.self::FORMATO_TELEFONO];
+        $telefono = ['nullable', 'string', 'regex:'.self::FORMATO_TELEFONO];
 
         return [
             'tipo' => ['required', 'in:local,domicilio,recogida'],
@@ -96,22 +100,22 @@ class StorePedidoRequest extends FormRequest
             'mesa_id' => ['required_if:tipo,local', 'nullable', Rule::exists('mesas', 'id')->where('activa', true)],
 
             'cliente_id' => $reglaCliente,
-            'cliente_invitado_nombre' => [Rule::requiredIf($requiereClienteOInvitado), 'nullable', 'string', 'max:255'],
+            'cliente_invitado_nombre' => [Rule::requiredIf($requiereClienteOInvitado), 'nullable', 'string', 'max:80', 'regex:'.\App\Support\Validacion\Formatos::PERSONA],
             'cliente_invitado_telefono' => [Rule::requiredIf($requiereClienteOInvitado), ...$telefono],
             'telefono_contacto' => [Rule::requiredIf($clienteSinTelefono), ...$telefono],
             // Fase 4, tarea 5 (RF-M07-R-012): correo opcional del invitado para avisarle cuando su
             // pedido esté listo. El Cliente con cuenta usa el de su cuenta.
-            'cliente_invitado_correo' => ['nullable', 'email', 'max:255'],
+            'cliente_invitado_correo' => ['nullable', 'email', 'max:120'],
 
             // RN-M07-01, RF-M07-005/006/007, HU-M07-003: datos de entrega obligatorios.
-            'direccion_entrega' => ['required_if:tipo,domicilio', 'nullable', 'string', 'max:255'],
-            'barrio' => ['required_if:tipo,domicilio', 'nullable', 'string', 'max:255'],
-            'referencia' => ['required_if:tipo,domicilio', 'nullable', 'string', 'max:255'],
+            'direccion_entrega' => ['required_if:tipo,domicilio', 'nullable', 'string', 'max:160'],
+            'barrio' => ['required_if:tipo,domicilio', 'nullable', 'string', 'max:80'],
+            'referencia' => ['required_if:tipo,domicilio', 'nullable', 'string', 'max:160'],
             // RF-M07-010: observaciones de entrega del pedido completo.
             'observaciones_entrega' => ['nullable', 'string', 'max:500'],
             // RF-M07-013/015, RF-M07-R-007/008: cómo va a pagar y, si es en línea, por dónde.
             'metodo_pago_preferido' => ['nullable', 'in:contra_entrega,en_linea'],
-            'pasarela_preferida' => ['required_if:metodo_pago_preferido,en_linea', 'nullable', 'in:nequi,bancolombia'],
+            'pasarela_preferida' => ['required_if:metodo_pago_preferido,en_linea', 'nullable', 'in:nequi,bancolombia,breb'],
             // valor_domicilio NO se recibe del Cliente: lo fija el servidor con el valor
             // vigente de config('fragua_real.valor_domicilio_default') — ver PedidoController.
             // Aceptarlo del body permitiría a cualquiera fijar su propio costo de domicilio.
@@ -130,8 +134,9 @@ class StorePedidoRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'cliente_invitado_telefono.regex' => 'Escribe un teléfono válido (solo números, de 7 a 15 dígitos).',
-            'telefono_contacto.regex' => 'Escribe un teléfono válido (solo números, de 7 a 15 dígitos).',
+            'cliente_invitado_telefono.regex' => \App\Support\Validacion\Formatos::MENSAJE_CELULAR,
+            'telefono_contacto.regex' => \App\Support\Validacion\Formatos::MENSAJE_CELULAR,
+            'cliente_invitado_nombre.regex' => \App\Support\Validacion\Formatos::MENSAJE_PERSONA,
             'telefono_contacto.required' => 'Escribe un teléfono de contacto para este pedido.',
             'cliente_invitado_correo.email' => 'Escribe un correo válido o déjalo vacío.',
             'barrio.required_if' => 'Escribe el barrio de la entrega.',

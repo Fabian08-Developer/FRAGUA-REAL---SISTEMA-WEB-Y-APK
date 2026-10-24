@@ -583,7 +583,7 @@ onBeforeUnmount(() => {
         Vas a cancelar el pedido <strong class="text-ink">#{{ pedidoACancelar?.id }}</strong
         >. Escribe el motivo (obligatorio).
       </p>
-      <textarea
+      <textarea v-formato="'texto'" maxlength="255"
         v-model="motivoCancelar"
         rows="3"
         class="field mt-3"

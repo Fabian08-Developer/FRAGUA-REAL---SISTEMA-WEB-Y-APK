@@ -8,9 +8,11 @@ import { CalendarClock, ChevronDown, PackageSearch, XCircle } from 'lucide-vue-n
 import mascota from '@/assets/img/mascota-fragua-real.png'
 import BotonComprobante from '@/components/pedidos/BotonComprobante.vue'
 import TotalesPedido from '@/components/pedidos/TotalesPedido.vue'
-import { pedidoService } from '@/services/pedido.service'
+import PagoEnLinea from '@/components/pagos/PagoEnLinea.vue'
+import { usePagosEnLinea } from '@/composables/usePagosEnLinea'
+import { pedidoService, type PagoEnLineaPayload } from '@/services/pedido.service'
 import { reservaService } from '@/services/reserva.service'
-import { mensajeDeError } from '@/services/errors'
+import { erroresDeValidacion, mensajeDeError } from '@/services/errors'
 import { irAlCheckout } from '@/utils/pasarela'
 import type { EstadoReserva, Pedido, Reserva } from '@/types/models'
 
@@ -59,31 +61,51 @@ function puedeCancelarPedido(pedido: Pedido) {
 
 // RF-M06-008 (Fase 0, tarea 4): si el último pago en línea fue rechazado y el pedido sigue
 // pendiente, el Cliente puede reintentarlo aquí sobre el mismo pedido.
+// Pago directo (22/10/2026): también si eligió pagar en línea y aún no envió el comprobante.
+const { pagos: configPagos, disponible: enLineaDisponible } = usePagosEnLinea()
+
+function pagosEnLinea(pedido: Pedido) {
+  return (pedido.pagos ?? []).filter((p) => p.metodo === 'en_linea' && !p.anulado).sort((a, b) => b.id - a.id)
+}
+
 function puedeReintentarPago(pedido: Pedido) {
-  const enLinea = (pedido.pagos ?? []).filter((p) => p.metodo === 'en_linea' && !p.anulado)
+  const enLinea = pagosEnLinea(pedido)
   // Fase 6, tarea 1: también si el último quedó a medias en la pasarela (el servidor pregunta por
   // él antes de abrir otro; si sigue en curso, lo dice).
   const aMedias = enLinea.some((p) => p.estado === 'pendiente' && p.transaccion_pasarela)
   return (
+    enLineaDisponible.value &&
     pedido.estado === 'pendiente' &&
     pedido.tipo !== 'local' &&
-    enLinea.length > 0 &&
-    (aMedias || enLinea.every((p) => p.estado === 'rechazado'))
+    (enLinea.length > 0 ? aMedias || enLinea.every((p) => p.estado === 'rechazado') : pedido.metodo_pago_preferido === 'en_linea')
   )
 }
 
+// Sin Wompi: la captura que mandó y aún se revisa.
+function comprobanteEnRevision(pedido: Pedido) {
+  const ultimo = pagosEnLinea(pedido)[0]
+  return pedido.estado === 'pendiente' && ultimo?.estado === 'pendiente' && !!ultimo.tiene_comprobante
+}
+
+function saldoPedido(pedido: Pedido) {
+  const pagado = (pedido.pagos ?? []).filter((p) => p.estado === 'aprobado' && !p.anulado).reduce((a, p) => a + Number(p.monto), 0)
+  return Math.max(0, Number(pedido.total) - pagado)
+}
+
+const pagoAbierto = ref<number | null>(null)
 const reintentando = ref<number | null>(null)
 const errorReintento = ref('')
 
-async function reintentarPago(pedido: Pedido, pasarela: 'nequi' | 'bancolombia') {
+async function reintentarPago(pedido: Pedido, datosPago: PagoEnLineaPayload) {
   reintentando.value = pedido.id
   errorReintento.value = ''
   try {
-    const { data } = await pedidoService.pagarEnLinea(pedido.id, { pasarela, monto: Number(pedido.total) })
+    const { data } = await pedidoService.pagarEnLinea(pedido.id, datosPago)
     if (irAlCheckout(data.checkout)) return // Fase 6: se paga en la pasarela y se vuelve por /pago/retorno
+    pagoAbierto.value = null
     await cargarPedidos()
   } catch (e) {
-    errorReintento.value = mensajeDeError(e, 'No pudimos registrar el pago.')
+    errorReintento.value = Object.values(erroresDeValidacion(e))[0] ?? mensajeDeError(e, 'No pudimos registrar el pago.')
   } finally {
     reintentando.value = null
   }
@@ -343,33 +365,41 @@ onMounted(cargarPedidos)
               <BotonComprobante v-if="detalleCache[pedido.id].comprobante" :pedido="detalleCache[pedido.id]" size="sm" class="mt-3" />
             </template>
 
+            <p
+              v-if="comprobanteEnRevision(pedido)"
+              class="mt-4 rounded-xl bg-[#fff7e5] px-3 py-2 text-xs text-[#7a5a12]"
+            >
+              Recibimos tu comprobante. Estamos verificando la transferencia; en cuanto la confirmemos empezamos tu pedido.
+            </p>
             <div v-if="puedeReintentarPago(pedido)" class="mt-4 border-t border-[#e2dbcf] pt-4">
               <p class="text-xs text-[#6c655c]">
-                {{
-                  (pedido.pagos ?? []).some((p) => p.estado === 'pendiente' && p.transaccion_pasarela)
-                    ? 'Tu pago en línea quedó en proceso. Si no lo terminaste, puedes intentarlo de nuevo:'
-                    : 'Tu pago en línea fue rechazado. Puedes intentarlo de nuevo:'
-                }}
+                <template v-if="pagosEnLinea(pedido)[0]?.estado === 'rechazado'">
+                  Tu pago en línea no se aprobó<template v-if="pagosEnLinea(pedido)[0]?.rechazo_motivo">:
+                    <strong class="text-red-700">{{ pagosEnLinea(pedido)[0]?.rechazo_motivo }}</strong></template>. Puedes intentarlo de nuevo.
+                </template>
+                <template v-else-if="pagosEnLinea(pedido).length">
+                  Tu pago en línea quedó en proceso. Si no lo terminaste, puedes intentarlo de nuevo.
+                </template>
+                <template v-else>Elegiste pagar en línea y aún no recibimos tu pago.</template>
               </p>
-              <p v-if="errorReintento" class="mt-2 alert-error">{{ errorReintento }}</p>
-              <div class="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  class="rounded-lg border border-[#e3ded4] px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-[#fbfaf7]"
-                  :disabled="reintentando === pedido.id"
-                  @click="reintentarPago(pedido, 'nequi')"
-                >
-                  Pagar con Nequi
-                </button>
-                <button
-                  type="button"
-                  class="rounded-lg border border-[#e3ded4] px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-[#fbfaf7]"
-                  :disabled="reintentando === pedido.id"
-                  @click="reintentarPago(pedido, 'bancolombia')"
-                >
-                  Pagar con Bancolombia
-                </button>
-              </div>
+              <button
+                v-if="pagoAbierto !== pedido.id"
+                type="button"
+                class="mt-2 rounded-lg border border-[#e3ded4] px-3 py-1.5 text-xs font-medium text-ink transition hover:bg-[#fbfaf7]"
+                @click="(pagoAbierto = pedido.id), (errorReintento = '')"
+              >
+                Pagar {{ formatoPrecio(saldoPedido(pedido)) }} en línea
+              </button>
+              <PagoEnLinea
+                v-else
+                class="mt-3"
+                :config="configPagos"
+                :monto="saldoPedido(pedido)"
+                :enviando="reintentando === pedido.id"
+                :error="errorReintento"
+                :medio-inicial="pedido.pasarela_preferida"
+                @pagar="reintentarPago(pedido, $event)"
+              />
             </div>
 
             <div v-if="puedeCancelarPedido(pedido)" class="mt-4 border-t border-[#e2dbcf] pt-4">
@@ -451,7 +481,7 @@ onMounted(cargarPedidos)
       <div class="w-full max-w-sm rounded-2xl bg-white p-6">
         <h2 class="font-display text-lg text-ink">Cancelar pedido #{{ pedidoACancelar.id }}</h2>
         <p class="mt-1 text-sm text-[#6c655c]">Cuéntanos brevemente por qué cancelas este pedido.</p>
-        <textarea
+        <textarea v-formato="'texto'" maxlength="255"
           v-model="motivoCancelacion"
           rows="3"
           class="mt-4 w-full rounded-xl border border-[#e2dbcf] px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"

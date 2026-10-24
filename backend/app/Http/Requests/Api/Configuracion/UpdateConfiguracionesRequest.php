@@ -16,8 +16,8 @@ class UpdateConfiguracionesRequest extends FormRequest
     public function rules(): array
     {
         $reglas = [
-            'valor_domicilio' => ['required', 'numeric', 'min:0'],
-            'deposito_reserva' => ['required', 'numeric', 'min:0'],
+            'valor_domicilio' => ['required', 'numeric', 'min:0', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS],
+            'deposito_reserva' => ['required', 'numeric', 'min:0', 'max:'.\App\Support\Validacion\Formatos::MAX_PESOS],
         ];
 
         // Fase 4, tarea 2 (RF-M05-017/026): tiempos de las reservas, en minutos enteros. Son

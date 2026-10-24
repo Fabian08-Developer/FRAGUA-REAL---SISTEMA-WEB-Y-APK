@@ -21,13 +21,15 @@ class NegocioController extends Controller
     // PUT /negocio (Administrador)
     public function actualizar(Request $request)
     {
+        // 22/10/2026: teléfono solo con números (10 dígitos) y NIT sin puntos ni espacios.
+        \App\Support\Validacion\Formatos::normalizar($request, ['telefono' => 'telefono', 'nit' => 'documento', 'nombre' => 'nombre']);
         $datos = $request->validate([
             'direccion' => ['required', 'string', 'max:160'],
-            // Se muestra tal cual y con él se arma el enlace de WhatsApp: de 7 a 15 dígitos.
-            'telefono' => ['required', 'string', 'max:30', 'regex:/^\+?[\d\s\-()]{7,25}$/'],
+            // Con él se arma el enlace de WhatsApp: 10 dígitos (celular o fijo de Colombia).
+            'telefono' => ['required', 'string', 'regex:'.\App\Support\Validacion\Formatos::CELULAR],
             // M09 (19/10/2026): nombre y NIT, solo del SuperAdmin.
             'nombre' => ['sometimes', 'required', 'string', 'max:120'],
-            'nit' => ['sometimes', 'nullable', 'string', 'max:30', 'regex:/^[\d.\-\s]*$/'],
+            'nit' => ['sometimes', 'nullable', 'string', 'regex:'.\App\Support\Validacion\Formatos::DOCUMENTO],
             // M09 (20/10/2026): el punto del local en el mapa (los dos o ninguno), solo del SuperAdmin.
             'latitud' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitud'],
             'longitud' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitud'],
@@ -35,13 +37,11 @@ class NegocioController extends Controller
             'latitud.between' => 'La latitud no es válida.',
             'longitud.between' => 'La longitud no es válida.',
             'nombre.required' => 'Escribe el nombre del negocio.',
-            'nit.regex' => 'El NIT solo lleva números, puntos y guion (por ejemplo, 1075320008-5).',
+            'nit.regex' => \App\Support\Validacion\Formatos::MENSAJE_DOCUMENTO,
             'direccion.required' => 'Escribe la dirección del negocio.',
             'telefono.required' => 'Escribe el teléfono del negocio.',
-            'telefono.regex' => 'Escribe un teléfono válido (solo números, espacios y guiones).',
+            'telefono.regex' => \App\Support\Validacion\Formatos::MENSAJE_CELULAR,
         ]);
-        $digitos = strlen(preg_replace('/\D+/', '', $datos['telefono']));
-        abort_if($digitos < 7 || $digitos > 15, 422, 'Escribe un teléfono válido, de 7 a 15 dígitos.');
 
         $soloSuperAdmin = array_intersect_key($datos, ['nombre' => true, 'nit' => true, 'latitud' => true, 'longitud' => true]);
         abort_if($soloSuperAdmin && ! $request->user()->esSuperAdmin(), 403, 'Solo el SuperAdmin puede cambiar el nombre, el NIT y la ubicación del negocio.');
@@ -101,5 +101,45 @@ class NegocioController extends Controller
             'Content-Type' => 'image/png',
             'Cache-Control' => 'public, max-age=31536000, immutable',
         ], 'inline');
+    }
+
+    // GET /negocio/pagos-directos (Administrador): las cuentas del pago directo, también las que están
+    // a medio llenar (las ve el Administrador; las cambia el SuperAdmin).
+    public function pagosDirectos(\App\Services\PagoDirectoService $pagosDirectos)
+    {
+        return response()->json(['datos' => $pagosDirectos->datos(), 'publico' => $pagosDirectos->publico()]);
+    }
+
+    // PUT /negocio/pagos-directos (solo SuperAdmin, RN-M06-17): Nequi, Bancolombia y la llave Bre-B.
+    public function actualizarPagosDirectos(Request $request, \App\Services\PagoDirectoService $pagosDirectos)
+    {
+        abort_if(! $request->user()->esSuperAdmin(), 403, 'Solo el SuperAdmin puede cambiar las cuentas donde se recibe el dinero.');
+        // 22/10/2026: números sin espacios ni guiones, titulares solo con letras.
+        \App\Support\Validacion\Formatos::normalizar($request, [
+            'nequi.numero' => 'telefono', 'bancolombia.numero' => 'digitos', 'bancolombia.documento' => 'documento',
+            'nequi.titular' => 'nombre', 'bancolombia.titular' => 'nombre', 'breb.titular' => 'nombre',
+        ]);
+        $titular = ['nullable', 'string', 'max:80', 'regex:'.\App\Support\Validacion\Formatos::PERSONA];
+        $datos = $request->validate([
+            'nequi.numero' => ['nullable', 'string', 'regex:/^3\d{9}$/'],
+            'nequi.titular' => $titular,
+            'bancolombia.tipo' => ['nullable', 'in:ahorros,corriente'],
+            'bancolombia.numero' => ['nullable', 'string', 'regex:'.\App\Support\Validacion\Formatos::CUENTA_BANCOLOMBIA],
+            'bancolombia.titular' => $titular,
+            'bancolombia.documento' => ['nullable', 'string', 'regex:'.\App\Support\Validacion\Formatos::DOCUMENTO],
+            'breb.llave' => ['nullable', 'string', 'max:80', 'regex:'.\App\Support\Validacion\Formatos::LLAVE_BREB],
+            'breb.titular' => $titular,
+        ], [
+            'nequi.numero.regex' => 'Escribe el número de celular de Nequi: 10 dígitos que empiezan por 3.',
+            'bancolombia.numero.regex' => \App\Support\Validacion\Formatos::MENSAJE_CUENTA,
+            'bancolombia.documento.regex' => \App\Support\Validacion\Formatos::MENSAJE_DOCUMENTO,
+            'breb.llave.regex' => \App\Support\Validacion\Formatos::MENSAJE_LLAVE,
+            'nequi.titular.regex' => \App\Support\Validacion\Formatos::MENSAJE_PERSONA,
+            'bancolombia.titular.regex' => \App\Support\Validacion\Formatos::MENSAJE_PERSONA,
+            'breb.titular.regex' => \App\Support\Validacion\Formatos::MENSAJE_PERSONA,
+        ]);
+        $pagosDirectos->actualizar($datos, $request->user());
+
+        return $this->pagosDirectos($pagosDirectos);
     }
 }

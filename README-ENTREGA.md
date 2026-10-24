@@ -6,7 +6,7 @@ sistema y dónde está cada documento, empieza por [`README.md`](README.md); la 
 backend está en [`README-BACKEND.md`](README-BACKEND.md), la base de datos en
 [`BASE-DE-DATOS.md`](BASE-DE-DATOS.md) y los endpoints en [`API.md`](API.md).
 
-**Estado al 20/10/2026**: plan de implementación completo (Fases 0 a 7), mejoras del 16/10/2026, correcciones y datos del negocio del 19/10/2026 el rol SuperAdmin con permisos de menú (M09), el rol Soporte de solo consulta (M10) y las notificaciones del personal (M11), 386 pruebas automáticas que
+**Estado al 22/10/2026**: plan de implementación completo (Fases 0 a 7), mejoras del 16/10/2026, correcciones y datos del negocio del 19/10/2026 el rol SuperAdmin con permisos de menú (M09), el rol Soporte de solo consulta (M10) las notificaciones del personal (M11) la contraseña segura con bloqueo por intentos (21/10/2026) y el pago en línea por transferencia con captura mientras no haya Wompi y el formato de todos los campos (22/10/2026), 407 pruebas automáticas que
 pasan en SQLite y PostgreSQL. Falta solo lo que no es código: la cuenta comercial de Wompi, el
 proveedor de SMS y el agente local de impresión (ver «Qué falta a propósito»).
 
@@ -295,8 +295,19 @@ sudo chown -R www-data:www-data /var/www/fragua-real/backend/storage/app/private
 ### 9. Pasarela de pago Wompi
 
 Decisión D4: los pagos en línea (pedidos y depósitos de reserva) van por Wompi y se confirman solos.
-Mientras no estén las llaves, el sistema sigue en **aprobación manual**: el pago queda en revisión y lo
-aprueba el Mesero o el Administrador.
+Mientras no estén las llaves, el sistema usa el **pago directo** (decisión del 22/10/2026): el Cliente
+transfiere a las cuentas del negocio y sube la captura, y el Mesero o el Administrador la revisa.
+
+**Poner las cuentas (sin Wompi).** Entrar como SuperAdmin > Configuración > «Cuentas para pagos en
+línea» y llenar los medios que se van a recibir: Nequi (número y a nombre de quién), cuenta
+Bancolombia (tipo, número, titular y, opcional, cédula o NIT) y llave Bre-B (llave y titular). Un medio
+incompleto no se le muestra al Cliente; si no hay ninguno, el pago en línea no aparece y solo se paga
+al recibir o en el local. Cada cambio queda en Auditoría. Antes de aprobar un pago, hay que mirar en la
+app del banco que el dinero llegó: la captura sola no basta. Las capturas quedan en
+`storage/app/private/comprobantes-pago` y entran en la copia de seguridad del paso 8.
+
+Cuando esté la cuenta de Wompi, se siguen los pasos de abajo; con Wompi activo las cuentas dejan de
+mostrarse y el pago vuelve a ser automático (Bre-B no se ofrece por Wompi).
 
 1. En Wompi > Desarrolladores, copiar las cuatro llaves del ambiente (sandbox para probar, producción
    cuando la cuenta comercial esté aprobada) al `.env`: `WOMPI_LLAVE_PUBLICA` (pub_…),
@@ -418,25 +429,27 @@ Si más adelante se quiere un APK para Play Store, la misma app se puede empaque
 | D1 | Fecha de entrega | Sin fecha fija; dejó de frenar porque el plan se terminó completo | — |
 | D2 | Dónde corre el sistema | VPS de Hostinger con HTTPS, cron y Supervisor | 12/10/2026 |
 | D3 | Proveedor de SMS | Correo en V1; el SMS queda para cuando haya proveedor y presupuesto | 12/10/2026 |
-| D4 | Pasarela de pago | Wompi (Nequi y botón Bancolombia), desarrollado contra el sandbox; la aprobación manual queda de respaldo | 13/10/2026 |
+| D4 | Pasarela de pago | Wompi (Nequi y botón Bancolombia), desarrollado contra el sandbox; la aprobación manual queda de respaldo. Mientras no haya cuenta de Wompi, transferencia directa a Nequi, Bancolombia o Bre-B con captura del comprobante (22/10/2026) | 13/10 y 22/10/2026 |
 | D5 | Impresora POS | Comandas y comprobantes de 80 mm desde el navegador del Mesero; el agente local, después de V1 | 13/10/2026 |
 | D6 | Tiempos de las reservas | No-show a los 15 min, recordatorio 2 h antes, mesa Reservada 1 h antes; editables en Configuración | 12/10/2026 |
 | D7 | Reglas contables | Abono del depósito como pago de tipo depósito; correcciones como ajustes sin reescribir el cierre; un Mesero con permiso registra compras y gastos (revisada en la Fase 7) | 12/10 y 13/10/2026 |
 
 Otras decisiones: la sesión del navegador queda en `localStorage` (13/10/2026); el depósito de reserva
 inicial es $20.000 (06/10/2026, RN-M05-14); toda reimpresión sale marcada y queda en Auditoría
-(13/10/2026); el mapa del salón queda para el futuro (13/10/2026).
+(13/10/2026); el mapa del salón no se hará (decisión del 22/10/2026; antes había quedado para el futuro el 13/10/2026).
 
 ## Qué falta a propósito
 
 - **Cuenta comercial de Wompi**: la confirmación automática ya funciona con el sandbox; faltan la
-  cuenta de producción y sus llaves.
+  cuenta de producción y sus llaves. Mientras tanto se cobra por transferencia directa con captura
+  (Configuración > «Cuentas para pagos en línea», solo el SuperAdmin).
 - **SMS** (D3): los avisos de reserva y de «listo para recoger» salen por correo y cada uno guarda su
   canal, listo para sumar el SMS cuando haya proveedor.
 - **Impresión sin una persona de por medio** (D5): un servidor en la nube no ve la impresora del local;
   hace falta un agente pequeño junto a ella. Mientras tanto, el equipo de la cocina puede abrir e
   imprimir solas las comandas con Chrome en modo de impresión automática (ver Fase 6).
-- **Mapa simple del salón** (RF-M05-022, opcional): para una versión futura.
+- **Mapa simple del salón** (RF-M05-022, opcional): descartado por el negocio el 22/10/2026; no se hará.
+  El estado de las mesas se sigue viendo en la lista de Mesas.
 - **Fuera del alcance** de los documentos oficiales: factura electrónica (el comprobante lo dice),
   inventario y recetas, roles de Cocina y Domiciliario, GPS y reportes por canal.
 - Cliente > Mis pedidos muestra los 20 pedidos más recientes, sin paginación.
@@ -808,6 +821,13 @@ Al escribir `QA-CLIENTE.md` y `QA-MESERO.md` se cruzó cada pantalla con el cód
   cambia el nombre o, con `--cambiar-clave`, la contraseña. En Usuarios solo la ve el SuperAdmin, que
   puede desactivarla (sus sesiones se cierran al momento), reactivarla y cerrar sus sesiones; el
   Administrador no la ve.
+- **Contraseña segura y bloqueo por intentos (21/10/2026)**: toda contraseña nueva debe tener 8 caracteres como mínimo, con al menos una mayúscula, una minúscula y un número;
+  las pantallas muestran los requisitos mientras se escribe. En producción también se rechazan las
+  contraseñas filtradas (el servidor necesita salida a internet para eso; si no la tiene, no bloquea).
+  Cinco intentos fallidos seguidos de una cuenta, o veinte desde una IP, bloquean el inicio de sesión
+  15 minutos; el Administrador y el SuperAdmin reciben el aviso y recuperar la contraseña lo quita. Se
+  ajusta con `FRAGUA_REAL_CLAVE_*` y `FRAGUA_REAL_LOGIN_*` en el `.env`. Las contraseñas de las cuentas
+  que ya existen siguen sirviendo; al crear las cuentas reales en el VPS ya se exige la nueva regla.
 - **Notificaciones del personal (M11, 21/10/2026)**: una campana en el panel del Mesero y del
   Administrador (en el teléfono, en la barra de arriba) con el contador de no leídas. Avisa de pedidos
   nuevos por la web o el QR, pedidos listos o cancelados por el cliente, pagos en línea, reservas

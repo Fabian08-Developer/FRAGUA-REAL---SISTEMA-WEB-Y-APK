@@ -95,6 +95,25 @@ return [
         'eventos_max_horas' => (int) env('PASARELA_EVENTOS_MAX_HORAS', 72),
     ],
 
+    // Seguridad (21/10/2026, RN-USR-23/24): contraseña segura para toda cuenta nueva o contraseña nueva
+    // (registro del Cliente, cuentas que crea el Administrador o el SuperAdmin, cambio y recuperación) y
+    // bloqueo temporal del inicio de sesión tras varios intentos fallidos.
+    'seguridad' => [
+        'clave_minimo' => (int) env('FRAGUA_REAL_CLAVE_MINIMO', 8),
+        // Al menos una mayúscula, una minúscula y un número.
+        'clave_mezcla' => (bool) env('FRAGUA_REAL_CLAVE_MEZCLA', true),
+        // Rechaza las contraseñas que aparecen en filtraciones conocidas (servicio «Have I Been Pwned»;
+        // solo se envían los 5 primeros caracteres del hash, nunca la contraseña). Si el servicio no
+        // responde, no se bloquea el registro. Por defecto, solo en producción.
+        'clave_filtradas' => (bool) env('FRAGUA_REAL_CLAVE_FILTRADAS', env('APP_ENV') === 'production'),
+        // Intentos fallidos seguidos de una misma cuenta (correo o usuario) antes de bloquearla.
+        'intentos_cuenta' => (int) env('FRAGUA_REAL_LOGIN_INTENTOS_CUENTA', 5),
+        // Intentos fallidos desde una misma IP (aunque pruebe cuentas distintas).
+        'intentos_ip' => (int) env('FRAGUA_REAL_LOGIN_INTENTOS_IP', 20),
+        // Minutos que dura el bloqueo (y la ventana en la que se cuentan los intentos).
+        'bloqueo_minutos' => (int) env('FRAGUA_REAL_LOGIN_BLOQUEO_MINUTOS', 15),
+    ],
+
     // M11 (21/10/2026): notificaciones del sistema (la campana del Mesero y del Administrador).
     // Horas en hora de Colombia ("HH:MM"). Los avisos se borran solos después de 'dias_guardadas'.
     'notificaciones' => [

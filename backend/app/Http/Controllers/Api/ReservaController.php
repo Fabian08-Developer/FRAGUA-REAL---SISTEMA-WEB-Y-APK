@@ -95,7 +95,7 @@ class ReservaController extends Controller
     {
         abort_unless(hash_equals((string) $reserva->token_publico, (string) $request->input('token')), 404);
 
-        [$reserva, $checkout] = $this->reservaService->iniciarDepositoEnLinea($reserva, $request->pasarela);
+        [$reserva, $checkout] = $this->reservaService->iniciarDepositoEnLinea($reserva, $request->pasarela, $request->file('comprobante'), $request->input('referencia'));
 
         return response()->json($reserva->load(['mesa', 'avisos', 'transaccionDeposito'])->toArray() + ['checkout' => $checkout]);
     }
@@ -116,7 +116,19 @@ class ReservaController extends Controller
     {
         abort_if(! ($request->user()->esAdministrador() || $request->user()->esMesero()), 403);
 
-        return response()->json($this->reservaService->rechazarDepositoEnLinea($reserva, $request->user())->load(['mesa', 'avisos', 'transaccionDeposito']));
+        $datos = $request->validate(['motivo' => ['nullable', 'string', 'max:255']]);
+
+        return response()->json($this->reservaService->rechazarDepositoEnLinea($reserva, $request->user(), 'manual', $datos['motivo'] ?? null)->load(['mesa', 'avisos', 'transaccionDeposito']));
+    }
+
+    // GET /api/reservas/{reserva}/deposito/comprobante — Pago directo (RF-M06-032): la captura del
+    // depósito, solo para el personal.
+    public function comprobanteDeposito(Request $request, Reserva $reserva, \App\Services\PagoDirectoService $pagosDirectos)
+    {
+        abort_if(! ($request->user()->esAdministrador() || $request->user()->esMesero()), 403);
+        abort_if(! $pagosDirectos->existe($reserva->deposito_comprobante_path), 404, 'Este depósito no tiene comprobante.');
+
+        return $pagosDirectos->respuesta($reserva->deposito_comprobante_path, $reserva->deposito_comprobante_mime, "comprobante-reserva-{$reserva->id}");
     }
 
     // RN-M05-16: depósito manual registrado por el Mesero o el Administrador.

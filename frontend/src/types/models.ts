@@ -231,7 +231,7 @@ export interface Pago {
   reserva_id?: number | null
   caja_turno_id: number | null
   metodo: 'efectivo' | 'tarjeta' | 'transferencia' | 'en_linea' | null
-  pasarela: 'nequi' | 'bancolombia' | null
+  pasarela: MedioPagoEnLinea | null
   monto: number
   estado: 'pendiente' | 'aprobado' | 'rechazado'
   registrado_por: number | null
@@ -251,7 +251,15 @@ export interface Pago {
   confirmado_por?: number | null
   confirmado_por_usuario?: Pick<Usuario, 'id' | 'nombre'> | null
   transaccion_pasarela?: TransaccionPasarela | null
+  // Pago directo (22/10/2026, RF-M06-031/033): la captura que subió el Cliente (la ve el personal por
+  // GET /pagos/{id}/comprobante), su número de referencia y por qué se rechazó.
+  tiene_comprobante?: boolean
+  referencia_cliente?: string | null
+  rechazo_motivo?: string | null
 }
+
+// Pago directo (22/10/2026): «breb» solo existe sin Wompi (transferencia a la llave Bre-B del negocio).
+export type MedioPagoEnLinea = 'nequi' | 'bancolombia' | 'breb'
 
 // Fase 6, tarea 2 (RN-PED-06/09/17 a 19, D5) — espeja app/Models/Comanda.php (sin su contenido,
 // que solo se usa para dibujar el ticket). El estado de impresión no es el estado del pedido.
@@ -384,7 +392,7 @@ export interface Pedido {
   observaciones_entrega?: string | null
   // RF-M07-013/015, RF-M07-R-007/008: cómo dijo el cliente que iba a pagar.
   metodo_pago_preferido?: 'contra_entrega' | 'en_linea' | null
-  pasarela_preferida?: 'nequi' | 'bancolombia' | null
+  pasarela_preferida?: MedioPagoEnLinea | null
   valor_domicilio: number | null
   subtotal: number
   // Fase 2, tarea 1 (RF-M04-035 a 038): total = subtotal − descuento + valor_domicilio.
@@ -465,8 +473,12 @@ export interface Reserva {
   deposito_valor: number
   deposito_pagado: boolean
   deposito_metodo: 'efectivo' | 'tarjeta' | 'transferencia' | 'en_linea' | null
-  deposito_pasarela: 'nequi' | 'bancolombia' | null
+  deposito_pasarela: MedioPagoEnLinea | null
   deposito_estado: EstadoDepositoReserva
+  // Pago directo (22/10/2026): captura del depósito, referencia y motivo del rechazo.
+  deposito_tiene_comprobante?: boolean
+  deposito_referencia?: string | null
+  deposito_rechazo_motivo?: string | null
   deposito_reembolsado: boolean
   deposito_aplicado_abono: boolean
   // Fase 1, tarea 4: el Administrador también registra reservas manuales (RN-M05-06), y
@@ -523,6 +535,10 @@ export interface ReservaPublica {
   // Fase 6, tarea 1 (RF-M05-030): pagar o reintentar el depósito desde el enlace.
   puede_pagar?: boolean
   deposito_estado?: EstadoDepositoReserva
+  // Pago directo (22/10/2026): si ya subió la captura y, si se rechazó, por qué.
+  deposito_pasarela?: MedioPagoEnLinea | null
+  deposito_tiene_comprobante?: boolean
+  deposito_rechazo_motivo?: string | null
 }
 
 // Espeja app/Models/CompraGasto.php (M03). 'estado' en vez de "anulado": el backend lo

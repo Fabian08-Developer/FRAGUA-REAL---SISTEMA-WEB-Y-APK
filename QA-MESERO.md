@@ -254,6 +254,15 @@ Usuarios.
 - [ ] Lo que hace este Mesero (por ejemplo, marcar un agotado) no le llega a él mismo. Los avisos de
       caja y del sistema no le llegan.
 
+## 8b-quater. Revisar un pago por transferencia (22/10/2026)
+
+- [ ] Cuando un cliente sube la captura, la campana dice «Comprobante por revisar · pedido #…». En Cobrar,
+      el pago sale con «Captura adjunta» y el botón «Revisar comprobante».
+- [ ] La ventana muestra el valor, el medio, la referencia y la captura (o el PDF). Antes de aprobar,
+      revisar en la app del banco que el dinero llegó.
+- [ ] «Rechazar» pide el motivo (hay motivos rápidos); sin motivo no deja. El cliente lo ve en su pedido.
+- [ ] En Reservas, el depósito dice «comprobante por revisar» y se revisa igual («Confirmar depósito»).
+
 ## 8c. Correcciones del 19/10/2026
 
 - [ ] Con una mesa dada de baja por el Administrador: no aparece en Mesas, ni en Nuevo pedido, ni en

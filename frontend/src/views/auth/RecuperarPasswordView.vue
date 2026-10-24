@@ -57,7 +57,7 @@ async function onSubmit() {
     <p class="text-sm text-[#6c655c]">
       Escribe el correo de tu cuenta y te enviaremos un enlace para crear una nueva contraseña.
     </p>
-    <BaseInput
+    <BaseInput formato="correo"
       v-model="email"
       type="email"
       label="Correo electrónico"

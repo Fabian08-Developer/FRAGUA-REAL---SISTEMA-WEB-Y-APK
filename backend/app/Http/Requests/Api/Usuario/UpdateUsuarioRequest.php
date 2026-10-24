@@ -46,6 +46,7 @@ class UpdateUsuarioRequest extends FormRequest
         if ($this->has('username')) {
             $this->merge(['username' => NombreUsuario::normalizar($this->input('username'))]);
         }
+        \App\Support\Validacion\Formatos::normalizar($this, ['telefono' => 'telefono', 'nombre' => 'nombre']);
     }
 
     public function rules(): array
@@ -53,9 +54,9 @@ class UpdateUsuarioRequest extends FormRequest
         $usuario = $this->route('usuario');
 
         return [
-            'nombre' => ['required', 'string', 'max:255'],
+            'nombre' => ['required', 'string', 'max:80', 'regex:'.\App\Support\Validacion\Formatos::PERSONA],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($usuario?->id)],
-            'telefono' => ['nullable', 'string', 'max:30'],
+            'telefono' => ['nullable', 'string', 'regex:'.\App\Support\Validacion\Formatos::CELULAR],
             // Fase 3, tarea 3 (RF-M01-007/011): vacío = sin nombre de usuario (entra con el correo);
             // si no se envía, no se toca.
             'username' => ['sometimes', ...NombreUsuario::reglas($usuario?->id)],

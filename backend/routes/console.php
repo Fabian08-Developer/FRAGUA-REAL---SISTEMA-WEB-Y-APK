@@ -81,7 +81,7 @@ Artisan::command('fragua:crear-superadmin {correo} {--nombre= : Nombre de la per
 
         $password = null;
         if (! $existe || $this->option('cambiar-clave')) {
-            $password = (string) $this->secret('Contraseña (mínimo 8 caracteres)');
+            $password = (string) $this->secret('Contraseña (mínimo 8 caracteres, con mayúscula, minúscula y número)');
             if ($password !== (string) $this->secret('Repite la contraseña')) {
                 $this->error('Las contraseñas no coinciden. No se cambió nada.');
 
@@ -117,7 +117,7 @@ Artisan::command('fragua:crear-soporte {correo} {--nombre= : Nombre de la person
 
         $password = null;
         if (! $existe || $this->option('cambiar-clave')) {
-            $password = (string) $this->secret('Contraseña (mínimo 8 caracteres)');
+            $password = (string) $this->secret('Contraseña (mínimo 8 caracteres, con mayúscula, minúscula y número)');
             if ($password !== (string) $this->secret('Repite la contraseña')) {
                 $this->error('Las contraseñas no coinciden. No se cambió nada.');
 

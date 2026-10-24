@@ -544,7 +544,7 @@ onMounted(async () => {
 
         <label class="block text-xs font-medium text-gray-700">
           ¿Algo que quitar o pedir especial?
-          <input
+          <input v-formato="'texto'" maxlength="500"
             v-model="notasSeleccionadas"
             type="text"
             placeholder="Opcional"

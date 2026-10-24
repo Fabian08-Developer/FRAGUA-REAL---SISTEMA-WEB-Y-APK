@@ -433,7 +433,7 @@ onMounted(() => {
 
       <label v-if="destinoListo && !cargandoCatalogo && !errorCatalogo" class="relative mx-auto mb-2.5 block max-w-6xl">
         <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
+        <input v-formato="'busqueda'"
           v-model="busqueda"
           type="search"
           class="field pl-9"
@@ -505,12 +505,12 @@ onMounted(() => {
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="block">
             <span class="mb-1.5 block text-xs font-semibold text-gray-600">Nombre del cliente</span>
-            <input v-model="datosCliente.nombre" type="text" maxlength="255" autocomplete="off" class="field" :class="{ '!border-red-400': erroresDatos.nombre }" />
+            <input v-formato="'persona'" v-model="datosCliente.nombre" type="text" maxlength="255" autocomplete="off" class="field" :class="{ '!border-red-400': erroresDatos.nombre }" />
             <span v-if="erroresDatos.nombre" class="mt-1 block text-xs text-red-600">{{ erroresDatos.nombre }}</span>
           </label>
           <label class="block">
             <span class="mb-1.5 block text-xs font-semibold text-gray-600">Teléfono</span>
-            <input v-model="datosCliente.telefono" type="tel" inputmode="tel" maxlength="30" autocomplete="off" class="field" :class="{ '!border-red-400': erroresDatos.telefono }" />
+            <input v-formato="'celular'" v-model="datosCliente.telefono" type="tel" inputmode="tel" maxlength="30" autocomplete="off" class="field" :class="{ '!border-red-400': erroresDatos.telefono }" />
             <span v-if="erroresDatos.telefono" class="mt-1 block text-xs text-red-600">{{ erroresDatos.telefono }}</span>
           </label>
         </div>
@@ -518,24 +518,24 @@ onMounted(() => {
           <span class="mb-1.5 block text-xs font-semibold text-gray-600">
             Correo <span class="font-normal text-gray-400">(opcional: le avisamos cuando esté listo)</span>
           </span>
-          <input v-model="datosCliente.correo" type="email" inputmode="email" maxlength="255" autocomplete="off" class="field" :class="{ '!border-red-400': erroresDatos.correo }" />
+          <input v-formato="'correo'" v-model="datosCliente.correo" type="email" inputmode="email" maxlength="255" autocomplete="off" class="field" :class="{ '!border-red-400': erroresDatos.correo }" />
           <span v-if="erroresDatos.correo" class="mt-1 block text-xs text-red-600">{{ erroresDatos.correo }}</span>
         </label>
         <template v-if="canal === 'domicilio'">
           <label class="block">
             <span class="mb-1.5 block text-xs font-semibold text-gray-600">Dirección</span>
-            <input v-model="datosCliente.direccion" type="text" maxlength="255" autocomplete="off" placeholder="Calle, carrera, número" class="field" :class="{ '!border-red-400': erroresDatos.direccion }" />
+            <input v-formato="'direccion'" v-model="datosCliente.direccion" type="text" maxlength="255" autocomplete="off" placeholder="Calle, carrera, número" class="field" :class="{ '!border-red-400': erroresDatos.direccion }" />
             <span v-if="erroresDatos.direccion" class="mt-1 block text-xs text-red-600">{{ erroresDatos.direccion }}</span>
           </label>
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="block">
               <span class="mb-1.5 block text-xs font-semibold text-gray-600">Barrio</span>
-              <input v-model="datosCliente.barrio" type="text" maxlength="255" autocomplete="off" class="field" :class="{ '!border-red-400': erroresDatos.barrio }" />
+              <input v-formato="'nombre'" v-model="datosCliente.barrio" type="text" maxlength="255" autocomplete="off" class="field" :class="{ '!border-red-400': erroresDatos.barrio }" />
               <span v-if="erroresDatos.barrio" class="mt-1 block text-xs text-red-600">{{ erroresDatos.barrio }}</span>
             </label>
             <label class="block">
               <span class="mb-1.5 block text-xs font-semibold text-gray-600">Punto de referencia</span>
-              <input v-model="datosCliente.referencia" type="text" maxlength="255" autocomplete="off" placeholder="Ej. casa azul frente al parque" class="field" :class="{ '!border-red-400': erroresDatos.referencia }" />
+              <input v-formato="'nombre'" v-model="datosCliente.referencia" type="text" maxlength="255" autocomplete="off" placeholder="Ej. casa azul frente al parque" class="field" :class="{ '!border-red-400': erroresDatos.referencia }" />
               <span v-if="erroresDatos.referencia" class="mt-1 block text-xs text-red-600">{{ erroresDatos.referencia }}</span>
             </label>
           </div>
@@ -544,7 +544,7 @@ onMounted(() => {
           <span class="mb-1.5 block text-xs font-semibold text-gray-600">
             {{ canal === 'domicilio' ? 'Indicaciones para la entrega' : 'Indicaciones' }} <span class="font-normal text-gray-400">(opcional)</span>
           </span>
-          <textarea v-model="datosCliente.observaciones" rows="2" maxlength="500" class="field" :placeholder="canal === 'domicilio' ? 'Ej. apartamento 302, llamar al llegar' : 'Ej. pasa a las 7:30 p. m.'" />
+          <textarea v-formato="'texto'" v-model="datosCliente.observaciones" rows="2" maxlength="500" class="field" :placeholder="canal === 'domicilio' ? 'Ej. apartamento 302, llamar al llegar' : 'Ej. pasa a las 7:30 p. m.'" />
           <span v-if="erroresDatos.observaciones" class="mt-1 block text-xs text-red-600">{{ erroresDatos.observaciones }}</span>
         </label>
         <button
@@ -785,7 +785,7 @@ onMounted(() => {
 
               <label class="mt-5 block">
                 <span class="field-label">Observaciones para cocina</span>
-                <input
+                <input v-formato="'texto'" maxlength="500"
                   v-model="observacionesActivas"
                   type="text"
                   placeholder="Opcional — ej: sin cebolla"

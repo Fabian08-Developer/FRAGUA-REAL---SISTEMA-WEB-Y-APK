@@ -119,7 +119,7 @@ onMounted(cargar)
         </p>
 
         <div v-if="abierta === tx.id" class="mt-3 space-y-2">
-          <textarea
+          <textarea v-formato="'texto'"
             v-model="nota"
             rows="2"
             maxlength="255"

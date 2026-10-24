@@ -7,6 +7,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Paperclip, Plus, Receipt, Upload } from 'lucide-vue-next'
 import BaseButton from '@/components/common/BaseButton.vue'
+import CampoPesos from '@/components/common/CampoPesos.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import { compraGastoService, type CompraGastoPayload } from '@/services/compra-gasto.service'
@@ -311,14 +312,14 @@ onMounted(() => {
 
         <label class="block">
           <span class="field-label">Descripción</span>
-          <input v-model="form.descripcion" type="text" class="field" placeholder="Ej.: taxi para traer el pan" />
+          <input v-formato="'texto'" maxlength="255" v-model="form.descripcion" type="text" class="field" placeholder="Ej.: taxi para traer el pan" />
           <span v-if="erroresForm.descripcion" class="mt-1 block text-xs text-red-600">{{ erroresForm.descripcion }}</span>
         </label>
 
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="block">
             <span class="field-label">Valor</span>
-            <input v-model.number="form.valor" type="number" min="0.01" step="0.01" inputmode="decimal" class="field" />
+            <CampoPesos v-model="form.valor" class="field" />
             <span v-if="erroresForm.valor" class="mt-1 block text-xs text-red-600">{{ erroresForm.valor }}</span>
           </label>
           <label class="block">
@@ -352,12 +353,12 @@ onMounted(() => {
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="block">
             <span class="field-label">Cantidad (opcional)</span>
-            <input v-model.number="form.cantidad" type="number" min="0" step="any" class="field" />
+            <input v-formato="'cantidad'" v-model.number="form.cantidad" type="text" min="0" class="field" />
             <span v-if="erroresForm.cantidad" class="mt-1 block text-xs text-red-600">{{ erroresForm.cantidad }}</span>
           </label>
           <label class="block">
             <span class="field-label">Unidad (opcional)</span>
-            <input v-model="form.unidad" type="text" list="unidades-mesero" maxlength="50" class="field" placeholder="kilos, bolsas, cajas…" />
+            <input v-formato="'nombre'" v-model="form.unidad" type="text" list="unidades-mesero" maxlength="50" class="field" placeholder="kilos, bolsas, cajas…" />
             <datalist id="unidades-mesero">
               <option v-for="u in UNIDADES" :key="u" :value="u" />
             </datalist>
@@ -367,17 +368,17 @@ onMounted(() => {
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="block">
             <span class="field-label">Proveedor (opcional)</span>
-            <input v-model="form.proveedor" type="text" class="field" />
+            <input v-formato="'nombre'" v-model="form.proveedor" type="text" class="field" />
           </label>
           <label class="block">
             <span class="field-label">N.º de factura (opcional)</span>
-            <input v-model="form.numero_factura" type="text" class="field" />
+            <input v-formato="'referencia'" v-model="form.numero_factura" type="text" class="field" />
           </label>
         </div>
 
         <label class="block">
           <span class="field-label">Observaciones (opcional)</span>
-          <textarea v-model="form.observaciones" rows="2" maxlength="1000" class="field" />
+          <textarea v-formato="'texto'" v-model="form.observaciones" rows="2" maxlength="1000" class="field" />
         </label>
 
         <label class="block">

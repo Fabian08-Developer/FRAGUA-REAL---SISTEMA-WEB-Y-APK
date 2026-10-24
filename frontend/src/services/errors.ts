@@ -41,8 +41,14 @@ export function mensajeDeError(error: unknown, fallback = 'Ocurrió un error. In
         ? 'No pudimos conectarnos. Revisa tu conexión a internet e intenta de nuevo.'
         : fallback
     }
-    if (error.response.status === 429) return MENSAJES_EN_INGLES[0][1]
     const mensaje = error.response.data?.message
+    // Seguridad (21/10/2026): el bloqueo por intentos fallidos trae su propio mensaje en español; el
+    // límite genérico de Laravel («Too Many Attempts.») se cambia por el de siempre.
+    if (error.response.status === 429) {
+      return typeof mensaje === 'string' && mensaje.trim() && !MENSAJES_EN_INGLES[0][0].test(mensaje.trim())
+        ? mensaje
+        : MENSAJES_EN_INGLES[0][1]
+    }
     if (typeof mensaje !== 'string' || !mensaje.trim()) return fallback
     // Error interno (500) sin depuración: "Server Error" no le sirve a nadie.
     if (error.response.status >= 500) return fallback

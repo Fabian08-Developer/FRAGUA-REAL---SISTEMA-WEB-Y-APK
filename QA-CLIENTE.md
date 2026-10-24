@@ -49,6 +49,8 @@ Al preparar la lista se revisó el código pantalla por pantalla y aparecieron c
   - la dirección, el teléfono y "Escribir por WhatsApp" (abre WhatsApp con el número del local);
   - si el SuperAdmin marcó el punto del local (M09), un mapa pequeño con el marcador dorado debajo del
     contacto. El mapa no se mueve al pasar el dedo para bajar la página; con los botones + y − se acerca.
+- [ ] **Ofertas y combos de hoy (21/10/2026).** Si hay promociones vigentes o combos que se pueden pedir hoy, debajo del encabezado sale «Aprovecha hoy.» con cada uno: la etiqueta (−15 %, Combo), el precio de antes tachado y el de hoy. «Agregar» lo pone en el pedido (el botón dice «Listo» y sube el número de «Mi pedido»); un producto con tamaños dice «Elegir» y lleva al Menú. En el teléfono las tarjetas se deslizan de lado. Sin ofertas ni combos, la sección no aparece.
+- [ ] Los precios de «Empieza por un buen antojo» se leen como «$ 28.000» (antes salía «Desde 5000.00»); «Desde» solo aparece si el producto tiene tamaños, con el precio del más barato. Los destacados son productos disponibles, primero los que tienen foto.
 - [ ] «Cómo llegar» (en Contacto y en el pie de página) abre Google Maps justo en el punto marcado; sin
       punto, busca la dirección escrita.
 - [ ] El menú de arriba lleva a Inicio, Menú y Reservar. "Contacto" baja a la sección de contacto.
@@ -210,6 +212,7 @@ En la ventana del invitado, Reservar:
 - [ ] **Crear cuenta**:
   - Nombre, correo y contraseña son obligatorios; teléfono y nombre de usuario, opcionales.
   - Una contraseña de menos de 8 caracteres, contraseñas distintas o un correo ya usado muestran el error bajo el campo, en español.
+  - **Contraseña segura (21/10/2026).** Debajo de la contraseña aparecen los requisitos (8 caracteres, mayúscula, minúscula, número y que coincidan) y se marcan en verde al cumplirse. «hamburguesa2» se rechaza con «debe contener al menos una mayúscula y una minúscula»; «Hamburguesa2026» se acepta.
 - [ ] Al crear la cuenta, entra solo y queda en el Inicio. La cuenta es de Cliente (nunca de Mesero).
 - [ ] **Corregido en esta revisión.** Desde el Checkout:
   1. pulsa "Inicia sesión" y luego "Crear cuenta";
@@ -220,6 +223,7 @@ En la ventana del invitado, Reservar:
   - Con la contraseña mala: "Usuario o contraseña incorrectos.", el mismo mensaje sea cual sea el error.
   - "Continuar como invitado" lleva al menú sin sesión.
 - [ ] **Corregido en esta revisión.** Más de 10 intentos en un minuto muestran "Hiciste demasiados intentos seguidos. Espera un minuto e intenta de nuevo." (antes "Too Many Attempts.").
+- [ ] **Bloqueo por intentos (21/10/2026).** Con una cuenta real, 5 contraseñas equivocadas seguidas muestran "Hiciste demasiados intentos fallidos. Por seguridad, espera 15 minutos o usa «¿Olvidaste tu contraseña?»."; durante esos minutos ni la contraseña correcta entra. Recuperar la contraseña por correo quita el bloqueo.
 - [ ] Un enlace de inicio de sesión armado con `?redirect=https://otro-sitio.com` o `?redirect=//otro-sitio.com` no saca del sitio: entra al Inicio.
 - [ ] **Recuperar contraseña**:
   - Con un correo que existe y con uno que no, el mensaje es el mismo; no revela si la cuenta existe.
@@ -289,6 +293,28 @@ En la ventana del invitado, Reservar:
 - [ ] Con la app instalada y sin internet (modo avión), abrirla muestra «Sin conexión» con
       «Reintentar»; con internet, vuelve a funcionar.
 - [ ] El Mesero con sesión abre la app desde el ícono y entra directo a Pedidos.
+
+## 13b. Pagar en línea por transferencia (sin Wompi, 22/10/2026)
+
+Antes: el SuperAdmin puso al menos una cuenta en Configuración > «Cuentas para pagos en línea».
+
+- [ ] Checkout: «Pago en línea» dice los medios configurados (por ejemplo «Nequi, Bancolombia o Bre-B»).
+      Al confirmar, la pantalla muestra las cuentas: elegir el medio, «Copiar» copia el número (o la
+      llave) y el valor exacto. Sin captura, «Enviar comprobante» pide subirla.
+- [ ] Subir un .txt o un archivo de más de 5 MB: dice que debe ser una foto o un PDF de hasta 5 MB.
+- [ ] Subir la foto de la transferencia (y, si se quiere, la referencia): dice «Recibimos tu
+      comprobante». En el seguimiento (o en «Mis pedidos») se lee «Estamos verificando la transferencia».
+- [ ] Si el personal lo rechaza, el seguimiento muestra «Tu pago anterior no se aprobó: …» con el motivo
+      y deja volver a enviarlo.
+- [ ] Reservar mesa: el depósito se paga igual; en el enlace de la reserva se ve «Recibimos tu
+      comprobante» y, si se rechaza, el motivo.
+- [ ] Sin ninguna cuenta configurada (y sin Wompi), el Checkout no ofrece pago en línea.
+
+## 13c. Formato de los campos (22/10/2026)
+
+- [ ] Registro, Checkout y Reservar: el teléfono solo acepta 10 números (con el teclado numérico en el
+      celular); el nombre no acepta números; el correo no acepta espacios. Pegar «300 123 4567» deja
+      «3001234567».
 
 ## 14. Correcciones del 19/10/2026 (reservas)
 

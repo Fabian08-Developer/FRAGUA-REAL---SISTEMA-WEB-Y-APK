@@ -57,9 +57,12 @@ class SesionesSegurasTest extends TestCase
 
     public function test_el_login_tiene_limite_de_intentos(): void
     {
-        for ($i = 0; $i < 10; $i++) {
+        // Seguridad (21/10/2026, RN-USR-24): 5 intentos fallidos seguidos bloquean la cuenta 15 minutos,
+        // y durante el bloqueo ni la contraseña correcta entra (SeguridadClavesTest cubre el resto).
+        for ($i = 0; $i < 4; $i++) {
             $this->postJson('/api/auth/login', ['email' => 'mesero@test.co', 'password' => 'equivocada'])->assertStatus(422);
         }
+        $this->postJson('/api/auth/login', ['email' => 'mesero@test.co', 'password' => 'equivocada'])->assertStatus(429);
 
         $this->postJson('/api/auth/login', ['email' => 'mesero@test.co', 'password' => 'clave-mesero'])->assertStatus(429);
     }
