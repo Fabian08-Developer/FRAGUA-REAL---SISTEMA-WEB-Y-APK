@@ -23,7 +23,7 @@ armado el backend hoy y guarda el historial de los 60 cambios técnicos que lo l
 
 Cada petición pasa por las mismas capas:
 
-1. **Ruta** (`routes/api.php`): 195 endpoints bajo `/api`, agrupados por nivel de acceso con los
+1. **Ruta** (`routes/api.php`): 196 endpoints bajo `/api`, agrupados por nivel de acceso con los
    middleware `auth:sanctum`, `activo` y `role:...`, y límites de peticiones en las rutas públicas.
 2. **Form Request** (`app/Http/Requests/Api`, 38 clases): valida los datos y devuelve los mensajes
    en español (`lang/es/validation.php`).
@@ -160,7 +160,7 @@ partir de la copia guardada en la base, así una reimpresión dice exactamente l
 
 ## Pruebas automáticas
 
-`backend/tests/Feature` tiene 61 archivos y 431 pruebas; `tests/Unit` tiene la de ejemplo de Laravel.
+`backend/tests/Feature` tiene 62 archivos y 434 pruebas; `tests/Unit` tiene la de ejemplo de Laravel.
 En total son 344.
 
 ```bash
@@ -1919,4 +1919,17 @@ inconsistencias con lo que existía o era correcto en Laravel:
       aviso del navegador muestra los pasos), también arriba para el Mesero.
     - `MejorasOperacionTest` (11 pruebas); `CajaCuadreTest`, `AuditoriaBaseTest` y
       `AbonoDepositoReservaTest` ajustadas a la regla de cerrar caja.
+    - Reservas y cobros en efectivo (26/10/2026, sin migración):
+      - El Cliente paga el depósito pendiente desde «Mis pedidos y reservas»: `GET /mis-reservas` trae
+        `puede_pagar` y `POST /mis-reservas/{reserva}/deposito` (solo sus reservas, por correo; las demás
+        dan 404) hace lo mismo que el enlace del correo. La regla `puedePagarDeposito()` pasó de
+        `ReservaPublicaController` a `ReservaService`. Mientras se revisa el comprobante dice «Pago en
+        revisión»; si se rechazó, muestra el motivo y deja pagar otra vez.
+      - Depósito manual: en efectivo se envía `recibido` (no puede ser menor que el depósito) y la
+        auditoría guarda lo recibido y el cambio; en transferencia la foto `comprobante` es obligatoria
+        (en tarjeta, opcional) y queda en `deposito_comprobante_path`. Reservas muestra «Ver comprobante».
+      - `EfectivoRecibido.vue`: al cobrar en efectivo (Cobrar, cuenta de la mesa y depósito) se toca
+        «Exacto», un billete sugerido o se escribe el valor, y muestra a cobrar, recibe y cambio. Si no
+        alcanza, no deja registrar. En el cobro de pedidos y mesas es una ayuda: no se guarda.
+      - `DepositoReservaMejorasTest` (3 pruebas); `ReservaPersonalTest` envía la foto en transferencia.
 

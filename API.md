@@ -1,6 +1,6 @@
 # API — Fragua Real Burger
 
-Referencia de los 195 endpoints de `backend/routes/api.php`, agrupados por módulo. Donde dice «Administrador» entra también el SuperAdmin (M09) y, solo para consultar, la cuenta de Soporte (M10): a ella el servidor le rechaza con 403 «La cuenta de Soporte solo puede consultar.» toda escritura (POST, PUT, PATCH o DELETE), salvo las de su propia cuenta (`/auth/*`, `/perfil`), `POST /reportes/exportar`, `POST /pedidos/cotizacion` y marcar sus notificaciones como leídas, y también `GET /comandas/{comanda}/ticket`, que marca la comanda como impresa. Las rutas del personal llevan además el permiso de menú de la cuenta (M09): si el SuperAdmin le quitó ese menú, responden 403 «Esta opción no está habilitada para tu cuenta…». Todas las rutas van bajo `/api` y responden JSON, salvo los PDF, tickets, fotos y archivos exportados.
+Referencia de los 196 endpoints de `backend/routes/api.php`, agrupados por módulo. Donde dice «Administrador» entra también el SuperAdmin (M09) y, solo para consultar, la cuenta de Soporte (M10): a ella el servidor le rechaza con 403 «La cuenta de Soporte solo puede consultar.» toda escritura (POST, PUT, PATCH o DELETE), salvo las de su propia cuenta (`/auth/*`, `/perfil`), `POST /reportes/exportar`, `POST /pedidos/cotizacion` y marcar sus notificaciones como leídas, y también `GET /comandas/{comanda}/ticket`, que marca la comanda como impresa. Las rutas del personal llevan además el permiso de menú de la cuenta (M09): si el SuperAdmin le quitó ese menú, responden 403 «Esta opción no está habilitada para tu cuenta…». Todas las rutas van bajo `/api` y responden JSON, salvo los PDF, tickets, fotos y archivos exportados.
 
 Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). Si cambia una ruta, actualiza esta tabla.
 
@@ -168,7 +168,8 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 | Método | Ruta | Quién | Para qué | Límite |
 |---|---|---|---|---|
 | `GET` | `/mesas/disponibles` | Pública | Mesas libres a una fecha y hora (sin datos de nadie). | 60/min |
-| `GET` | `/mis-reservas` | Cliente | Reservas del Cliente (por su correo). |  |
+| `GET` | `/mis-reservas` | Cliente | Reservas del Cliente (por su correo), con `puede_pagar`. |  |
+| `POST` | `/mis-reservas/{reserva}/deposito` | Cliente | Paga el depósito pendiente de su reserva (`pasarela`, `comprobante`, `referencia`), como con el enlace del correo. 404 si no es suya. | 30/min |
 | `POST` | `/reservas` | Pública | Crea una reserva (web o del personal) con `descripcion` opcional (hasta 500 caracteres); solo de 4:00 p. m. a 11:00 p. m. y con al menos 3 horas de anticipación (422 si no). Devuelve el enlace secreto. | 30/min |
 | `GET` | `/reservas` | Administrador, Mesero | Reservas con filtros, sus avisos y su depósito. |  |
 | `GET` | `/reservas/depositos-retenidos` | Administrador | Depósitos retenidos por no-show. |  |
@@ -182,7 +183,7 @@ Generada desde el código el 13/10/2026 (`php artisan route:list --path=api`). S
 | `POST` | `/reservas/{reserva}/deposito/en-linea` | Pública | Inicia el pago en línea del depósito (pide el enlace secreto de la reserva; sin Wompi, con `comprobante` y `referencia`). | 30/min |
 | `POST` | `/reservas/{reserva}/deposito/en-linea/confirmar` | Administrador, Mesero | Aprueba a mano el depósito en línea (respaldo). |  |
 | `POST` | `/reservas/{reserva}/deposito/en-linea/rechazar` | Administrador, Mesero | Rechaza a mano el depósito en línea, con `motivo` opcional (hasta 255) que el Cliente ve en el enlace de su reserva. |  |
-| `POST` | `/reservas/{reserva}/deposito/manual` | Administrador, Mesero | Registra el depósito en efectivo, tarjeta o transferencia (con la caja abierta). |  |
+| `POST` | `/reservas/{reserva}/deposito/manual` | Administrador, Mesero | Registra el depósito en efectivo, tarjeta o transferencia (con la caja abierta). En efectivo, `recibido` (no menor que el depósito); en transferencia, la foto `comprobante` (obligatoria; en tarjeta, opcional). |  |
 | `POST` | `/reservas/{reserva}/no-show` | Administrador, Mesero | Marca no-show cuando ya pasó la tolerancia; el depósito se retiene. |  |
 
 ## Caja y pagos (M06)

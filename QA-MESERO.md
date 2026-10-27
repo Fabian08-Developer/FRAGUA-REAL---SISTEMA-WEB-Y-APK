@@ -280,6 +280,12 @@ Usuarios.
 - [ ] Un domicilio contra entrega muestra con cuánto paga el cliente y el cambio que hay que llevar, y «Ver
       la ubicación en el mapa» si la compartió.
 - [ ] En el teléfono, el botón de descarga de arriba instala la app (o muestra los pasos del navegador).
+- [ ] Cobrar en efectivo (un pedido o la cuenta de la mesa): «¿Con cuánto paga el cliente?» con «Exacto» y
+      billetes sugeridos; al tocar uno (o escribir el valor) se ve a cobrar, recibe y el cambio. Con menos
+      del monto dice cuánto falta y no deja registrar. Al registrar, el aviso dice el cambio a entregar.
+- [ ] Reservas > «Registrar depósito manual»: en efectivo hay que indicar con cuánto pagó (sin eso no
+      registra) y se ve el cambio; en transferencia hay que tomar la foto; en tarjeta es opcional. Después,
+      la reserva tiene «Ver comprobante».
 
 ## 8c. Correcciones del 19/10/2026
 

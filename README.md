@@ -15,7 +15,7 @@ backend (API en Laravel) y el frontend (aplicación web en Vue).
 
 - El plan de implementación está completo: Fases 0 a 7, más el endurecimiento de seguridad, la prueba
   de un día completo de operación y las listas de revisión manual por rol.
-- 432 pruebas automáticas, que pasan en SQLite y en PostgreSQL.
+- 435 pruebas automáticas, que pasan en SQLite y en PostgreSQL.
 - Pago en línea sin Wompi (22/10/2026): el Cliente transfiere a Nequi, a la cuenta Bancolombia o a la
   llave Bre-B del negocio y sube la captura; el personal la revisa y aprueba o rechaza con motivo. Las
   cuentas las pone el SuperAdmin en Configuración; al activar Wompi vuelve el pago automático.
@@ -84,7 +84,7 @@ FRAGUA-REAL---SISTEMA-WEB-Y-APK/
 ├── README-ENTREGA.md        Cómo correrlo, cómo ponerlo en el servidor y qué cambió por fase
 ├── README-BACKEND.md        Arquitectura del backend e historial técnico de cambios
 ├── BASE-DE-DATOS.md         Tablas, relaciones, migraciones y decisiones de diseño
-├── API.md                   Los 195 endpoints, por módulo, con quién puede usarlos
+├── API.md                   Los 196 endpoints, por módulo, con quién puede usarlos
 ├── PRUEBA-DIA-COMPLETO.md   Recorrido a mano de un día de operación, con las cifras esperadas
 └── QA-CLIENTE.md, QA-MESERO.md, QA-ADMINISTRADOR.md
                              Listas de revisión manual por rol
@@ -119,7 +119,7 @@ con la contraseña `password`. El detalle, la puesta en producción y la configu
 
 ```bash
 cd backend
-php artisan test              # 432 pruebas (SQLite en memoria)
+php artisan test              # 435 pruebas (SQLite en memoria)
 ```
 
 Cada prueba lleva en su nombre o en su comentario el requisito que cubre. `DiaCompletoTest` recorre un
@@ -135,7 +135,7 @@ QA por rol.
 | [`README-ENTREGA.md`](README-ENTREGA.md) | Instalar, poner en producción en el VPS, decisiones del negocio y cambios de comportamiento por fase |
 | [`README-BACKEND.md`](README-BACKEND.md) | Cómo está armado el backend (capas, módulos, tareas programadas, configuración) y el historial de los 60 cambios |
 | [`BASE-DE-DATOS.md`](BASE-DE-DATOS.md) | Las 41 tablas, sus relaciones, las 68 migraciones y las decisiones de diseño (ADR) |
-| [`API.md`](API.md) | Los 195 endpoints con rol, uso y límite de peticiones |
+| [`API.md`](API.md) | Los 196 endpoints con rol, uso y límite de peticiones |
 | [`PRUEBA-DIA-COMPLETO.md`](PRUEBA-DIA-COMPLETO.md) | Prueba manual de un día completo |
 | [`QA-CLIENTE.md`](QA-CLIENTE.md), [`QA-MESERO.md`](QA-MESERO.md), [`QA-ADMINISTRADOR.md`](QA-ADMINISTRADOR.md) | Revisión manual pantalla por pantalla |
 | [`backend/README.md`](backend/README.md), [`frontend/README.md`](frontend/README.md) | Notas de cada proyecto |

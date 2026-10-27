@@ -11,6 +11,7 @@ import BaseButton from '@/components/common/BaseButton.vue'
 import CampoPesos from '@/components/common/CampoPesos.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 import FotoComprobante from '@/components/pagos/FotoComprobante.vue'
+import EfectivoRecibido from '@/components/pagos/EfectivoRecibido.vue'
 import { mesaService, type CuentaMesa } from '@/services/mesa.service'
 import { mensajeDeError } from '@/services/errors'
 import { formatoHoraPedido, saldoPendiente } from '@/utils/pedidoUi'
@@ -37,6 +38,10 @@ const metodo = ref<Metodo>('efectivo')
 const monto = ref(0)
 const cobrando = ref(false)
 const foto = ref<File | null>(null)
+// Mejora (26/10/2026): en efectivo, con cuánto paga el cliente, para mostrar el cambio.
+const recibido = ref<number | null>(null)
+const cambio = computed(() => (metodo.value === 'efectivo' && recibido.value ? recibido.value - (monto.value || 0) : null))
+watch([metodo, monto, recibido, foto], () => (error.value = ''))
 
 // null = toda la mesa. Con una sola cuenta no hay nada que elegir.
 const cuentaElegida = ref<number | null>(null)
@@ -49,6 +54,7 @@ const saldoElegido = computed(() =>
 function elegirCuenta(numero: number | null) {
   cuentaElegida.value = numero
   monto.value = saldoElegido.value
+  recibido.value = null
 }
 // Cuentas con sus pedidos, para mostrarlas por separado.
 const grupos = computed(() =>
@@ -97,6 +103,7 @@ watch(
       monto.value = saldoElegido.value
       metodo.value = 'efectivo'
       foto.value = null
+      recibido.value = null
     } catch (e) {
       error.value = mensajeDeError(e, 'No pudimos cargar la cuenta de la mesa.')
     } finally {
@@ -126,6 +133,11 @@ async function cobrar() {
     error.value = 'Toma la foto del comprobante de la transferencia.'
     return
   }
+  if (cambio.value !== null && cambio.value < 0) {
+    error.value = `Lo que entrega el cliente no alcanza: faltan ${formatoPrecio(-cambio.value)}.`
+    return
+  }
+  const cambioEntregado = cambio.value
   cobrando.value = true
   error.value = ''
   aviso.value = ''
@@ -146,7 +158,9 @@ async function cobrar() {
     } else if (saldoCobrada > 0) aviso.value = `Cobro registrado. Falta ${formatoPrecio(saldoCobrada)}.`
     else if (!data.abierta) aviso.value = 'Cuenta pagada. Los pedidos quedaron finalizados y la mesa está libre.'
     else aviso.value = 'Cuenta pagada. Los pedidos que aún no se preparan se finalizan desde Pedidos.'
+    if (cambioEntregado) aviso.value += ` Entrega ${formatoPrecio(cambioEntregado)} de cambio.`
     monto.value = saldoElegido.value
+    recibido.value = null
     emit('cobrado', data)
   } catch (e) {
     error.value = mensajeDeError(e, 'No pudimos registrar el cobro.')
@@ -262,7 +276,8 @@ async function cobrar() {
           </span>
         </label>
         <p class="mt-1.5 text-xs text-gray-400">Para un pago mixto, cobra una parte con cada método.</p>
-        <FotoComprobante v-if="metodo !== 'efectivo'" v-model="foto" :obligatoria="metodo === 'transferencia'" />
+        <EfectivoRecibido v-if="metodo === 'efectivo'" v-model="recibido" :total="monto || 0" />
+        <FotoComprobante v-else v-model="foto" :obligatoria="metodo === 'transferencia'" />
         <p v-if="pendientesDePreparar" class="mt-2 text-xs text-amber-700">
           {{ pendientesDePreparar }} {{ pendientesDePreparar === 1 ? 'pedido aún no pasa' : 'pedidos aún no pasan' }} a preparación:
           quedan pagados y se finalizan después.

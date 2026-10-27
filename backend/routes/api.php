@@ -248,6 +248,8 @@ Route::middleware(['auth:sanctum', 'activo'])->group(function () {
     // ReservaController::misReservas().
     Route::middleware('role:cliente')->group(function () {
         Route::get('/mis-reservas', [ReservaController::class, 'misReservas']);
+        // Mejora (26/10/2026): pagar el depósito pendiente desde «Mis pedidos y reservas».
+        Route::post('/mis-reservas/{reserva}/deposito', [ReservaController::class, 'pagarMiDeposito'])->middleware('throttle:30,1');
     });
 
     // ---- Exclusivo Administrador ----

@@ -19,14 +19,14 @@ otras dos terminales.
 ## Pruebas
 
 ```bash
-php artisan test              # 432 pruebas, SQLite en memoria
+php artisan test              # 435 pruebas, SQLite en memoria
 ```
 
 ## Dónde está cada cosa
 
 | Carpeta | Contenido |
 |---|---|
-| `routes/api.php` | Los 195 endpoints, agrupados por rol |
+| `routes/api.php` | Los 196 endpoints, agrupados por rol |
 | `routes/console.php` | Comandos y tareas programadas |
 | `app/Http/Controllers/Api` | 18 controladores, uno por área |
 | `app/Http/Requests/Api` | Validación de cada petición (mensajes en español) |

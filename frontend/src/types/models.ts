@@ -543,6 +543,8 @@ export interface Reserva {
   transaccion_deposito?: TransaccionPasarela | null
   // Solo en la respuesta de crearla desde la web: el enlace secreto con el que se paga el depósito.
   token_publico?: string
+  // Mejora (26/10/2026): solo en «Mis reservas» del Cliente: si puede pagar el depósito desde ahí.
+  puede_pagar?: boolean
   mesa?: Mesa
 }
 

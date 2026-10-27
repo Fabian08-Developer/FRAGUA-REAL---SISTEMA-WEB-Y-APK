@@ -712,6 +712,9 @@ Resumen; la lista completa del invitado está en `QA-CLIENTE.md` (secciones 4 a 
 - [ ] Auditoría: al abrir un registro, el detalle empieza por «Hecho por» (nombre, rol y correo) y «Cuándo».
 - [ ] En el teléfono, el menú lateral con todas las opciones: la lista se desplaza y el perfil y «Cerrar
       sesión» quedan a la vista; «Instalar app» aparece aunque el navegador no lo ofrezca (muestra los pasos).
+- [ ] Reservas > «Registrar depósito manual» en efectivo con $50.000 para $20.000: dice «Entrega $30.000 de
+      cambio»; en Auditoría el registro muestra «Entregó el cliente» y «Cambio entregado». Por transferencia
+      pide la foto y la reserva queda con «Ver comprobante».
 
 ## 16. Contraseña segura y bloqueo por intentos (21/10/2026)
 
