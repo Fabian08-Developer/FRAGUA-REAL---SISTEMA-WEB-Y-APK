@@ -67,7 +67,10 @@ Al preparar la lista se revisó el código de cada pantalla. Se corrigieron dos 
 - [ ] Mientras está abierta la ventana de editar, descuento, historial o cancelar, la lista no se mueve; al cerrarla se pone al día.
 - [ ] "Actualizar" recarga la lista a mano.
 - [ ] Con un corte de internet, la actualización automática no muestra errores; vuelve sola al regresar la conexión.
-- [ ] **Confirmar pedido** (pendiente → confirmado): se abre la comanda de cocina (sección 4).
+- [ ] **Crear pedido** desde Nuevo pedido (27/10/2026): el pedido queda Confirmado de una vez, la lista dice
+      «Pedido #N creado: la comanda ya va para la cocina» y la comanda sale en la impresora de la cocina
+      (o se abre en este equipo si tiene «Abre la comanda al confirmar»).
+- [ ] **Confirmar pedido** (pendiente → confirmado), para los que llegan por el QR o la web: se abre la comanda de cocina (sección 4).
   - Un domicilio o una recogida con pago en línea sin aprobar no se deja confirmar, con el mensaje en español y sin códigos como "(RN-M06-05)".
 - [ ] **Marcar preparando**: cada línea muestra una casilla para marcarla como preparada.
   - Una línea preparada ya no se puede cambiar ni quitar al editar.

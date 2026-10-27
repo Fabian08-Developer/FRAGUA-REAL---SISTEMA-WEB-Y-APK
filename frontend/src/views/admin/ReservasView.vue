@@ -220,7 +220,7 @@ async function rechazarDeposito(motivo: string) {
 }
 
 // ---- Depósito manual (RN-M05-16) ----
-// Mejora (26/10/2026): en efectivo se indica con cuánto pagó el cliente (y se ve el cambio); en
+// Mejora (26/10/2026, RF-M05-045 y 046): en efectivo se indica con cuánto pagó el cliente (y se ve el cambio); en
 // transferencia se toma la foto del comprobante (obligatoria; en tarjeta, opcional).
 const reservaDeposito = ref<Reserva | null>(null)
 const metodoDeposito = ref<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo')
@@ -284,7 +284,7 @@ async function confirmarDepositoManual() {
   }
 }
 
-// Mejora (26/10/2026): la foto o captura del comprobante de un depósito ya pagado.
+// Mejora (26/10/2026, RF-M05-046): la foto o captura del comprobante de un depósito ya pagado.
 const fotoVista = ref<{ titulo: string; url: string; pdf: boolean } | null>(null)
 async function verFotoDeposito(reserva: Reserva) {
   error.value = ''

@@ -3,7 +3,7 @@
 // pedidos de la visita en curso con su total, lo pagado y el saldo. El Mesero cobra aquí la
 // mesa completa, o una parte si el cliente paga con varios métodos (RF-M06-003/011): el
 // sistema reparte el pago entre los pedidos, del más antiguo al más nuevo.
-// Mejora (26/10/2026): con cuentas separadas, los pedidos se ven por cuenta y se cobra una cuenta a la
+// Mejora (26/10/2026, RF-M02-L-034, RF-M06-037): con cuentas separadas, los pedidos se ven por cuenta y se cobra una cuenta a la
 // vez (o toda la mesa); en transferencia hay que tomar la foto del comprobante.
 import { computed, ref, watch } from 'vue'
 import { Banknote, CreditCard, Landmark } from 'lucide-vue-next'
@@ -38,7 +38,7 @@ const metodo = ref<Metodo>('efectivo')
 const monto = ref(0)
 const cobrando = ref(false)
 const foto = ref<File | null>(null)
-// Mejora (26/10/2026): en efectivo, con cuánto paga el cliente, para mostrar el cambio.
+// Mejora (26/10/2026, RF-M06-036): en efectivo, con cuánto paga el cliente, para mostrar el cambio.
 const recibido = ref<number | null>(null)
 const cambio = computed(() => (metodo.value === 'efectivo' && recibido.value ? recibido.value - (monto.value || 0) : null))
 watch([metodo, monto, recibido, foto], () => (error.value = ''))

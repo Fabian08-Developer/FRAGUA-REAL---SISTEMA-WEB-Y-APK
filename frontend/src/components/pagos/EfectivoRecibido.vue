@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Mejora (26/10/2026): al cobrar en efectivo (un pedido, la cuenta de una mesa o el depósito de una
+// Mejora (26/10/2026, RF-M06-036, RF-M05-045): al cobrar en efectivo (un pedido, la cuenta de una mesa o el depósito de una
 // reserva), el personal indica con cuánto paga el cliente y ve de una vez el cambio que debe entregar.
 // Los botones sugieren el valor exacto y los billetes que alcanzan; también se puede escribir el valor.
 import { computed } from 'vue'

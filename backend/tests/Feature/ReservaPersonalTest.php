@@ -132,7 +132,7 @@ class ReservaPersonalTest extends TestCase
         $id = $this->postJson('/api/reservas', $this->datos())->assertCreated()->json('id');
 
         $this->postJson("/api/reservas/{$id}/deposito/manual", ['metodo' => 'en_linea'])->assertStatus(422);
-        // Mejora (26/10/2026): en transferencia va la foto del comprobante.
+        // Mejora (26/10/2026, RF-M05-046): en transferencia va la foto del comprobante.
         \Illuminate\Support\Facades\Storage::fake('local');
         $this->post("/api/reservas/{$id}/deposito/manual", [
             'metodo' => 'transferencia', 'comprobante' => \Illuminate\Http\UploadedFile::fake()->image('comprobante.jpg'),

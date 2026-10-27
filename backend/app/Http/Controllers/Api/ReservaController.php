@@ -132,7 +132,7 @@ class ReservaController extends Controller
     }
 
     // RN-M05-16: depósito manual registrado por el Mesero o el Administrador.
-    // Mejora (26/10/2026): con lo que entregó el cliente en efectivo y la foto del comprobante.
+    // Mejora (26/10/2026, RF-M05-045 y 046): con lo que entregó el cliente en efectivo y la foto del comprobante.
     public function registrarDepositoManual(RegistrarDepositoManualRequest $request, Reserva $reserva)
     {
         $recibido = $request->filled('recibido') ? (float) $request->input('recibido') : null;
@@ -189,13 +189,13 @@ class ReservaController extends Controller
             ->latest('fecha_hora')
             ->paginate(20);
 
-        // Mejora (26/10/2026): si el depósito sigue por pagar, el Cliente lo paga desde aquí.
+        // Mejora (26/10/2026, RF-M05-044): si el depósito sigue por pagar, el Cliente lo paga desde aquí.
         $reservas->getCollection()->each(fn (Reserva $r) => $r->setAttribute('puede_pagar', $this->reservaService->puedePagarDeposito($r)));
 
         return response()->json($reservas);
     }
 
-    // POST /api/mis-reservas/{reserva}/deposito — Mejora (26/10/2026): el Cliente con sesión paga el
+    // POST /api/mis-reservas/{reserva}/deposito — Mejora (26/10/2026, RF-M05-044): el Cliente con sesión paga el
     // depósito de su reserva desde «Mis pedidos y reservas», igual que con el enlace del correo.
     // Solo sus reservas (mismo correo); las de otros responden 404.
     public function pagarMiDeposito(Request $request, Reserva $reserva, \App\Services\PagoDirectoService $pagosDirectos)

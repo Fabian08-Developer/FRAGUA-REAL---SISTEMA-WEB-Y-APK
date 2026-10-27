@@ -148,9 +148,9 @@ const metodo = ref<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo')
 const monto = ref(0)
 const errorCobro = ref('')
 const cobrando = ref(false)
-// Mejora (26/10/2026): foto del comprobante (obligatoria en transferencia, opcional en tarjeta).
+// Mejora (26/10/2026, RF-M06-037): foto del comprobante (obligatoria en transferencia, opcional en tarjeta).
 const fotoCobro = ref<File | null>(null)
-// Mejora (26/10/2026): en efectivo, con cuánto paga el cliente, para mostrar el cambio.
+// Mejora (26/10/2026, RF-M06-036): en efectivo, con cuánto paga el cliente, para mostrar el cambio.
 const recibido = ref<number | null>(null)
 const cambioCobro = computed(() => (metodo.value === 'efectivo' && recibido.value ? recibido.value - (monto.value || 0) : null))
 watch([metodo, monto, recibido, fotoCobro], () => (errorCobro.value = ''))

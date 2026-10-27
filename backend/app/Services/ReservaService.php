@@ -231,7 +231,7 @@ class ReservaService
      * Fase 6, tarea 1: el Cliente puede pagar (o volver a intentar) el depósito de su reserva web
      * mientras esté pendiente de pago y no haya llegado la hora. En modo manual, un depósito ya
      * registrado espera la aprobación del personal: no se repite.
-     * Mejora (26/10/2026): también lo usa «Mis pedidos y reservas» (antes solo el enlace del correo).
+     * Mejora (26/10/2026, RF-M05-044, RN-M05-25): también lo usa «Mis pedidos y reservas» (antes solo el enlace del correo).
      */
     public function puedePagarDeposito(Reserva $reserva): bool
     {
@@ -243,7 +243,7 @@ class ReservaService
 
     // RN-M05-16: depósito manual registrado por el Mesero o el Administrador, con
     // cualquier método de cobro de M06.
-    // Mejora (26/10/2026): en efectivo se puede indicar con cuánto pagó el cliente (queda en la
+    // Mejora (26/10/2026, RF-M05-045 y 046, RN-M05-26): en efectivo se puede indicar con cuánto pagó el cliente (queda en la
     // auditoría con el cambio entregado); en transferencia o tarjeta, la foto del comprobante.
     public function registrarDepositoManual(Reserva $reserva, string $metodo, User $registradoPor, ?float $recibido = null, ?\Illuminate\Http\UploadedFile $comprobante = null): Reserva
     {

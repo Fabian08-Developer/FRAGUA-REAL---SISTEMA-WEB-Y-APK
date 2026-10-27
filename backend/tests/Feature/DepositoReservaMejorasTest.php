@@ -16,8 +16,9 @@ use Tests\Concerns\PagoDirectoDePrueba;
 use Tests\TestCase;
 
 /**
- * Mejoras del 26/10/2026: el Cliente paga el depósito pendiente desde «Mis pedidos y reservas», y el
- * depósito manual registra con cuánto pagó el cliente en efectivo (y el cambio) o la foto del comprobante.
+ * Mejoras del 26/10/2026 (M05): el Cliente paga el depósito pendiente desde «Mis pedidos y reservas»
+ * (RF-M05-044, RN-M05-25), y el depósito manual registra con cuánto pagó el cliente en efectivo y el cambio
+ * (RF-M05-045, M06 RF-M06-036) o la foto del comprobante (RF-M05-046, RN-M05-26).
  */
 class DepositoReservaMejorasTest extends TestCase
 {
@@ -53,7 +54,7 @@ class DepositoReservaMejorasTest extends TestCase
         ])->assertCreated()->json('id');
     }
 
-    public function test_el_cliente_paga_el_deposito_pendiente_desde_mis_reservas(): void
+    public function test_RF_M05_044_RN_M05_25_el_cliente_paga_el_deposito_pendiente_desde_mis_reservas(): void
     {
         $id = $this->reserva();
         $ajena = $this->reserva('otra@correo.co');
@@ -79,7 +80,7 @@ class DepositoReservaMejorasTest extends TestCase
         $this->pagoDirecto("/api/mis-reservas/{$id}/deposito", ['pasarela' => 'nequi'])->assertStatus(422);
     }
 
-    public function test_el_deposito_manual_en_efectivo_guarda_lo_recibido_y_el_cambio(): void
+    public function test_RF_M05_045_RN_M05_26_el_deposito_manual_en_efectivo_guarda_lo_recibido_y_el_cambio(): void
     {
         Sanctum::actingAs($this->mesero);
         $id = $this->reserva();
@@ -98,7 +99,7 @@ class DepositoReservaMejorasTest extends TestCase
         $this->assertEquals(30000, $detalles['cambio']);
     }
 
-    public function test_el_deposito_manual_por_transferencia_exige_la_foto_y_el_personal_la_ve(): void
+    public function test_RF_M05_046_el_deposito_manual_por_transferencia_exige_la_foto_y_el_personal_la_ve(): void
     {
         Storage::fake('local');
         Sanctum::actingAs($this->mesero);

@@ -3,7 +3,7 @@
 // cuando el usuario autenticado es Cliente (PedidoController::index); GET /mis-reservas
 // identifica las reservas propias por correo de contacto, ya que Reserva no tiene
 // cliente_id (RN-M05-12 — ver ReservaController::misReservas()).
-// Mejora (26/10/2026): una reserva pendiente de pago se paga desde aquí (antes solo con el enlace
+// Mejora (26/10/2026, RF-M05-044): una reserva pendiente de pago se paga desde aquí (antes solo con el enlace
 // del correo); mientras el personal revisa el comprobante se ve «Pago en revisión».
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { CalendarClock, ChevronDown, PackageSearch, XCircle } from 'lucide-vue-next'
@@ -138,7 +138,7 @@ async function cargarPedidos(silencioso = false) {
   }
 }
 
-// Mejora (26/10/2026): mientras haya un pedido en curso, la lista se pone al día cada 10 s (con la
+// Mejora (26/10/2026, RF-M07-036): mientras haya un pedido en curso, la lista se pone al día cada 10 s (con la
 // página a la vista) y al volver a ella.
 let temporizador: ReturnType<typeof setInterval> | undefined
 const hayEnCurso = () => pedidos.value.some((p) => ['pendiente', 'confirmado', 'preparando'].includes(p.estado))
@@ -530,7 +530,7 @@ onMounted(() => cargarPedidos())
             </span>
           </div>
 
-          <!-- Mejora (26/10/2026): pagar el depósito pendiente sin buscar el correo. -->
+          <!-- Mejora (26/10/2026, RF-M05-044): pagar el depósito pendiente sin buscar el correo. -->
           <p v-if="depositoEnRevision(reserva)" class="mt-3 rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-800">
             <template v-if="reserva.deposito_tiene_comprobante">Recibimos tu comprobante.</template>
             <template v-else>Tu pago quedó en proceso.</template>

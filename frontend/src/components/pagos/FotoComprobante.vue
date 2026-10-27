@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Mejora (26/10/2026): al cobrar por transferencia o tarjeta, el Mesero toma la foto del comprobante con
+// Mejora (26/10/2026, RF-M06-037, RF-M05-046): al cobrar por transferencia o tarjeta, el Mesero toma la foto del comprobante con
 // la cámara del teléfono (capture="environment" abre la cámara trasera; en un computador abre el
 // selector de archivos). En transferencia es obligatoria; en tarjeta, opcional (el datáfono deja recibo).
 import { onBeforeUnmount, ref, watch } from 'vue'
